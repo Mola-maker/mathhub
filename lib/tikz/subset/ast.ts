@@ -1,7 +1,7 @@
 export interface SourceRange { start: number; end: number }
 
 export type CoordExpr =
-  | { kind: 'literal'; x: number; y: number; range: SourceRange }
+  | { kind: 'literal'; x: number | NumExpr; y: number | NumExpr; range: SourceRange }
   | { kind: 'ref'; name: string; range: SourceRange }
   | { kind: 'calc'; expr: CalcExpr; range: SourceRange };
 

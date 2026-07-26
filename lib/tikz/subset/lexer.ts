@@ -1,7 +1,8 @@
 export type TokenType =
   | 'cmd' | 'lbrace' | 'rbrace' | 'lbracket' | 'rbracket' | 'lparen' | 'rparen'
   | 'dashdash' | 'bang' | 'colon' | 'equals' | 'comma' | 'semi' | 'dollar'
-  | 'plus' | 'minus' | 'star' | 'slash' | 'number' | 'name';
+  | 'plus' | 'minus' | 'star' | 'slash' | 'gt' | 'lt'
+  | 'number' | 'name';
 
 export interface Token { type: TokenType; value: string; start: number; end: number }
 
@@ -9,6 +10,7 @@ const SINGLE: Record<string, TokenType> = {
   '{': 'lbrace', '}': 'rbrace', '[': 'lbracket', ']': 'rbracket',
   '(': 'lparen', ')': 'rparen', '!': 'bang', ':': 'colon', '=': 'equals',
   ',': 'comma', ';': 'semi', '$': 'dollar', '+': 'plus', '*': 'star', '/': 'slash',
+  '>': 'gt', '<': 'lt',
 };
 
 export function lex(src: string): Token[] {
@@ -28,7 +30,7 @@ export function lex(src: string): Token[] {
     if (ch === '-') { push('minus', '-', i, i + 1); i++; continue; }
     const num = /^\d+(\.\d+)?([eE][+-]?\d+)?/.exec(src.slice(i));
     if (num) { push('number', num[0], i, i + num[0].length); i += num[0].length; continue; }
-    const nm = /^[A-Za-z][A-Za-z0-9_-]*/.exec(src.slice(i));
+    const nm = /^[A-Za-z][A-Za-z0-9_]*/.exec(src.slice(i));
     if (nm) { push('name', nm[0], i, i + nm[0].length); i += nm[0].length; continue; }
     const t = SINGLE[ch];
     if (t) { push(t, ch, i, i + 1); i++; continue; }
