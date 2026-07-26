@@ -329,9 +329,9 @@ async function streamProvider(
   model: string,
   systemPrompt: string,
 ): Promise<string> {
-  if (provider === 'anthropic') return streamAnthropic(messages, send, cfg, model, systemPrompt);
-  if (provider === 'coze') return streamCoze(messages, send, cfg, systemPrompt);
-  const label = provider === 'deepseek' ? 'DeepSeek' : 'DashScope';
+  if (cfg.protocol === 'anthropic') return streamAnthropic(messages, send, cfg, model, systemPrompt);
+  if (cfg.protocol === 'coze') return streamCoze(messages, send, cfg, systemPrompt);
+  const label = provider === 'deepseek' ? 'DeepSeek' : provider === 'dashscope' ? 'DashScope' : 'Anthropic';
   return streamOpenAICompatible(messages, send, cfg, model, provider, label, systemPrompt);
 }
 
