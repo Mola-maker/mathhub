@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { analyze } from '@/lib/tikz/analyze';
 import { SAMPLE_TIKZ } from '@/lib/tikz/prompt/sample-code';
+import { runTikzRepair } from '@/lib/tikz/repair/tikz-repair';
 import { TikzCanvas } from './tikz/tikz-canvas';
 import { TikzCodePanel } from './tikz/tikz-code-panel';
 import { TikzStylePanel } from './tikz/tikz-style-panel';
@@ -57,6 +59,8 @@ export function TikzStudio({ startOpen = false }: { startOpen?: boolean }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
+  const [repairing, setRepairing] = useState(false);
+  const [repairStatus, setRepairStatus] = useState('');
   const [catalogError, setCatalogError] = useState('');
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const engine = useTikzEngine(SAMPLE_TIKZ);
@@ -117,6 +121,34 @@ export function TikzStudio({ startOpen = false }: { startOpen?: boolean }) {
       });
     return () => controller.abort();
   }, [provider, providers]);
+
+  const repairCode = useCallback(async (code: string) => {
+    if (repairing) return;
+    setRepairing(true);
+    setRepairStatus('正在检查修复…');
+    try {
+      const result = await runTikzRepair({
+        code,
+        provider,
+        model,
+        maxRounds: providers.includes(provider) ? 2 : 0,
+      });
+      if (result.code !== code) engine.setCode(result.code);
+      if (result.errorsBefore === 0) {
+        setRepairStatus('无需修复');
+      } else if (result.errorsAfter === 0) {
+        setRepairStatus('修复完成');
+      } else if (result.errorsAfter < result.errorsBefore) {
+        setRepairStatus(`问题减少至 ${result.errorsAfter} 个`);
+      } else {
+        setRepairStatus('已保留当前最佳版本');
+      }
+    } catch (error) {
+      setRepairStatus(error instanceof Error ? `修复失败：${error.message}` : '修复失败');
+    } finally {
+      setRepairing(false);
+    }
+  }, [engine, model, provider, providers, repairing]);
 
   const openStudio = useCallback(() => {
     setMounted(true);
@@ -186,6 +218,7 @@ export function TikzStudio({ startOpen = false }: { startOpen?: boolean }) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let generatedCode: string | null = null;
       for (;;) {
         const { done, value } = await reader.read();
         buffer += decoder.decode(value, { stream: !done });
@@ -205,12 +238,21 @@ export function TikzStudio({ startOpen = false }: { startOpen?: boolean }) {
           if (typeof event.token === 'string') {
             updateLastAssistant(setMessages, (content) => content + event.token);
           }
-          if (typeof event.tikzCode === 'string') engine.setCode(event.tikzCode);
+          if (typeof event.tikzCode === 'string') {
+            generatedCode = event.tikzCode;
+            engine.setCode(event.tikzCode);
+          }
           if (typeof event.error === 'string') {
             updateLastAssistant(setMessages, () => `出错了：${event.error}`);
           }
         }
         if (done) break;
+      }
+      if (
+        generatedCode
+        && analyze(generatedCode).issues.some((issue) => issue.severity === 'error')
+      ) {
+        await repairCode(generatedCode);
       }
     } catch (error) {
       updateLastAssistant(
@@ -220,7 +262,7 @@ export function TikzStudio({ startOpen = false }: { startOpen?: boolean }) {
     } finally {
       setStreaming(false);
     }
-  }, [engine, input, messages, model, provider, providers, streaming]);
+  }, [engine, input, messages, model, provider, providers, repairCode, streaming]);
 
   const studio = mounted && open
     ? createPortal(
@@ -311,6 +353,9 @@ export function TikzStudio({ startOpen = false }: { startOpen?: boolean }) {
             onTogglePure={() => setPureMode((value) => !value)}
             onClose={closeStudio}
             engine={engine}
+            repairing={repairing}
+            repairStatus={repairStatus}
+            onRepair={() => void repairCode(engine.code)}
           />
           <TikzCanvas engine={engine} />
         </main>
