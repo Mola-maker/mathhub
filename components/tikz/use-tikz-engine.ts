@@ -15,12 +15,13 @@ export interface TikzEngine {
   issues: AnalysisIssue[];
   freePointRanges: Map<string, SourceRange>;
   selection: string[];
+  selectedStmtIndex: number | null;
   activeTool: string;
   viewport: Viewport;
   ephemeralStyles: Readonly<Record<string, never>>;
   setCode(next: string): void;
   applyPatch(next: string): void;
-  setSelection(refs: string[]): void;
+  setSelection(refs: string[], stmtIndex?: number | null): void;
   setActiveTool(id: string): void;
   setViewport(viewport: Viewport): void;
 }
@@ -28,6 +29,7 @@ export interface TikzEngine {
 export function useTikzEngine(initialCode: string): TikzEngine {
   const [code, setCodeState] = useState(initialCode);
   const [selection, setSelection] = useState<string[]>([]);
+  const [selectedStmtIndex, setSelectedStmtIndex] = useState<number | null>(null);
   const [activeTool, setActiveTool] = useState('select');
   const [viewport, setViewport] = useState<Viewport>({
     scale: CM_TO_PX,
@@ -45,6 +47,11 @@ export function useTikzEngine(initialCode: string): TikzEngine {
     setCodeState(next);
   }, []);
 
+  const select = useCallback((refs: string[], stmtIndex: number | null = null) => {
+    setSelection(refs);
+    setSelectedStmtIndex(stmtIndex);
+  }, []);
+
   return {
     code,
     scene: analysis.scene ?? lastGood.current,
@@ -52,14 +59,14 @@ export function useTikzEngine(initialCode: string): TikzEngine {
     issues: analysis.issues,
     freePointRanges: analysis.freePointRanges,
     selection,
+    selectedStmtIndex,
     activeTool,
     viewport,
     ephemeralStyles: EMPTY_EPHEMERAL_STYLES,
     setCode,
     applyPatch: setCode,
-    setSelection,
+    setSelection: select,
     setActiveTool,
     setViewport,
   };
 }
-

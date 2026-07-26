@@ -13,7 +13,7 @@ export interface ToolContext {
   freePointRanges: Map<string, SourceRange>;
   applyPatch(next: string): void;
   previewPatch?(next: string | null): void;
-  setSelection(refs: string[]): void;
+  setSelection(refs: string[], stmtIndex?: number | null): void;
   toScenePoint(clientX: number, clientY: number): Pt;
   toClientPoint(scenePoint: Pt): Pt;
 }
@@ -58,7 +58,7 @@ export const selectTool: Tool = {
     }
 
     const hit = hitTestElement(screen, context.scene, context.viewport, 8);
-    context.setSelection(hit ? hit.refs : []);
+    context.setSelection(hit ? hit.refs : [], hit?.stmtIndex ?? null);
   },
   onPointerMove(event, context) {
     if (!drag) return;
@@ -82,4 +82,3 @@ export const selectTool: Tool = {
 export const toolRegistry: ReadonlyMap<string, Tool> = new Map([
   [selectTool.id, selectTool],
 ]);
-

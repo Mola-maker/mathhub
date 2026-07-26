@@ -103,6 +103,7 @@ export function TikzCanvas({ engine }: { engine: TikzEngine }) {
               scene={displayScene}
               viewport={engine.viewport}
               selection={engine.selection}
+              selectedStmtIndex={engine.selectedStmtIndex}
             />
           )
           : null}

@@ -234,11 +234,13 @@ export function TikzSceneSvg({
   viewport,
   theme = defaultTheme,
   selection = [],
+  selectedStmtIndex = null,
 }: {
   scene: Scene;
   viewport: Viewport;
   theme?: RenderTheme;
   selection?: string[];
+  selectedStmtIndex?: number | null;
 }) {
   const selected = new Set(selection);
   return (
@@ -250,7 +252,10 @@ export function TikzSceneSvg({
             el={element}
             vp={viewport}
             theme={theme}
-            selected={element.refs.some((ref) => selected.has(ref))}
+            selected={
+              selectedStmtIndex === element.stmtIndex
+              || (selectedStmtIndex === null && element.refs.some((ref) => selected.has(ref)))
+            }
           />
         ))}
       </g>
@@ -268,4 +273,3 @@ export function TikzSceneSvg({
     </>
   );
 }
-

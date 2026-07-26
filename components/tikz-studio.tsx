@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { SAMPLE_TIKZ } from '@/lib/tikz/prompt/sample-code';
 import { TikzCanvas } from './tikz/tikz-canvas';
 import { TikzCodePanel } from './tikz/tikz-code-panel';
+import { TikzStylePanel } from './tikz/tikz-style-panel';
 import { TikzToolbar } from './tikz/tikz-toolbar';
 import { useTikzEngine } from './tikz/use-tikz-engine';
 
@@ -323,6 +324,7 @@ export function TikzStudio({ startOpen = false }: { startOpen?: boolean }) {
             issues={engine.issues}
             onChange={engine.setCode}
           />
+          <TikzStylePanel engine={engine} />
         </aside>
       </div>,
       document.body,
