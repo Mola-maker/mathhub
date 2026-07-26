@@ -1,0 +1,10 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (4,0);
+\coordinate (C) at (0,3);
+\coordinate (O) at ($(B)!0.5!(C)$);
+\coordinate (H) at (A);
+\coordinate (N) at ($(O)!0.5!(H)$);
+\draw (A) -- (B) -- (C) -- cycle;
+\draw[blue] (N) circle (1.25);
+\end{tikzpicture}

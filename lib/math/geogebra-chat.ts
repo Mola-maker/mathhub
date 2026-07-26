@@ -6,10 +6,7 @@ import {
   TIKZ_INSTEAD_OF_GGB_MSG,
   hasTikzDrawing,
 } from '@/lib/math/math-response-sanitize';
-import {
-  inferMathTaskMode,
-  userMessageHasDrawableContent,
-} from '@/lib/math/math-task-mode';
+import { userMessageHasDrawableContent } from '@/lib/math/math-task-mode';
 import type { DrawingCommand } from '@/lib/math/math-drawing/commands';
 import { commandRequiresGgb } from '@/lib/math/math-drawing/commands';
 

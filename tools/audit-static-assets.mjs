@@ -15,23 +15,12 @@
 // CDN origins (cdn.geogebra.org, www.geogebra.org, cdn.jsdelivr.net).
 // Also whitelisted: data: URLs for images, blob: URLs, npm package imports.
 
-import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOT = process.cwd();
 const SCAN_DIRS = ['app', 'components', 'lib'];
 const SCAN_EXTS = new Set(['.ts', '.tsx', '.css', '.js', '.mjs']);
-const ALLOWED_ORIGINS = [
-  'cdn.geogebra.org',
-  'www.geogebra.org',
-  'cdn.jsdelivr.net',
-  'fonts.googleapis.com',
-  'fonts.gstatic.com',
-  'avatars.githubusercontent.com',
-  'data:',
-  'blob:',
-];
-
 const failures = [];
 const publicDir = join(ROOT, 'public');
 if (existsSync(publicDir)) {
@@ -49,10 +38,6 @@ function walk(dir) {
     else if (SCAN_EXTS.has(p.slice(p.lastIndexOf('.')))) out.push(p);
   }
   return out;
-}
-
-function isAllowedUrl(url) {
-  return ALLOWED_ORIGINS.some((origin) => url.startsWith(`https://${origin}`) || url.startsWith(`http://${origin}`) || url.startsWith(`${origin}/`));
 }
 
 const LOCAL_LOAD_RE = /\.load\((['"])(\/[^'"]+)\1\)/g;

@@ -1,0 +1,9 @@
+\begin{tikzpicture}
+\coordinate (O) at (0,0);
+\coordinate (A) at (1,0);
+\coordinate (B) at ($(O)!1!90:(A)$);
+\coordinate (C) at ($(O)!2!(B)$);
+\draw[->] (O) -- (A);
+\draw[->] (O) -- (B);
+\draw[->,red] (O) -- (C);
+\end{tikzpicture}

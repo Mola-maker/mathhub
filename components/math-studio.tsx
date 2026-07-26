@@ -536,7 +536,7 @@ export function MathStudio() {
     };
     const source = GGB_SOURCES[ggbAttempt];
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timer = setTimeout(() => { if (!cancelled && !apiRef.current) fail(); }, 15_000);
 
     const markReady = () => {
       ggbDrawReadyRef.current = true;
@@ -599,7 +599,6 @@ export function MathStudio() {
       } catch { fail(); }
     };
 
-    timer = setTimeout(() => { if (!cancelled && !apiRef.current) fail(); }, 15_000);
 
     if (win.GGBApplet) {
       void setupApplet();
@@ -1276,7 +1275,7 @@ export function MathStudio() {
                     aria-label={stepsPlaying ? 'Pause autoplay' : 'Play construction'}
                   >{stepsPlaying ? '❚❚' : '▶ 播放'}</button>
                   <span className="wp-steps__pos">{stepIndex === null ? '完整图形' : `${stepIndex + 1} / ${steps.length}`}</span>
-                  <button type="button" onClick={() => { setStepsPlaying(false); (stepIndex === null || stepIndex >= steps.length - 1 ? goToStep(null) : goToStep(stepIndex + 1)); }} disabled={!steps.length || stepIndex === null} aria-label="Next step">▶</button>
+                  <button type="button" onClick={() => { setStepsPlaying(false); if (stepIndex === null || stepIndex >= steps.length - 1) goToStep(null); else goToStep(stepIndex + 1); }} disabled={!steps.length || stepIndex === null} aria-label="Next step">▶</button>
                   <button type="button" onClick={() => { setStepsPlaying(false); goToStep(null); }} disabled={stepIndex === null} aria-label="Full figure">⏭</button>
                 </div>
                 <div className="wp-steps__hint">点击步骤回放到该步 · ← → 键也可逐步 · Esc 关闭</div>

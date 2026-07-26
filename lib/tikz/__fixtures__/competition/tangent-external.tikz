@@ -1,0 +1,8 @@
+\begin{tikzpicture}
+\coordinate (O) at (0,0);
+\coordinate (T) at (3,4);
+\coordinate (U) at ($(T)!1!90:(O)$);
+\draw (O) circle (5);
+\draw[red] (T) -- (U);
+\draw[dashed] (O) -- (T);
+\end{tikzpicture}

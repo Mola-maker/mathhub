@@ -12,7 +12,6 @@ const Client = dynamic(() => import('./HeroCanvas3DClient'), {
  *  `three` / `@react-three/fiber` / `@react-three/drei` out of the SSR
  *  bundle so they only ship when the user reaches the hero. */
 export function HeroCanvas3D() {
-  const tokens = useHeroTokens();
   return <Client className="hero__canvas" />;
 }
 

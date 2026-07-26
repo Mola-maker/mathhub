@@ -1,4 +1,4 @@
-import type { Statement, CoordExpr } from '../../tikz/subset/ast';
+import type { Statement } from '../../tikz/subset/ast';
 import { buildDependencyGraph } from './dependency-graph';
 import { evalCoord, evalNum, EvalError, type Pt, type EvalEnvs } from './calc-eval';
 import { intersectPaths, type GeomPath } from './intersections';

@@ -1,0 +1,17 @@
+\begin{tikzpicture}
+\coordinate (O1) at (0,0);
+\coordinate (O2) at (6,0);
+\coordinate (O3) at (3,4);
+\coordinate (V1) at (3,-3);
+\coordinate (V2) at (3,4);
+\coordinate (W1) at (0,3.125);
+\coordinate (W2) at (5,-0.625);
+\path[name path=r12] (V1) -- (V2);
+\path[name path=r13] (W1) -- (W2);
+\path[name intersections={of=r12 and r13}] (intersection-1) coordinate (R);
+\draw (O1) circle (5);
+\draw (O2) circle (5);
+\draw (O3) circle (5);
+\draw[red] (V1) -- (V2);
+\draw[blue] (W1) -- (W2);
+\end{tikzpicture}

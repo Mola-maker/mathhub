@@ -74,8 +74,6 @@ export function extractDeliverableFromReasoning(reasoning: string): DeliverableE
 
   const ggbMatch = trimmed.match(/```(?:geogebra|ggb|geo)\s*[\s\S]*?```/i);
   const hasTikz = hasTikzDrawing(trimmed);
-  const hasGgb = !!ggbMatch || hasGgbBlock(trimmed);
-
   if (ggbMatch) {
     const prose = stripReasoningAndTikz(trimmed.replace(ggbMatch[0], '')).trim();
     const summaryLines = prose

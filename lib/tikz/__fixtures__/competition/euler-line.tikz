@@ -1,0 +1,10 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (4,0);
+\coordinate (C) at (0,3);
+\coordinate (H) at (A);
+\coordinate (O) at ($(B)!0.5!(C)$);
+\coordinate (G) at ($(H)!0.6666666667!(O)$);
+\draw (A) -- (B) -- (C) -- cycle;
+\draw[red] (H) -- (G) -- (O);
+\end{tikzpicture}

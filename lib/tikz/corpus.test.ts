@@ -18,7 +18,7 @@ const cases = readdirSync(directory)
 
 describe('竞赛语料回归', () => {
   it('fixture 数量 ≥ 20', () => {
-    expect(cases.length).toBeGreaterThanOrEqual(20);
+    expect(cases.length).toBeGreaterThanOrEqual(30);
   });
 
   for (const name of cases) {

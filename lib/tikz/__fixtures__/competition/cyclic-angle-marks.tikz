@@ -1,0 +1,9 @@
+\begin{tikzpicture}
+\coordinate (O) at (0,0);
+\coordinate (A) at (2,0);
+\coordinate (B) at ($(O)!1!90:(A)$);
+\coordinate (C) at ($(O)!1!180:(A)$);
+\draw (O) circle (2);
+\draw (A) -- (B) -- (C);
+\pic[red] {angle=A--B--C};
+\end{tikzpicture}

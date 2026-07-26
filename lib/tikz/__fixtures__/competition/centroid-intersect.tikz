@@ -1,0 +1,12 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (6,0);
+\coordinate (C) at (0,3);
+\coordinate (M) at ($(B)!0.5!(C)$);
+\coordinate (N) at ($(A)!0.5!(C)$);
+\path[name path=m1] (A) -- (M);
+\path[name path=m2] (B) -- (N);
+\path[name intersections={of=m1 and m2}] (intersection-1) coordinate (G);
+\draw (A) -- (B) -- (C) -- cycle;
+\draw[dashed] (A) -- (M) (B) -- (N);
+\end{tikzpicture}
