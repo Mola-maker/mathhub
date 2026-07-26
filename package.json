@@ -11,6 +11,11 @@
     "audit:cdn": "node tools/audit-static-assets.mjs"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.4",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.6",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "animejs": "^4.5.0",

@@ -303,6 +303,20 @@
   tab-size: 2;
 }
 
+.tz-cm {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tz-cm .cm-editor {
+  height: 100%;
+}
+
+.tz-cm .cm-lintRange-error {
+  background-position: left bottom;
+}
+
 .tz-toolbar {
   min-height: 52px;
   display: flex;

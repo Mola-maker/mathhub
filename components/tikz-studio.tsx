@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SAMPLE_TIKZ } from '@/lib/tikz/prompt/sample-code';
 import { TikzCanvas } from './tikz/tikz-canvas';
+import { TikzCodePanel } from './tikz/tikz-code-panel';
 import { TikzToolbar } from './tikz/tikz-toolbar';
 import { useTikzEngine } from './tikz/use-tikz-engine';
 
@@ -317,7 +318,11 @@ export function TikzStudio({ startOpen = false }: { startOpen?: boolean }) {
             <span>TikZ 源码</span>
             <span>唯一真源</span>
           </div>
-          <pre className="tz-code__pre"><code>{engine.code}</code></pre>
+          <TikzCodePanel
+            code={engine.code}
+            issues={engine.issues}
+            onChange={engine.setCode}
+          />
         </aside>
       </div>,
       document.body,
