@@ -1,0 +1,310 @@
+/* ========================================================================
+   Hero — "Geo · math geohub"
+   Isolated design sandbox. All design tokens live in :root; nothing is
+   inherited from the parent Next.js project.
+   ======================================================================== */
+
+:root {
+  /* Palette: monochrome canvas with one accent. */
+  --hb-bg: #ffffff;
+  --hb-ink: #0a0a0a;
+  --hb-mid: #4a4a4a;
+  --hb-soft: #a8a8a8;
+  --hb-rule: #e5e5e5;
+  --hb-accent: #ff4d2e;
+
+  /* Type scale. JetBrains Mono is the only family in use. */
+  --hb-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+
+  /* Layout tokens. */
+  --hb-stage-gap: clamp(32px, 5vw, 72px);
+  --hb-col-gap: clamp(20px, 2.4vw, 40px);
+
+  /* Animation tokens — also overridden under prefers-reduced-motion. */
+  --hb-mesh-step: 28ms;
+  --hb-col-step: 60ms;
+  --hb-rise-y: 28px;
+}
+
+/* ── Reset / base ───────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--hb-bg);
+  color: var(--hb-ink);
+  font-family: var(--hb-mono);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* ── Hero shell ─────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: center;
+  justify-items: center;
+  gap: clamp(28px, 4vw, 48px);
+  padding: clamp(40px, 6vw, 96px) clamp(20px, 4vw, 64px);
+  isolation: isolate;
+}
+
+/* 3D canvas lives behind the text layer. */
+.hero__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Foreground layers sit above the canvas. */
+.hero__kicker,
+.hero__stage,
+.hero__copy {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, 100%);
+}
+
+/* ── Kicker ─────────────────────────────────────────────────────── */
+.hero__kicker {
+  justify-self: start;
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--hb-mid);
+}
+
+/* ── Stage: wordmark + binary columns ───────────────────────────── */
+.hero__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: var(--hb-stage-gap);
+  align-items: center;
+}
+
+.hero__wordmark-slot {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 32 / 15;
+  min-height: 180px;
+}
+
+/* Four columns of binary digits. */
+.hero__binary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--hb-col-gap);
+  align-items: end;
+  font-size: 11px;
+  line-height: 1.65;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--hb-mid);
+}
+
+.hb-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+  /* Each column rises with its own delay. */
+  transform: translateY(var(--hb-rise-y));
+  opacity: 0;
+  animation: hbColRise 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(180ms + var(--hb-col-i) * var(--hb-col-step));
+}
+
+.hb-row {
+  display: block;
+  color: var(--hb-mid);
+}
+
+.hb-row:nth-child(odd) {
+  color: var(--hb-soft);
+}
+
+/* The "now reading" digit — the one vermilion accent in the whole hero. */
+.hb-row--hi {
+  color: var(--hb-ink);
+}
+
+.hb-row__hi-digit {
+  color: var(--hb-accent);
+  text-shadow: 0 0 12px color-mix(in oklab, var(--hb-accent) 35%, transparent);
+  animation: hbDigitPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes hbColRise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--hb-rise-y));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hbDigitPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ── Copy: title / subtitle / cta ───────────────────────────────── */
+.hero__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.hero__title {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 64px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--hb-ink);
+  max-width: 22ch;
+}
+
+.hero__title em {
+  font-style: italic;
+  color: var(--hb-accent);
+}
+
+.hero__subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--hb-mid);
+  max-width: 56ch;
+  letter-spacing: 0.01em;
+}
+
+.hero__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  border: 1px solid var(--hb-ink);
+  background: var(--hb-ink);
+  color: var(--hb-bg);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.hero__cta:hover {
+  background: var(--hb-bg);
+  color: var(--hb-ink);
+}
+
+.hero__cta-arrow {
+  display: inline-block;
+  transition: transform 200ms ease;
+}
+
+.hero__cta:hover .hero__cta-arrow {
+  transform: translateX(4px);
+}
+
+/* ── Reveal targets (driven by anime.js in src/reveal.ts) ──────── */
+[data-hb-reveal] {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: none;
+}
+
+[data-hb-reveal].is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── Mesh triangles (the wireframe polygons inside the wordmark) ── */
+.hb-mesh__tri {
+  fill: none;
+  stroke: var(--hb-ink);
+  stroke-width: 0.4;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  animation: hbMeshIn 420ms ease-out both;
+  /* Per-triangle stagger via inline --hb-mesh-i. */
+  animation-delay: calc(var(--hb-mesh-i, 0) * var(--hb-mesh-step));
+}
+
+@keyframes hbMeshIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.95;
+  }
+}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 820px) {
+  .hero__stage {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .hero__wordmark-slot {
+    aspect-ratio: 16 / 7;
+    min-height: 160px;
+  }
+  .hero__copy {
+    align-items: center;
+    text-align: center;
+  }
+  .hero__title {
+    margin-inline: auto;
+  }
+  .hero__subtitle {
+    margin-inline: auto;
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --hb-mesh-step: 0ms;
+    --hb-col-step: 0ms;
+    --hb-rise-y: 0px;
+  }
+  [data-hb-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+  .hb-mesh__tri,
+  .hb-row__hi-digit {
+    animation: none;
+    opacity: 0.95;
+  }
+}

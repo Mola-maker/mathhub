@@ -1,0 +1,85 @@
+/* Hero (components/hero/*) — DOM/SVG layer only. The WebGL canvas is positioned
+   absolutely behind the text via .hero__canvas-wrap. This file holds no animation
+   keyframes — entrance timing is driven by anime.js from revealTarget.ts. */
+
+.hero {
+  position: relative;
+  min-height: 56vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  padding: clamp(48px, 8vw, 96px) 24px;
+  background: transparent;
+}
+
+.hero__canvas-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hero__inner {
+  position: relative;
+  z-index: 1;
+  width: min(960px, 100%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.hero__kicker {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.hero__title {
+  font-size: clamp(40px, 10vw, 96px);
+  line-height: 0.95;
+  letter-spacing: 0;
+  margin: 0;
+  color: var(--ink);
+}
+
+.hero__subtitle {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--muted);
+  max-width: 56ch;
+}
+
+.hero__divider {
+  display: block;
+  width: min(320px, 60%);
+  height: 1px;
+  background: var(--rule);
+}
+
+.hero__cta {
+  margin-top: 8px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 10px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.hero__cta:hover {
+  border-color: var(--accent);
+}

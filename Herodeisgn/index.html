@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Geo · math geohub — hero design</title>
+    <meta
+      name="description"
+      content="Isolated hero design sandbox. Triangulated 3D Geo wordmark + cascading binary columns."
+    />
+    <link
+      rel="preconnect"
+      href="https://cdn.jsdelivr.net"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/jetbrains-mono@1.0.6/css/jetbrains-mono.min.css"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main class="hero" aria-label="Math geohub hero">
+      <!-- 3D canvas (positioned absolutely behind the text layer) -->
+      <canvas id="hb-scene" class="hero__canvas" aria-hidden="true"></canvas>
+
+      <!-- Foreground: top kicker -->
+      <p class="hero__kicker" data-hb-reveal="kicker">
+        molamaker&nbsp;·&nbsp;math&nbsp;geohub
+      </p>
+
+      <!-- Foreground: wordmark + binary columns (horizontally composed) -->
+      <section class="hero__stage" data-hb-reveal="stage">
+        <div class="hero__wordmark-slot" aria-label="Geo wordmark">
+          <!-- three.js renders the triangulated Geo into this slot -->
+        </div>
+        <div class="hero__binary" aria-hidden="true">
+          <!-- BinaryColumns.ts injects four columns here -->
+        </div>
+      </section>
+
+      <!-- Foreground: title + subtitle + cta -->
+      <div class="hero__copy" data-hb-reveal="copy">
+        <h1 class="hero__title">
+          Where geometry <em>learns</em> to read itself.
+        </h1>
+        <p class="hero__subtitle">
+          A live geometry workbench. Triangulate, decompose, recompose —
+          every shape becomes a queryable mesh.
+        </p>
+        <a class="hero__cta" href="#">
+          <span>Open the studio</span>
+          <span class="hero__cta-arrow" aria-hidden="true">→</span>
+        </a>
+      </div>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

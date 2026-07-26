@@ -1,0 +1,99 @@
+#!/usr/bin/env node
+// Audit math_geohub for any static asset that bypasses the CDN rule.
+//
+// Fails (exit 1) if any of these are true:
+//   1. public/ directory exists (self-hosting slot).
+//   2. A source file contains a non-CDN url(...) reference — strings like
+//      /foo.png, /static/..., /assets/..., or a relative /... path that
+//      would resolve to public/ if public/ existed.
+//   3. A source file uses <Image src='/...'> or <img src='/...'> with a
+//      non-CDN path.
+//   4. A source file uses a loader call with a local path:
+//      .load('/foo.glb'), .load('/foo.png'), .load('/foo.json'), etc.
+//
+// Whitelisted: any URL whose origin matches one of the CSP-allow-listed
+// CDN origins (cdn.geogebra.org, www.geogebra.org, cdn.jsdelivr.net).
+// Also whitelisted: data: URLs for images, blob: URLs, npm package imports.
+
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+const ROOT = process.cwd();
+const SCAN_DIRS = ['app', 'components', 'lib'];
+const SCAN_EXTS = new Set(['.ts', '.tsx', '.css', '.js', '.mjs']);
+const ALLOWED_ORIGINS = [
+  'cdn.geogebra.org',
+  'www.geogebra.org',
+  'cdn.jsdelivr.net',
+  'fonts.googleapis.com',
+  'fonts.gstatic.com',
+  'avatars.githubusercontent.com',
+  'data:',
+  'blob:',
+];
+
+const failures = [];
+const publicDir = join(ROOT, 'public');
+if (existsSync(publicDir)) {
+  failures.push(`public/ directory exists — self-hosting is forbidden by the CDN rule (delete public/ before committing).`);
+}
+
+function walk(dir) {
+  const out = [];
+  let entries;
+  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+    const p = join(dir, e.name);
+    if (e.isDirectory()) out.push(...walk(p));
+    else if (SCAN_EXTS.has(p.slice(p.lastIndexOf('.')))) out.push(p);
+  }
+  return out;
+}
+
+function isAllowedUrl(url) {
+  return ALLOWED_ORIGINS.some((origin) => url.startsWith(`https://${origin}`) || url.startsWith(`http://${origin}`) || url.startsWith(`${origin}/`));
+}
+
+const LOCAL_LOAD_RE = /\.load\((['"])(\/[^'"]+)\1\)/g;
+const URL_RE = /url\(\s*(['"]?)([^'")]+)\1\s*\)/g;
+const IMG_SRC_RE = /<(?:img|Image|source)\b[^>]*\bsrc=['"]([^'"]+)['"]/g;
+
+for (const dir of SCAN_DIRS) {
+  const abs = join(ROOT, dir);
+  if (!existsSync(abs)) continue;
+  for (const file of walk(abs)) {
+    const src = readFileSync(file, 'utf8');
+    const rel = relative(ROOT, file);
+
+    let m;
+    while ((m = URL_RE.exec(src))) {
+      const u = m[2].trim();
+      if (u.startsWith('/') && !u.startsWith('//')) {
+        // Allow Next.js routing refs like /api/math, /_next/static, /
+        if (u.startsWith('/_next') || u.startsWith('/api') || u === '/' || u.startsWith('/_')) continue;
+        failures.push(`${rel}: url(${u}) — non-CDN local path (forbidden)`);
+      }
+    }
+
+    while ((m = IMG_SRC_RE.exec(src))) {
+      const u = m[1];
+      if (u.startsWith('/') && !u.startsWith('//') && !u.startsWith('/_next')) {
+        failures.push(`${rel}: <img src='${u}'> — non-CDN local path (forbidden)`);
+      }
+    }
+
+    while ((m = LOCAL_LOAD_RE.exec(src))) {
+      failures.push(`${rel}: loader .load('${m[2]}') — local path (forbidden, use CDN URL)`);
+    }
+  }
+}
+
+if (failures.length === 0) {
+  console.log('CDN audit PASS — no self-hosted static assets, no non-CDN url(...) / loader calls.');
+  process.exit(0);
+} else {
+  console.error('CDN audit FAIL:');
+  for (const f of failures) console.error('  ' + f);
+  process.exit(1);
+}
