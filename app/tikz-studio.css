@@ -1,0 +1,468 @@
+/* TikZ Studio */
+.math-shell > .wp-tile--tikz {
+  width: min(720px, 100%);
+}
+
+.wp-tile--tikz {
+  cursor: pointer;
+  border-color: rgba(47, 111, 214, 0.35);
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.wp-tile--tikz:hover {
+  border-color: #2f6fd6;
+  box-shadow: 0 4px 18px -7px rgba(47, 111, 214, 0.34);
+}
+
+.wp-tile--tikz .wp-tile__dot--live {
+  background: #2f6fd6;
+}
+
+.tz-studio {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: minmax(260px, 300px) minmax(380px, 1fr) minmax(280px, 340px);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.tz-studio--pure {
+  grid-template-columns: 0 minmax(0, 1fr) 0;
+}
+
+.tz-studio--pure .tz-sidebar,
+.tz-studio--pure .tz-code {
+  display: none;
+}
+
+.tz-sidebar,
+.tz-code,
+.tz-stage {
+  min-width: 0;
+  min-height: 0;
+}
+
+.tz-sidebar {
+  border-right: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+}
+
+.tz-sidebar__head,
+.tz-code__head {
+  min-height: 52px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tz-sidebar__head > div,
+.tz-code__head {
+  min-width: 0;
+}
+
+.tz-sidebar__head strong {
+  display: block;
+  font-size: 14px;
+}
+
+.tz-sidebar__head span,
+.tz-code__head span:last-child {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.tz-sidebar__head button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.tz-provider-row {
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.tz-provider-row button {
+  min-height: 34px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: 11px var(--font-mono);
+  cursor: pointer;
+}
+
+.tz-provider-row button.is-active {
+  border-color: #2f6fd6;
+  background: rgba(47, 111, 214, 0.09);
+  color: #285fb5;
+}
+
+.tz-provider-row button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.tz-model {
+  padding: 9px 10px 4px;
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.tz-model select {
+  min-width: 0;
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 0 9px;
+  background: #fff;
+  color: var(--ink);
+  font: 11px var(--font-mono);
+}
+
+.tz-catalog-error {
+  margin: 6px 10px 0;
+  color: #a13c3c;
+  font-size: 11px;
+}
+
+.tz-chat {
+  flex: 1;
+  min-height: 100px;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tz-chat__empty {
+  margin: auto 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+  text-align: center;
+}
+
+.tz-msg {
+  max-width: 92%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tz-msg--user {
+  background: rgba(201, 100, 66, 0.12);
+  align-self: flex-end;
+}
+
+.tz-msg--assistant {
+  border: 1px solid var(--rule);
+  background: rgba(37, 31, 26, 0.04);
+  align-self: flex-start;
+}
+
+.tz-composer {
+  padding: 10px;
+  border-top: 1px solid var(--rule);
+}
+
+.tz-input {
+  width: 100%;
+  min-height: 72px;
+  max-height: 180px;
+  resize: vertical;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 9px 10px;
+  font: 12px/1.5 var(--font-sans);
+  color: var(--ink);
+  background: #fff;
+}
+
+.tz-input:focus,
+.tz-model select:focus {
+  outline: 2px solid rgba(47, 111, 214, 0.22);
+  border-color: #2f6fd6;
+}
+
+.tz-send {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: #2f6fd6;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tz-send:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+.tz-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(47, 111, 214, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47, 111, 214, 0.045) 1px, transparent 1px),
+    var(--bg);
+  background-size: 24px 24px;
+}
+
+.tz-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tz-canvas svg {
+  display: block;
+  touch-action: none;
+}
+
+.tz-issues {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  max-width: min(520px, 80%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tz-issue {
+  border: 1px solid rgba(201, 66, 66, 0.3);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: rgba(255, 243, 240, 0.94);
+  color: #a13c3c;
+  font-size: 11px;
+}
+
+.tz-code {
+  border-left: 1px solid var(--rule);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+}
+
+.tz-code__head {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.tz-code__pre {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  padding: 14px;
+  color: #38302a;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.65;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.tz-toolbar {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule);
+  background: rgba(255, 250, 242, 0.94);
+  backdrop-filter: blur(10px);
+}
+
+.tz-toolbar__brand {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tz-toolbar__spacer {
+  flex: 1;
+}
+
+.tz-pill {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(37, 31, 26, 0.07);
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.tz-pill--ok {
+  background: rgba(42, 128, 91, 0.1);
+  color: #236f50;
+}
+
+.tz-pill--warn {
+  background: rgba(201, 66, 66, 0.1);
+  color: #a13c3c;
+}
+
+.tz-toolbar button {
+  min-height: 34px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 5px 10px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tz-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (max-width: 980px) {
+  .tz-studio {
+    grid-template-columns: minmax(240px, 30vw) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(180px, 32vh);
+  }
+
+  .tz-sidebar {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .tz-stage {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .tz-code {
+    grid-column: 2;
+    grid-row: 2;
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .tz-code__head {
+    min-height: 42px;
+  }
+
+  .tz-studio--pure {
+    display: block;
+  }
+
+  .tz-studio--pure .tz-stage {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .tz-studio {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(260px, 44vh) minmax(240px, 34vh) minmax(150px, 22vh);
+  }
+
+  .tz-stage {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .tz-sidebar {
+    grid-column: 1;
+    grid-row: 2;
+    border-right: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .tz-sidebar__head,
+  .tz-provider-row,
+  .tz-model,
+  .tz-catalog-error {
+    display: none;
+  }
+
+  .tz-chat {
+    padding: 8px 10px 4px;
+  }
+
+  .tz-composer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 84px;
+    gap: 8px;
+    padding: 8px 10px 10px;
+  }
+
+  .tz-input {
+    min-height: 58px;
+    resize: none;
+  }
+
+  .tz-send {
+    min-height: 44px;
+    height: 100%;
+    margin: 0;
+  }
+
+  .tz-code {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .tz-toolbar {
+    min-height: 48px;
+    padding: 6px 8px;
+    overflow-x: auto;
+  }
+
+  .tz-toolbar__brand,
+  .tz-toolbar .tz-pill:first-of-type,
+  .tz-toolbar button[disabled] {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wp-tile--tikz {
+    transition: none;
+  }
+}
