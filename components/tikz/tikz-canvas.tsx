@@ -7,7 +7,13 @@ import { toolRegistry, type ToolContext } from '@/lib/tikz/render/tools';
 import { fitViewport, sceneToScreen, screenToScene } from '@/lib/tikz/render/viewport';
 import type { TikzEngine } from './use-tikz-engine';
 
-export function TikzCanvas({ engine }: { engine: TikzEngine }) {
+export function TikzCanvas({
+  engine,
+  revealUpTo,
+}: {
+  engine: TikzEngine;
+  revealUpTo?: number;
+}) {
   const boxRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [previewCode, setPreviewCode] = useState<string | null>(null);
@@ -16,6 +22,17 @@ export function TikzCanvas({ engine }: { engine: TikzEngine }) {
     [previewCode],
   );
   const displayScene = previewAnalysis?.scene ?? engine.scene;
+  const revealedScene = useMemo(() => {
+    if (!displayScene || revealUpTo === undefined) return displayScene;
+    return {
+      ...displayScene,
+      points: new Map(
+        [...displayScene.points].filter(([, point]) => point.stmtIndex <= revealUpTo),
+      ),
+      elements: displayScene.elements.filter((element) => element.stmtIndex <= revealUpTo),
+      issues: displayScene.issues.filter((issue) => issue.stmtIndex <= revealUpTo),
+    };
+  }, [displayScene, revealUpTo]);
   const structureSignature = engine.scene
     ? [...engine.scene.points.keys()].join(',')
     : '';
@@ -97,10 +114,10 @@ export function TikzCanvas({ engine }: { engine: TikzEngine }) {
         onPointerUp={(event) => dispatch('onPointerUp', event)}
         onPointerCancel={(event) => dispatch('onPointerCancel', event)}
       >
-        {displayScene
+        {revealedScene
           ? (
             <TikzSceneSvg
-              scene={displayScene}
+              scene={revealedScene}
               viewport={engine.viewport}
               selection={engine.selection}
               selectedStmtIndex={engine.selectedStmtIndex}

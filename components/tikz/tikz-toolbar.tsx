@@ -10,6 +10,8 @@ export function TikzToolbar({
   repairing = false,
   repairStatus = '',
   onRepair,
+  stepsOpen = false,
+  onToggleSteps,
 }: {
   engine: TikzEngine;
   pureMode: boolean;
@@ -18,6 +20,8 @@ export function TikzToolbar({
   repairing?: boolean;
   repairStatus?: string;
   onRepair?(): void;
+  stepsOpen?: boolean;
+  onToggleSteps?(): void;
 }) {
   const pointCount = engine.scene?.points.size ?? 0;
   const elementCount = engine.scene?.elements.length ?? 0;
@@ -33,6 +37,9 @@ export function TikzToolbar({
       <span className="tz-toolbar__spacer" />
       <button type="button" disabled={repairing} onClick={onRepair}>
         {repairing ? '修复中…' : '🔧 修复'}
+      </button>
+      <button type="button" onClick={onToggleSteps} aria-pressed={stepsOpen}>
+        ☷ 步骤
       </button>
       <button type="button" disabled title="精确 TeX 预览将在下一阶段启用">
         ⌁ 精确预览

@@ -8,6 +8,7 @@ import { runTikzRepair } from '@/lib/tikz/repair/tikz-repair';
 import { TikzCanvas } from './tikz/tikz-canvas';
 import { TikzCodePanel } from './tikz/tikz-code-panel';
 import { TikzStylePanel } from './tikz/tikz-style-panel';
+import { TikzStepsPanel } from './tikz/tikz-steps-panel';
 import { TikzToolbar } from './tikz/tikz-toolbar';
 import { useTikzEngine } from './tikz/use-tikz-engine';
 
@@ -61,6 +62,8 @@ export function TikzStudio({ startOpen = false }: { startOpen?: boolean }) {
   const [streaming, setStreaming] = useState(false);
   const [repairing, setRepairing] = useState(false);
   const [repairStatus, setRepairStatus] = useState('');
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const [revealUpTo, setRevealUpTo] = useState<number | undefined>(undefined);
   const [catalogError, setCatalogError] = useState('');
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const engine = useTikzEngine(SAMPLE_TIKZ);
@@ -356,8 +359,23 @@ export function TikzStudio({ startOpen = false }: { startOpen?: boolean }) {
             repairing={repairing}
             repairStatus={repairStatus}
             onRepair={() => void repairCode(engine.code)}
+            stepsOpen={stepsOpen}
+            onToggleSteps={() => setStepsOpen((value) => !value)}
           />
-          <TikzCanvas engine={engine} />
+          <TikzCanvas engine={engine} revealUpTo={revealUpTo} />
+          {stepsOpen
+            ? (
+              <TikzStepsPanel
+                engine={engine}
+                revealUpTo={revealUpTo}
+                onReveal={setRevealUpTo}
+                onClose={() => {
+                  setStepsOpen(false);
+                  setRevealUpTo(undefined);
+                }}
+              />
+            )
+            : null}
         </main>
         <aside className="tz-code" data-testid="tikz-code-panel">
           <div className="tz-code__head">
