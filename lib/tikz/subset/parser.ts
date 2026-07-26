@@ -98,14 +98,14 @@ function parseCoord(c: Cursor): CoordExpr {
   }
 
   if (t.type === 'number' || t.type === 'minus' || t.type === 'lbrace') {
-    const x: { value: number; range: SourceRange } = parseLiteralOrBraceNumber(c);
+    const x: { value: number | NumExpr; range: SourceRange } = parseLiteralOrBraceNumber(c);
     // unit detection after x: peek next
     const afterX = c.peek();
     if (afterX && afterX.type === 'name' && /^(cm|mm|in|pt|em|ex|mu|sp|gd)$/.test(afterX.value)) {
       c.fail('v1 子集坐标只支持纯数字（单位 cm 省略）', afterX);
     }
     c.expect('comma', "','");
-    const y: { value: number; range: SourceRange } = parseLiteralOrBraceNumber(c);
+    const y: { value: number | NumExpr; range: SourceRange } = parseLiteralOrBraceNumber(c);
     const after = c.peek();
     if (after && after.type === 'rparen') {
       c.next();
@@ -138,18 +138,17 @@ function parseLiteralNumber(c: Cursor): { value: number; range: SourceRange } {
   return { value: Number(n.value), range: { start: n.start, end: n.end } };
 }
 
-function parseLiteralOrBraceNumber(c: Cursor): { value: number; range: SourceRange } {
+function parseLiteralOrBraceNumber(c: Cursor): { value: number | NumExpr; range: SourceRange } {
   const t = c.peek();
   if (!t) c.fail('期望数字');
   if (t.type === 'lbrace') {
-    // {numexpr} — accept as numeric literal at parse time; evaluation deferred
+    // {numexpr} — preserve the expression for the semantic evaluator.
     const inner = c.readBraceRaw();
     const subTokens = lex(inner.raw);
     const sub = makeCursor(subTokens, inner.raw);
     const expr = parseNumAddSub(sub);
-    // collapse to placeholder numeric value (0); evaluation re-reads via eval layer
-    void expr;
-    return { value: 0, range: { start: inner.range.start, end: inner.range.end } };
+    if (sub.peek()) sub.fail('花括号数值表达式末尾存在多余内容', sub.peek());
+    return { value: expr, range: { start: inner.range.start, end: inner.range.end } };
   }
   return parseLiteralNumber(c);
 }
@@ -173,10 +172,20 @@ function parseNumAtom(c: Cursor): NumExpr {
     const n = c.expect('number', '数字');
     return { kind: 'num-lit', value: -Number(n.value), range: { start: m.start, end: n.end } };
   }
-  if (t.type === 'cmd' && (t.value === '\\x' || t.value === '\\y' || t.value === '\\n')) {
+  if (t.type === 'cmd' && t.value === '\\n') {
     const cmd = c.next();
     const n = c.expect('number', '编号');
     return { kind: 'num-var', name: cmd.value + n.value, range: { start: cmd.start, end: n.end } };
+  }
+  if (t.type === 'cmd' && (t.value === '\\x' || t.value === '\\y')) {
+    const cmd = c.next();
+    const n = c.expect('number', '编号');
+    return {
+      kind: 'num-comp',
+      pvar: `\\p${n.value}`,
+      axis: cmd.value === '\\x' ? 'x' : 'y',
+      range: { start: cmd.start, end: n.end },
+    };
   }
   if (t.type === 'cmd' && t.value === '\\veclen') {
     const cmd = c.next();
@@ -494,16 +503,17 @@ function parseLetCoordinate2(c: Cursor): Statement {
       c.fail('let 绑定仅支持 \\p 或 \\n', tCmd);
     }
     const cmdTok = c.next();
-    c.expect('number', '绑定编号');
+    const bindingIndex = c.expect('number', '绑定编号');
+    const bindingName = cmdTok.value + bindingIndex.value;
     c.expect('equals', "'='");
     if (cmdTok.value === '\\p') {
       const value = parseCoord(c);
-      bindings.push({ type: 'point', name: cmdTok.value, value, range: { start: cmdTok.start, end: value.range.end } });
+      bindings.push({ type: 'point', name: bindingName, value, range: { start: cmdTok.start, end: value.range.end } });
     } else {
       c.expect('lbrace', "'{'");
       const value = parseNumAddSub(c);
       c.expect('rbrace', "'}'");
-      bindings.push({ type: 'num', name: cmdTok.value, value, range: { start: cmdTok.start, end: value.range.end + 1 } });
+      bindings.push({ type: 'num', name: bindingName, value, range: { start: cmdTok.start, end: value.range.end + 1 } });
     }
     const sep = c.peek();
     if (sep && sep.type === 'comma') c.next();

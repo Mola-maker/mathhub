@@ -63,6 +63,29 @@ describe('parseTikz', () => {
     expect(s).toMatchObject({ kind: 'let-coordinate', name: 'D' });
     if (s.kind !== 'let-coordinate') throw new Error('bad');
     expect(s.bindings.map(b => b.type)).toEqual(['point', 'num']);
+    expect(s.bindings.map(b => b.name)).toEqual(['\\p1', '\\n1']);
+    expect(s.bindings[1]).toMatchObject({
+      type: 'num',
+      value: {
+        kind: 'veclen',
+        x: { kind: 'num-comp', pvar: '\\p1', axis: 'x' },
+        y: { kind: 'num-comp', pvar: '\\p1', axis: 'y' },
+      },
+    });
+    expect(s.at).toMatchObject({
+      kind: 'calc',
+      expr: {
+        op: 'add',
+        right: {
+          op: 'coord',
+          coord: {
+            kind: 'literal',
+            x: { kind: 'num-bin', binop: '/', left: { kind: 'num-comp' }, right: { kind: 'num-var', name: '\\n1' } },
+            y: { kind: 'num-bin', binop: '/', left: { kind: 'num-comp' }, right: { kind: 'num-var', name: '\\n1' } },
+          },
+        },
+      },
+    });
   });
 
   it('through 圆半径', () => {
