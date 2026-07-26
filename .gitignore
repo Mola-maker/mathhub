@@ -2,6 +2,8 @@ node_modules/
 .next/
 dist/
 coverage/
+.wrangler/
+output/
 *.tsbuildinfo
 next-env.d.ts
 **/.omc/state/
