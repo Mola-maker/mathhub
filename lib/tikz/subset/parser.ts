@@ -281,14 +281,28 @@ function parseCalcExpr(c: Cursor): CalcExpr {
       // interpolate / rotate: '!' t '!' [θ ':'] factor
       const tExpr = parseNumAddSub(c);
       c.expect('bang', "'!'");
-      if (c.peek()?.type === 'colon') {
+      // peek-ahead: if after angle there's a ':' → rotate; else interpolate (angle was actually the next factor head)
+      const probe = makeCursor(c.tokens.slice(c.pos), c.src);
+      let angle: NumExpr | null = null;
+      try {
+        const a = probe.peek();
+        // peek-ahead consumes up to but does not mutate outer c
+        // For simple number angle: probe eats one number; if next probe token is ':' → rotate
+        if (a && (a.type === 'number' || a.type === 'minus' || a.type === 'cmd')) {
+          probe.next();
+          if (probe.peek()?.type === 'colon') {
+            // commit: parse angle with outer c
+            angle = parseNumAddSub(c);
+          }
+        }
+      } catch { /* not a rotate */ }
+      if (angle && c.peek()?.type === 'colon') {
         c.next(); // ':'
-        const angle = parseNumAddSub(c);
         const factor = parseCalcFactor(c);
         left = {
           op: 'rotate',
           a: left,
-          t: { kind: 'num-lit', value: 1, range: tExpr.range },
+          t: tExpr,
           angleDeg: angle,
           b: factor,
           range: { start: left.range.start, end: factor.range.end },
