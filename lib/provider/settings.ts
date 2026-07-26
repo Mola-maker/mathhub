@@ -73,7 +73,7 @@ function envFallback(name: ProviderName): {
       };
     case 'coze':
       return {
-        apiKey: process.env.COZE_API_KEY || process.env.LLM_RELAY_API_KEY || '',
+        apiKey: process.env.COZE_API_KEY ?? '',
         botId: process.env.COZE_BOT_ID ?? '',
         baseUrl: process.env.COZE_BASE_URL,
       };

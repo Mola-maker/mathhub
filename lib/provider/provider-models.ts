@@ -101,11 +101,11 @@ export async function listProviderModels(
     return { models: [], source: 'fallback', error: 'not configured' };
   }
   try {
-    if (name === 'coze') {
+    if (cfg.protocol === 'coze') {
       const models = staticFallback('coze', cfg);
       return { models, source: 'api' };
     }
-    if (name === 'anthropic') {
+    if (cfg.protocol === 'anthropic') {
       const models = await fetchAnthropicModels(cfg);
       if (models.length) return { models: dedupeModels(models), source: 'api' };
     } else {

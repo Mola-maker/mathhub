@@ -39,4 +39,11 @@ describe('relay defaults', () => {
     expect(p.protocol).toBe('coze');
     expect(p.baseUrl).toBe('https://api.coze.cn');
   });
+
+  it('coze 不使用 LLM_RELAY_API_KEY 兜底（直连例外）', async () => {
+    vi.stubEnv('LLM_RELAY_API_KEY', 'relay-key');
+    const p = await getEffectiveProvider('coze');
+    expect(p.apiKey).toBe('');
+    expect(p.configured).toBe(false);
+  });
 });

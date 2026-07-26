@@ -109,8 +109,8 @@ export async function probeProviderModel(
   model: string,
 ): Promise<ModelProbeResult> {
   if (!cfg.apiKey) return { ok: false, ms: 0, error: 'no api key' };
-  if (provider === 'anthropic') return probeAnthropic(cfg, model);
-  if (provider === 'coze') return probeCoze(cfg);
+  if (cfg.protocol === 'anthropic') return probeAnthropic(cfg, model);
+  if (cfg.protocol === 'coze') return probeCoze(cfg);
   return probeOpenAICompatible(cfg, model, provider);
 }
 
