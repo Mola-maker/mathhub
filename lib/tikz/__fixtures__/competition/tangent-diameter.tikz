@@ -1,0 +1,11 @@
+\begin{tikzpicture}
+\coordinate (O) at (0,0);
+\coordinate (P) at (4,0);
+\coordinate (M) at ($(O)!0.5!(P)$);
+\path[name path=c1] (O) circle (2);
+\path[name path=dm] (M) circle [through=(O)];
+\path[name intersections={of=c1 and dm}] (intersection-1) coordinate (T1) (intersection-2) coordinate (T2);
+\draw (O) circle (2);
+\draw (P) -- (T1);
+\draw (P) -- (T2);
+\end{tikzpicture}

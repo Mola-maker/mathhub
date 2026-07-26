@@ -1,0 +1,8 @@
+\begin{tikzpicture}
+\coordinate (A) at (-2,0);
+\coordinate (B) at (2,0);
+\coordinate (M) at ($(A)!0.5!(B)$);
+\coordinate (P) at ($(M)!1!90:(A)$);
+\draw (A) -- (B);
+\draw[dashed] (M) -- (P);
+\end{tikzpicture}

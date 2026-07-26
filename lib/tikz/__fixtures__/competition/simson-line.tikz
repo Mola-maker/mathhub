@@ -1,0 +1,11 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (4,0);
+\coordinate (C) at (0,3);
+\coordinate (P) at (2,-1);
+\coordinate (F1) at ($(A)!(P)!(B)$);
+\coordinate (F2) at ($(A)!(P)!(C)$);
+\coordinate (F3) at ($(B)!(P)!(C)$);
+\draw (A) -- (B) -- (C) -- cycle;
+\draw[red] (F2) -- (F1) -- (F3);
+\end{tikzpicture}

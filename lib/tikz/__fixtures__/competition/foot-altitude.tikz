@@ -1,0 +1,9 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (4,0);
+\coordinate (C) at (1,3);
+\coordinate (H) at ($(A)!(C)!(B)$);
+\draw (A) -- (B) -- (C) -- cycle;
+\draw[dashed] (C) -- (H);
+\pic {right angle = C--H--B};
+\end{tikzpicture}

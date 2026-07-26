@@ -1,0 +1,6 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (2,0);
+\coordinate (C) at ($(A)!1!60:(B)$);
+\draw (A) -- (B) -- (C) -- cycle;
+\end{tikzpicture}

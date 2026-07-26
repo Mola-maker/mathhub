@@ -1,0 +1,8 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (2,0);
+\coordinate (C) at (0,2);
+\draw (A) -- (B);
+\draw (A) -- (C);
+\pic {right angle = B--A--C};
+\end{tikzpicture}

@@ -1,0 +1,7 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (3,1);
+\coordinate (C) at (5,4);
+\coordinate (D) at ($(A)+(C)-(B)$);
+\draw (A) -- (B) -- (C) -- (D) -- cycle;
+\end{tikzpicture}

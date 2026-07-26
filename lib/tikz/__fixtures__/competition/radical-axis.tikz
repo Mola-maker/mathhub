@@ -1,0 +1,10 @@
+\begin{tikzpicture}
+\coordinate (O1) at (0,0);
+\coordinate (O2) at (3,0);
+\path[name path=c1] (O1) circle (2);
+\path[name path=c2] (O2) circle (2);
+\path[name intersections={of=c1 and c2}] (intersection-1) coordinate (P) (intersection-2) coordinate (Q);
+\draw (O1) circle (2);
+\draw (O2) circle (2);
+\draw[red] (P) -- (Q);
+\end{tikzpicture}

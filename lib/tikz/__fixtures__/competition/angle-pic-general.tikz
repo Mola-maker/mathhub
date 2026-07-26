@@ -1,0 +1,7 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (3,0);
+\coordinate (C) at (1,2);
+\draw (A) -- (B) -- (C) -- cycle;
+\pic {angle = C--B--A};
+\end{tikzpicture}

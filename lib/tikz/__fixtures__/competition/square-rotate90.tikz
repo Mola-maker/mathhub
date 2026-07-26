@@ -1,0 +1,7 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (2,0);
+\coordinate (D) at ($(A)!1!90:(B)$);
+\coordinate (C) at ($(B)+(D)$);
+\draw (A) -- (B) -- (C) -- (D) -- cycle;
+\end{tikzpicture}

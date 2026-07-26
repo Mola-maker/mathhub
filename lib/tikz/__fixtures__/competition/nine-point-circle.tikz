@@ -1,0 +1,13 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (4,0);
+\coordinate (C) at (0,3);
+\coordinate (O) at (2,1.5);
+\coordinate (H) at (A);
+\coordinate (N) at ($(O)!0.5!(H)$);
+\coordinate (Mab) at ($(A)!0.5!(B)$);
+\coordinate (Mac) at ($(A)!0.5!(C)$);
+\coordinate (Mbc) at ($(B)!0.5!(C)$);
+\draw (A) -- (B) -- (C) -- cycle;
+\draw (N) circle [through=(Mab)];
+\end{tikzpicture}

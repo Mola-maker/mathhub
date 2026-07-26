@@ -1,0 +1,6 @@
+\begin{tikzpicture}
+\coordinate (O) at (1,1);
+\coordinate (P) at (2,3);
+\coordinate (Q) at ($(O)!2!(P)$);
+\draw (O) -- (P) -- (Q);
+\end{tikzpicture}
