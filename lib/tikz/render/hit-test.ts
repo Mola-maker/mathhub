@@ -1,5 +1,10 @@
 import type { Pt } from '../semantics/calc-eval';
-import type { Scene } from '../semantics/scene';
+import type { Scene, SceneElement } from '../semantics/scene';
+import { labelScreenBounds, type ScreenBounds } from './label-layout';
+import {
+  angleMarkGeometry,
+  DEFAULT_ANGLE_MARK_RADIUS,
+} from './svg-decoration-primitives';
 import { sceneToScreen, type Viewport } from './viewport';
 
 const distance = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -19,6 +24,21 @@ function distanceToSegment(point: Pt, start: Pt, end: Pt): number {
   });
 }
 
+function distanceToBounds(point: Pt, bounds: ScreenBounds): number {
+  const dx = Math.max(bounds.left - point.x, 0, point.x - bounds.right);
+  const dy = Math.max(bounds.top - point.y, 0, point.y - bounds.bottom);
+  return Math.hypot(dx, dy);
+}
+
+export interface ElementHit {
+  stableId: string;
+  stmtIndex: number;
+  refs: string[];
+  kind: SceneElement['kind'];
+  element: SceneElement;
+  distance: number;
+}
+
 export function hitTestPointHandle(
   screen: Pt,
   scene: Scene,
@@ -28,6 +48,7 @@ export function hitTestPointHandle(
   let best: string | null = null;
   let bestDistance = radiusPx;
   for (const point of scene.points.values()) {
+    if (point.internal) continue;
     const currentDistance = distance(screen, sceneToScreen(point.position, viewport));
     if (currentDistance <= bestDistance) {
       bestDistance = currentDistance;
@@ -42,8 +63,8 @@ export function hitTestElement(
   scene: Scene,
   viewport: Viewport,
   tolerancePx = 6,
-): { stmtIndex: number; refs: string[] } | null {
-  let best: { stmtIndex: number; refs: string[] } | null = null;
+): ElementHit | null {
+  let best: ElementHit | null = null;
   let bestDistance = tolerancePx;
 
   for (const element of scene.elements) {
@@ -61,23 +82,43 @@ export function hitTestElement(
       currentDistance = Math.abs(distance(screen, center) - element.radius * viewport.scale);
     } else if (element.kind === 'label') {
       const at = sceneToScreen(element.at, viewport);
-      const width = Math.max(10, element.text.replace(/\$/g, '').length * 8);
-      currentDistance = distanceToSegment(
+      currentDistance = distanceToBounds(
         screen,
-        { x: at.x - width / 2, y: at.y },
-        { x: at.x + width / 2, y: at.y },
+        labelScreenBounds(at, element.text, element.anchor),
       );
     } else {
-      currentDistance = Math.abs(
-        distance(screen, sceneToScreen(element.vertex, viewport)) - 16,
-      );
+      const geometry = angleMarkGeometry({
+        vertex: sceneToScreen(element.vertex, viewport),
+        from: sceneToScreen(element.from, viewport),
+        to: sceneToScreen(element.to, viewport),
+        right: element.right,
+        radius: DEFAULT_ANGLE_MARK_RADIUS,
+      });
+      if (geometry) {
+        for (let index = 1; index < geometry.points.length; index += 1) {
+          currentDistance = Math.min(
+            currentDistance,
+            distanceToSegment(
+              screen,
+              geometry.points[index - 1]!,
+              geometry.points[index]!,
+            ),
+          );
+        }
+      }
     }
 
     if (currentDistance <= bestDistance) {
       bestDistance = currentDistance;
-      best = { stmtIndex: element.stmtIndex, refs: element.refs };
+      best = {
+        stableId: element.stableId,
+        stmtIndex: element.stmtIndex,
+        refs: element.refs,
+        kind: element.kind,
+        element,
+        distance: currentDistance,
+      };
     }
   }
   return best;
 }
-

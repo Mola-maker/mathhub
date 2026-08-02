@@ -1,0 +1,80 @@
+@top Document { content* }
+
+content {
+  TikzPicture |
+  Scope |
+  Statement |
+  Group |
+  BracketGroup |
+  Parenthesized |
+  MathGroup |
+  Comment |
+  Atom
+}
+
+TikzPicture { BeginTikz pictureContent* EndTikz }
+
+Scope { BeginScope pictureContent* EndScope }
+
+pictureContent {
+  Scope |
+  Statement |
+  Group |
+  BracketGroup |
+  Parenthesized |
+  MathGroup |
+  Comment |
+  Atom
+}
+
+Statement { Command statementPart* ";" }
+
+statementPart {
+  Group |
+  BracketGroup |
+  Parenthesized |
+  MathGroup |
+  Comment |
+  Command |
+  Atom
+}
+
+Group { "{" content* "}" }
+
+BracketGroup { "[" content* "]" }
+
+Parenthesized { "(" content* ")" }
+
+MathGroup { "$" mathContent* "$" }
+
+mathContent {
+  Group |
+  BracketGroup |
+  Parenthesized |
+  Comment |
+  Command |
+  Atom
+}
+
+@skip { whitespace }
+
+@tokens {
+  BeginTikz { "\\begin{tikzpicture}" }
+  EndTikz { "\\end{tikzpicture}" }
+  BeginScope { "\\begin{scope}" }
+  EndScope { "\\end{scope}" }
+  Command { "\\" @asciiLetter+ }
+  Comment { "%" ![\n\r]* }
+  Atom { ![\\%{}\[\]();$ \t\r\n]+ }
+  whitespace { $[ \t\r\n]+ }
+
+  @precedence {
+    BeginTikz,
+    EndTikz,
+    BeginScope,
+    EndScope,
+    Command,
+    Comment,
+    Atom
+  }
+}

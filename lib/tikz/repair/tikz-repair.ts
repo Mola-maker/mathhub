@@ -1,5 +1,6 @@
 import { analyze } from '../analyze';
 import { snapshotScene } from './scene-snapshot';
+import { canonicalizeTikz } from '../normalize';
 
 const FULLWIDTH: Array<[RegExp, string]> = [
   [/，/g, ','],
@@ -11,8 +12,9 @@ const FULLWIDTH: Array<[RegExp, string]> = [
 ];
 
 export function localRepairTikz(code: string): { code: string; fixes: string[] } {
-  let output = code;
+  let output = canonicalizeTikz(code);
   const fixes: string[] = [];
+  if (output !== code) fixes.push('旧版过点圆转为标准 TikZ node 语法');
   const fence = /```(?:tikz|latex|tex)?\s*\n?([\s\S]*?)```/i.exec(output);
   if (fence) {
     output = fence[1].trim();

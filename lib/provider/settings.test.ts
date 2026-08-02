@@ -1,49 +1,41 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getEffectiveProvider, relayBaseUrl } from './settings';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CLIENT_PROVIDER, getEffectiveProvider, PROVIDER_NAMES, relayBaseUrl } from './settings';
 
-const ENV_KEYS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'LLM_RELAY_API_KEY', 'LLM_RELAY_BASE_URL', 'DEEPSEEK_API_KEY', 'COZE_API_KEY', 'COZE_BOT_ID'];
-beforeEach(() => { for (const k of ENV_KEYS) vi.stubEnv(k, ''); delete process.env.ANTHROPIC_BASE_URL; delete process.env.LLM_RELAY_BASE_URL; });
-afterEach(() => { vi.unstubAllEnvs(); });
+const ENV_KEYS = ['LLM_RELAY_API_KEY', 'LLM_RELAY_MODEL'];
 
-describe('relay defaults', () => {
-  it('relayBaseUrl 默认 api.molamaker.cn，可被 LLM_RELAY_BASE_URL 覆盖', () => {
+beforeEach(() => {
+  for (const key of ENV_KEYS) vi.stubEnv(key, '');
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe('api.molamaker.cn relay settings', () => {
+  it('公开 provider 只有 relay', () => {
+    expect(CLIENT_PROVIDER).toBe('relay');
+    expect(PROVIDER_NAMES).toEqual(['relay']);
+  });
+
+  it('固定使用 api.molamaker.cn，不接受环境变量替换上游', () => {
     expect(relayBaseUrl()).toBe('https://api.molamaker.cn');
     vi.stubEnv('LLM_RELAY_BASE_URL', 'https://relay.example.com/');
-    expect(relayBaseUrl()).toBe('https://relay.example.com');
+    expect(relayBaseUrl()).toBe('https://api.molamaker.cn');
   });
 
-  it('anthropic 默认走中转站且协议为 openai-compatible', async () => {
-    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test');
-    const p = await getEffectiveProvider('anthropic');
-    expect(p.baseUrl).toBe('https://api.molamaker.cn');
-    expect(p.protocol).toBe('openai-compatible');
-  });
-
-  it('baseUrl 指回 api.anthropic.com 时协议为 anthropic 原生', async () => {
-    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test');
-    vi.stubEnv('ANTHROPIC_BASE_URL', 'https://api.anthropic.com');
-    const p = await getEffectiveProvider('anthropic');
-    expect(p.protocol).toBe('anthropic');
-  });
-
-  it('共享 LLM_RELAY_API_KEY 兜底，具体 key 优先', async () => {
+  it('只读取 relay key 和可选默认模型', async () => {
     vi.stubEnv('LLM_RELAY_API_KEY', 'relay-key');
-    expect((await getEffectiveProvider('deepseek')).apiKey).toBe('relay-key');
-    vi.stubEnv('DEEPSEEK_API_KEY', 'ds-key');
-    expect((await getEffectiveProvider('deepseek')).apiKey).toBe('ds-key');
+    vi.stubEnv('LLM_RELAY_MODEL', 'model-a');
+    const provider = await getEffectiveProvider('relay');
+    expect(provider).toMatchObject({
+      apiKey: 'relay-key',
+      baseUrl: 'https://api.molamaker.cn',
+      model: 'model-a',
+      configured: true,
+    });
   });
 
-  it('coze 协议保持 coze、默认直连 api.coze.cn', async () => {
-    vi.stubEnv('COZE_API_KEY', 'k'); vi.stubEnv('COZE_BOT_ID', 'b');
-    const p = await getEffectiveProvider('coze');
-    expect(p.protocol).toBe('coze');
-    expect(p.baseUrl).toBe('https://api.coze.cn');
-  });
-
-  it('coze 不使用 LLM_RELAY_API_KEY 兜底（直连例外）', async () => {
-    vi.stubEnv('LLM_RELAY_API_KEY', 'relay-key');
-    const p = await getEffectiveProvider('coze');
-    expect(p.apiKey).toBe('');
-    expect(p.configured).toBe(false);
+  it('未配置 key 时不可用', async () => {
+    expect((await getEffectiveProvider('relay')).configured).toBe(false);
   });
 });

@@ -9,4 +9,7 @@ next-env.d.ts
 **/.omc/state/
 .DS_Store
 .superpowers/
+.playwright-cli/
+.claude/worktrees/
 .env*
+!.env.example

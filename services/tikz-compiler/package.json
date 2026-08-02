@@ -1,0 +1,13 @@
+{
+  "name": "@math-geohub/tikz-compiler-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ali-oss": "6.23.0",
+    "redis": "6.1.0"
+  }
+}

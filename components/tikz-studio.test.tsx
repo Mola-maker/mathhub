@@ -11,13 +11,13 @@ function stubCatalogs() {
   vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) => {
     const path = String(url);
     if (path.includes('/api/tikz/providers')) {
-      return Response.json({ available: ['anthropic'], providers: { anthropic: { configured: true } } });
+      return Response.json({ available: ['relay'], providers: { relay: { configured: true } } });
     }
     if (path.includes('/api/tikz/models')) {
       return Response.json({
-        models: [{ id: 'claude-sonnet-4-6', probe: { ok: true } }],
+        models: [{ id: 'claude-sonnet-4-6' }],
         defaultModel: 'claude-sonnet-4-6',
-        source: 'fallback',
+        source: 'api',
       });
     }
     return new Response('data: [DONE]\n\n', {

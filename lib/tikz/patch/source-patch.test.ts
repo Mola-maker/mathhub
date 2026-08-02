@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatCoordNumber, patchCoordinateLiteral, patchStyleOptions } from './source-patch';
+import {
+  coordinateLiteralPatch,
+  formatCoordNumber,
+  patchCoordinateLiteral,
+  patchStyleOptions,
+  styleOptionsPatch,
+} from './source-patch';
 
 describe('formatCoordNumber', () => {
   it('最多 4 位小数、去尾零、-0 归零', () => {
@@ -24,6 +30,15 @@ describe('patchCoordinateLiteral', () => {
     expect(next).toBe('\\begin{tikzpicture}\n  \\coordinate (A) at (2.34,-1);  % 注释保留\n\\end{tikzpicture}');
   });
 
+  it('暴露最小 TextPatch 供 CodeMirror transaction 使用', () => {
+    const start = code.indexOf('(0,0)');
+    expect(coordinateLiteralPatch(
+      code,
+      { start, end: start + 5 },
+      { x: 2, y: 3 },
+    )).toEqual({ from: start, to: start + 5, insert: '(2,3)' });
+  });
+
   it('拒绝越界范围', () => {
     expect(() => patchCoordinateLiteral(code, { start: -1, end: 2 }, { x: 0, y: 0 }))
       .toThrow(RangeError);
@@ -43,5 +58,10 @@ describe('patchStyleOptions', () => {
     const code = '\\draw (A) -- (B);';
     expect(patchStyleOptions(code, null, 'thick', 5)).toBe('\\draw[thick] (A) -- (B);');
   });
-});
 
+  it('样式更新返回局部插入补丁', () => {
+    const code = '\\draw (A) -- (B);';
+    expect(styleOptionsPatch(code, null, 'thick', 5))
+      .toEqual({ from: 5, to: 5, insert: '[thick]' });
+  });
+});

@@ -4,7 +4,7 @@ import { checkRate } from '@/lib/rate-limit';
 import { clientIp } from '@/lib/client-ip';
 import {
   getEffectiveProvider,
-  PROVIDER_NAMES,
+  CLIENT_PROVIDER,
   type ProviderName,
 } from '@/lib/provider/settings';
 import { isSafeModelId } from '@/lib/provider/provider-models';
@@ -91,6 +91,16 @@ export async function POST(req: NextRequest) {
   const rate = mode === 'repair'
     ? await checkRate(`math-repair:${ip}`, 40, 60_000)
     : await checkRate(`math:${ip}`, 20, 60_000);
+  if (rate.unavailable) {
+    return new Response(JSON.stringify({ error: 'rate limiter unavailable' }), {
+      status: 503,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Retry-After': '1',
+      },
+    });
+  }
   if (!rate.allowed) {
     return new Response('rate limited', {
       status: 429,
@@ -99,7 +109,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { provider } = body;
-  if (!PROVIDER_NAMES.includes(provider)) {
+  if (provider !== CLIENT_PROVIDER) {
     return new Response('invalid provider', { status: 400 });
   }
 
@@ -111,8 +121,8 @@ export async function POST(req: NextRequest) {
   }
 
   const requestedModel = typeof body.model === 'string' ? body.model.trim() : '';
-  const model = provider === 'coze' ? cfg.botId : (requestedModel || cfg.model);
-  if (provider !== 'coze' && !isSafeModelId(model)) {
+  const model = requestedModel || cfg.model;
+  if (!isSafeModelId(model)) {
     return new Response(JSON.stringify({ error: 'invalid model' }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });
@@ -138,7 +148,7 @@ export async function POST(req: NextRequest) {
     const content = `题目：\n${problem || '（未提供题面，按作图本身讲解）'}\n\n作图步骤：\n${steps.join('\n')}`;
 
     return makeSseStream(async (send, sendEvent) => {
-      sendEvent({ model: provider === 'coze' ? `coze:${cfg.botId}` : model, mode });
+      sendEvent({ model, mode });
       await streamProvider(provider, [{ role: 'user', content }], send, cfg, model, narratePrompt);
     });
   }
@@ -165,7 +175,7 @@ export async function POST(req: NextRequest) {
     const messages: Message[] = [{ role: 'user', content: formatRepairUserContent(commands, failures, canvasState) }];
 
     return makeSseStream(async (send, sendEvent) => {
-      sendEvent({ model: provider === 'coze' ? `coze:${cfg.botId}` : model, mode });
+      sendEvent({ model, mode });
       sendEvent({ ggbLookup: { count: ggbContext.commandNames.length, commands: ggbContext.commandNames } });
       const fullText = await streamProvider(provider, messages, send, cfg, model, prompt);
       // Pre-flight (hallucinated names → real commands, bare pair names →
@@ -201,7 +211,7 @@ export async function POST(req: NextRequest) {
   const messages = buildApiMessages(problemText, history, activeCommand);
 
   return makeSseStream(async (send, sendEvent) => {
-    sendEvent({ model: provider === 'coze' ? `coze:${cfg.botId}` : model, mode });
+    sendEvent({ model, mode });
     sendEvent({ drawingCommand: activeCommand });
     sendEvent({
       ggbLookup: {

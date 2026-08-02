@@ -1,0 +1,449 @@
+[browser] ./lib/tikz/render/tools.ts:222:8
+Expected ';', '}' or <eof>
+  220 |       ) return;
+  221 |       state.solving = false;
+> 222 | +      const queued = state.queuedTarget;
+      |        ^^^^^
+  223 | +      state.queuedTarget = null;
+  224 | +      if (queued) {
+  225 | +        // A newer target owns both the preview and the eventual commit.
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/tikz/render/tools.ts [Client Component Browser]
+    ./components/tikz/tikz-tool-palette.tsx [Client Component Browser]
+    ./components/tikz-studio.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Server Component]
+    ./app/tikz/page.tsx [Server Component] 
+[browser] ./lib/tikz/render/tools.ts:222:8
+Expression expected
+  220 |       ) return;
+  221 |       state.solving = false;
+> 222 | +      const queued = state.queuedTarget;
+      |        ^^^^^
+  223 | +      state.queuedTarget = null;
+  224 | +      if (queued) {
+  225 | +        // A newer target owns both the preview and the eventual commit.
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/tikz/render/tools.ts [Client Component Browser]
+    ./components/tikz/tikz-tool-palette.tsx [Client Component Browser]
+    ./components/tikz-studio.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Server Component]
+    ./app/tikz/page.tsx [Server Component] 
+[browser] Uncaught RangeError: 源码补丁区间相互重叠
+    at applyTextPatches (lib/tikz/document/source-transaction.ts:33:13)
+    at Object.onPointerMove (lib/tikz/render/tools.ts:896:46)
+    at TikzCanvas.useCallback[dispatch] (components/tikz/tikz-canvas.tsx:238:15)
+    at onPointerMove (components/tikz/tikz-canvas.tsx:355:35)
+    at h (<anonymous>:1:1997)
+    at S (<anonymous>:1:3027)
+    at KH (<anonymous>:2:77)
+    at <unknown> (<anonymous>:2:311)
+    at svg (<anonymous>)
+    at TikzCanvas (components/tikz/tikz-canvas.tsx:324:52)
+    at TikzStudio (components/tikz-studio.tsx:762:11)
+    at TikzRouteClient (components/tikz/tikz-route-client.tsx:25:5)
+    at TikzHome (app\tikz\page.tsx:24:7)
+  31 |     assertPatch(source, patch);
+  32 |     if (patch.to > boundary) {
+> 33 |       throw new RangeError('源码补丁区间相互重叠');
+     |             ^
+  34 |     }
+  35 |     result = applyTextPatch(result, patch);
+  36 |     boundary = patch.from;
+[browser] Uncaught RangeError: 源码补丁区间相互重叠
+    at applyTextPatches (lib/tikz/document/source-transaction.ts:33:13)
+    at Object.onPointerMove (lib/tikz/render/tools.ts:896:46)
+    at TikzCanvas.useCallback[dispatch] (components/tikz/tikz-canvas.tsx:238:15)
+    at onPointerMove (components/tikz/tikz-canvas.tsx:355:35)
+    at h (<anonymous>:1:1997)
+    at S (<anonymous>:1:3027)
+    at KH (<anonymous>:2:77)
+    at <unknown> (<anonymous>:2:311)
+    at svg (<anonymous>)
+    at TikzCanvas (components/tikz/tikz-canvas.tsx:324:52)
+    at TikzStudio (components/tikz-studio.tsx:762:11)
+    at TikzRouteClient (components/tikz/tikz-route-client.tsx:25:5)
+    at TikzHome (app\tikz\page.tsx:24:7)
+  31 |     assertPatch(source, patch);
+  32 |     if (patch.to > boundary) {
+> 33 |       throw new RangeError('源码补丁区间相互重叠');
+     |             ^
+  34 |     }
+  35 |     result = applyTextPatch(result, patch);
+  36 |     boundary = patch.from;
+[browser] Uncaught RangeError: 源码补丁区间相互重叠
+    at applyTextPatches (lib/tikz/document/source-transaction.ts:33:13)
+    at Object.onPointerMove (lib/tikz/render/tools.ts:896:46)
+    at TikzCanvas.useCallback[dispatch] (components/tikz/tikz-canvas.tsx:238:15)
+    at onPointerMove (components/tikz/tikz-canvas.tsx:355:35)
+    at h (<anonymous>:1:1997)
+    at S (<anonymous>:1:3027)
+    at KH (<anonymous>:2:77)
+    at <unknown> (<anonymous>:2:311)
+    at svg (<anonymous>)
+    at TikzCanvas (components/tikz/tikz-canvas.tsx:324:52)
+    at TikzStudio (components/tikz-studio.tsx:762:11)
+    at TikzRouteClient (components/tikz/tikz-route-client.tsx:25:5)
+    at TikzHome (app\tikz\page.tsx:24:7)
+  31 |     assertPatch(source, patch);
+  32 |     if (patch.to > boundary) {
+> 33 |       throw new RangeError('源码补丁区间相互重叠');
+     |             ^
+  34 |     }
+  35 |     result = applyTextPatch(result, patch);
+  36 |     boundary = patch.from;
+[browser] Uncaught RangeError: 源码补丁区间相互重叠
+    at applyTextPatches (lib/tikz/document/source-transaction.ts:33:13)
+    at Object.onPointerMove (lib/tikz/render/tools.ts:896:46)
+    at TikzCanvas.useCallback[dispatch] (components/tikz/tikz-canvas.tsx:238:15)
+    at onPointerMove (components/tikz/tikz-canvas.tsx:355:35)
+    at h (<anonymous>:1:1997)
+    at S (<anonymous>:1:3027)
+    at KH (<anonymous>:2:77)
+    at <unknown> (<anonymous>:2:311)
+    at svg (<anonymous>)
+    at TikzCanvas (components/tikz/tikz-canvas.tsx:324:52)
+    at TikzStudio (components/tikz-studio.tsx:762:11)
+    at TikzRouteClient (components/tikz/tikz-route-client.tsx:25:5)
+    at TikzHome (app\tikz\page.tsx:24:7)
+  31 |     assertPatch(source, patch);
+  32 |     if (patch.to > boundary) {
+> 33 |       throw new RangeError('源码补丁区间相互重叠');
+     |             ^
+  34 |     }
+  35 |     result = applyTextPatch(result, patch);
+  36 |     boundary = patch.from;
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'find')
+    at eval (lib/tikz/ir/tikz-adapter.ts:841:40)
+    at Array.flatMap (<anonymous>)
+    at bindingsOf (lib/tikz/ir/tikz-adapter.ts:838:18)
+    at projectTikzAnalysisToGeometryTruth (lib/tikz/ir/tikz-adapter.ts:1076:8)
+    at useTikzEngine.useMemo[currentGeometryProjection] (components/tikz/use-tikz-engine.ts:214:54)
+    at useTikzEngine (components/tikz/use-tikz-engine.ts:211:44)
+    at TikzStudio (file://E:/Portaitsweb/math_geohub/.next/dev/static/chunks/_13d03_o._.js?id=%255Bproject%255D%252Fcomponents%252Ftikz-studio.tsx+%255Bapp-client%255D+%2528ecmascript%2529:112:184)
+    at TikzRouteClient (components/tikz/tikz-route-client.tsx:25:5)
+    at TikzHome (app\tikz\page.tsx:24:7)
+  839 |     const range = statementRange(input.analysis, record.stmtIndex);
+  840 |     if (!range) return [];
+> 841 |     const managedBlock = managedBlocks.find((block) => (
+      |                                        ^
+  842 |       range.start < block.range.end && range.end > block.range.start
+  843 |     ));
+  844 |     return [{
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'find')
+    at eval (lib/tikz/ir/tikz-adapter.ts:841:40)
+    at Array.flatMap (<anonymous>)
+    at bindingsOf (lib/tikz/ir/tikz-adapter.ts:838:18)
+    at projectTikzAnalysisToGeometryTruth (lib/tikz/ir/tikz-adapter.ts:1076:8)
+    at useTikzEngine.useMemo[currentGeometryProjection] (components/tikz/use-tikz-engine.ts:214:54)
+    at useTikzEngine (components/tikz/use-tikz-engine.ts:211:44)
+    at TikzStudio (file://E:/Portaitsweb/math_geohub/.next/dev/static/chunks/_13d03_o._.js?id=%255Bproject%255D%252Fcomponents%252Ftikz-studio.tsx+%255Bapp-client%255D+%2528ecmascript%2529:112:184)
+    at TikzRouteClient (components/tikz/tikz-route-client.tsx:25:5)
+    at TikzHome (app\tikz\page.tsx:24:7)
+  839 |     const range = statementRange(input.analysis, record.stmtIndex);
+  840 |     if (!range) return [];
+> 841 |     const managedBlock = managedBlocks.find((block) => (
+      |                                        ^
+  842 |       range.start < block.range.end && range.end > block.range.start
+  843 |     ));
+  844 |     return [{
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Unexpected import of module [project]/components/tikz-studio.tsx [app-client] (ecmascript, next/dynamic entry) from module [project]/components/tikz/tikz-route-client.tsx [app-client] (ecmascript), which was deleted by an HMR update (.next\dev\static\chunks\components_tikz-studio_tsx_0a0speo._.js:13:16)
+[browser] Uncaught TypeError: sourceEntities.map is not a function
+    at managedConstructionSemantics (lib/tikz/ir/tikz-adapter.ts:490:49)
+    at projectTikzAnalysisToGeometryTruth (lib/tikz/ir/tikz-adapter.ts:1183:19)
+    at useTikzEngine.useMemo[currentGeometryProjection] (components/tikz/use-tikz-engine.ts:49:1)
+    at useTikzEngine (components/tikz/use-tikz-engine.ts:37:1)
+    at TikzStudio (lib/tikz/semantics/scene-heatmap.ts:146:1)
+    at Set.forEach (<anonymous>)
+    at TikzRouteClient (components/tikz/tikz-route-client.tsx:25:5)
+    at TikzHome (app\tikz\page.tsx:24:7)
+  488 |     readonly GeometryBindableRecordReference[]
+  489 |   >();
+> 490 |   const knownEntityIds = new Set(sourceEntities.map((entity) => entity.id));
+      |                                                 ^
+  491 |   const sourceEntityIdsBySemanticKey =
+  492 |     uniqueSourceEntityIdsBySemanticKey(sourceEntities);
+  493 |
+[browser] Uncaught TypeError: sourceEntities.map is not a function
+    at managedConstructionSemantics (lib/tikz/ir/tikz-adapter.ts:490:49)
+    at projectTikzAnalysisToGeometryTruth (lib/tikz/ir/tikz-adapter.ts:1183:19)
+    at useTikzEngine.useMemo[currentGeometryProjection] (components/tikz/use-tikz-engine.ts:214:54)
+    at useTikzEngine (components/tikz/use-tikz-engine.ts:211:44)
+    at TikzStudio (components/tikz-studio.tsx:105:31)
+    at TikzRouteClient (components/tikz/tikz-route-client.tsx:25:5)
+    at TikzHome (app\tikz\page.tsx:24:7)
+  488 |     readonly GeometryBindableRecordReference[]
+  489 |   >();
+> 490 |   const knownEntityIds = new Set(sourceEntities.map((entity) => entity.id));
+      |                                                 ^
+  491 |   const sourceEntityIdsBySemanticKey =
+  492 |     uniqueSourceEntityIdsBySemanticKey(sourceEntities);
+  493 |
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ./lib/tikz/authoring/construction-ir.ts:10:1
+Export managedConstructionBodyFingerprint doesn't exist in target module
+  [90m 8 |[0m } [36mfrom[0m [32m'./tikz-coordinate-serializer'[0m;
+  [90m 9 |[0m [36mimport[0m { formatCoordNumber } [36mfrom[0m [32m'../patch/source-patch'[0m;
+[31m[1m>[0m [90m10 |[0m [36mimport[0m {
+  [90m   |[0m [31m[1m^^^^^^^[0m
+[31m[1m>[0m [90m11 |[0m   [33mMANAGED_CONSTRUCTION_SCHEMA_VERSION[0m,
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m12 |[0m   managedConstructionBodyFingerprint,
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m13 |[0m   serializeManagedConstructionRecords,
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m14 |[0m   [36mtype[0m [33mManagedConstructionSemanticRecord[0m,
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m15 |[0m } [36mfrom[0m [32m'../semantics/managed-construction'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m16 |[0m
+  [90m17 |[0m /**
+  [90m18 |[0m  * [33mConstruction[0m [33mIR[0m is deliberately independent [36mof[0m a renderer or a source
+
+The export managedConstructionBodyFingerprint was not found in module [project]/lib/tikz/semantics/managed-construction.ts [app-client] (ecmascript).
+Did you mean to import managedConstructionContentFingerprint?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./lib/tikz/authoring/construction-ir.ts [Client Component Browser]
+    ./lib/tikz/authoring/construction-catalog.ts [Client Component Browser]
+    ./components/tikz/tikz-tool-palette.tsx [Client Component Browser]
+    ./components/tikz-studio.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Server Component]
+    ./app/tikz/page.tsx [Server Component]
+
+
+[browser] ./lib/tikz/authoring/construction-ir.ts:10:1
+Export managedConstructionBodyFingerprint doesn't exist in target module
+   8 | } from './tikz-coordinate-serializer';
+   9 | import { formatCoordNumber } from '../patch/source-patch';
+> 10 | import {
+     | ^^^^^^^
+> 11 |   MANAGED_CONSTRUCTION_SCHEMA_VERSION,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 12 |   managedConstructionBodyFingerprint,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 13 |   serializeManagedConstructionRecords,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 14 |   type ManagedConstructionSemanticRecord,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 15 | } from '../semantics/managed-construction';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  16 |
+  17 | /**
+  18 |  * Construction IR is deliberately independent of a renderer or a source
+
+The export managedConstructionBodyFingerprint was not found in module [project]/lib/tikz/semantics/managed-construction.ts [app-client] (ecmascript).
+Did you mean to import managedConstructionContentFingerprint?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./lib/tikz/authoring/construction-ir.ts [Client Component Browser]
+    ./lib/tikz/authoring/construction-catalog.ts [Client Component Browser]
+    ./components/tikz/tikz-tool-palette.tsx [Client Component Browser]
+    ./components/tikz-studio.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Server Component]
+    ./app/tikz/page.tsx [Server Component] 
+⨯ ./lib/tikz/authoring/construction-ir.ts:10:1
+Export managedConstructionBodyFingerprint doesn't exist in target module
+  [90m 8 |[0m } [36mfrom[0m [32m'./tikz-coordinate-serializer'[0m;
+  [90m 9 |[0m [36mimport[0m { formatCoordNumber } [36mfrom[0m [32m'../patch/source-patch'[0m;
+[31m[1m>[0m [90m10 |[0m [36mimport[0m {
+  [90m   |[0m [31m[1m^^^^^^^[0m
+[31m[1m>[0m [90m11 |[0m   [33mMANAGED_CONSTRUCTION_SCHEMA_VERSION[0m,
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m12 |[0m   managedConstructionBodyFingerprint,
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m13 |[0m   serializeManagedConstructionRecords,
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m14 |[0m   [36mtype[0m [33mManagedConstructionSemanticRecord[0m,
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m15 |[0m } [36mfrom[0m [32m'../semantics/managed-construction'[0m;
+  [90m   |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m16 |[0m
+  [90m17 |[0m /**
+  [90m18 |[0m  * [33mConstruction[0m [33mIR[0m is deliberately independent [36mof[0m a renderer or a source
+
+The export managedConstructionBodyFingerprint was not found in module [project]/lib/tikz/semantics/managed-construction.ts [app-client] (ecmascript).
+Did you mean to import managedConstructionContentFingerprint?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./lib/tikz/authoring/construction-ir.ts [Client Component Browser]
+    ./lib/tikz/authoring/construction-catalog.ts [Client Component Browser]
+    ./components/tikz/tikz-tool-palette.tsx [Client Component Browser]
+    ./components/tikz-studio.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Server Component]
+    ./app/tikz/page.tsx [Server Component]
+
+
+[browser] Uncaught Error: ./lib/tikz/authoring/construction-ir.ts:10:1
+Export managedConstructionBodyFingerprint doesn't exist in target module
+   8 | } from './tikz-coordinate-serializer';
+   9 | import { formatCoordNumber } from '../patch/source-patch';
+> 10 | import {
+     | ^^^^^^^
+> 11 |   MANAGED_CONSTRUCTION_SCHEMA_VERSION,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 12 |   managedConstructionBodyFingerprint,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 13 |   serializeManagedConstructionRecords,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 14 |   type ManagedConstructionSemanticRecord,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 15 | } from '../semantics/managed-construction';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  16 |
+  17 | /**
+  18 |  * Construction IR is deliberately independent of a renderer or a source
+
+The export managedConstructionBodyFingerprint was not found in module [project]/lib/tikz/semantics/managed-construction.ts [app-client] (ecmascript).
+Did you mean to import managedConstructionContentFingerprint?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./lib/tikz/authoring/construction-ir.ts [Client Component Browser]
+    ./lib/tikz/authoring/construction-catalog.ts [Client Component Browser]
+    ./components/tikz/tikz-tool-palette.tsx [Client Component Browser]
+    ./components/tikz-studio.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Server Component]
+    ./app/tikz/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./lib/tikz/authoring/construction-ir.ts:10:1)
+    at <unknown> (Error: (./lib/tikz/authoring/construction-ir.ts:10:1)
+[browser] ./lib/tikz/authoring/construction-ir.ts:10:1
+Export managedConstructionBodyFingerprint doesn't exist in target module
+   8 | } from './tikz-coordinate-serializer';
+   9 | import { formatCoordNumber } from '../patch/source-patch';
+> 10 | import {
+     | ^^^^^^^
+> 11 |   MANAGED_CONSTRUCTION_SCHEMA_VERSION,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 12 |   managedConstructionBodyFingerprint,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 13 |   serializeManagedConstructionRecords,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 14 |   type ManagedConstructionSemanticRecord,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 15 | } from '../semantics/managed-construction';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  16 |
+  17 | /**
+  18 |  * Construction IR is deliberately independent of a renderer or a source
+
+The export managedConstructionBodyFingerprint was not found in module [project]/lib/tikz/semantics/managed-construction.ts [app-client] (ecmascript).
+Did you mean to import managedConstructionContentFingerprint?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./lib/tikz/authoring/construction-ir.ts [Client Component Browser]
+    ./lib/tikz/authoring/construction-catalog.ts [Client Component Browser]
+    ./components/tikz/tikz-tool-palette.tsx [Client Component Browser]
+    ./components/tikz-studio.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Server Component]
+    ./app/tikz/page.tsx [Server Component] 
+[browser] ./lib/tikz/authoring/construction-ir.ts:10:1
+Export managedConstructionBodyFingerprint doesn't exist in target module
+   8 | } from './tikz-coordinate-serializer';
+   9 | import { formatCoordNumber } from '../patch/source-patch';
+> 10 | import {
+     | ^^^^^^^
+> 11 |   MANAGED_CONSTRUCTION_SCHEMA_VERSION,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 12 |   managedConstructionBodyFingerprint,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 13 |   serializeManagedConstructionRecords,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 14 |   type ManagedConstructionSemanticRecord,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 15 | } from '../semantics/managed-construction';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  16 |
+  17 | /**
+  18 |  * Construction IR is deliberately independent of a renderer or a source
+
+The export managedConstructionBodyFingerprint was not found in module [project]/lib/tikz/semantics/managed-construction.ts [app-client] (ecmascript).
+Did you mean to import managedConstructionContentFingerprint?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./lib/tikz/authoring/construction-ir.ts [Client Component Browser]
+    ./lib/tikz/authoring/construction-catalog.ts [Client Component Browser]
+    ./components/tikz/tikz-tool-palette.tsx [Client Component Browser]
+    ./components/tikz-studio.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Server Component]
+    ./app/tikz/page.tsx [Server Component] 
+[browser] ./lib/tikz/authoring/construction-ir.ts:10:1
+Export managedConstructionBodyFingerprint doesn't exist in target module
+   8 | } from './tikz-coordinate-serializer';
+   9 | import { formatCoordNumber } from '../patch/source-patch';
+> 10 | import {
+     | ^^^^^^^
+> 11 |   MANAGED_CONSTRUCTION_SCHEMA_VERSION,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 12 |   managedConstructionBodyFingerprint,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 13 |   serializeManagedConstructionRecords,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 14 |   type ManagedConstructionSemanticRecord,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 15 | } from '../semantics/managed-construction';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  16 |
+  17 | /**
+  18 |  * Construction IR is deliberately independent of a renderer or a source
+
+The export managedConstructionBodyFingerprint was not found in module [project]/lib/tikz/semantics/managed-construction.ts [app-client] (ecmascript).
+Did you mean to import managedConstructionContentFingerprint?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./lib/tikz/authoring/construction-ir.ts [Client Component Browser]
+    ./lib/tikz/authoring/construction-catalog.ts [Client Component Browser]
+    ./components/tikz/tikz-tool-palette.tsx [Client Component Browser]
+    ./components/tikz-studio.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Client Component Browser]
+    ./components/tikz/tikz-route-client.tsx [Server Component]
+    ./app/tikz/page.tsx [Server Component] 
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'get')
+    at uniqueSourceEntityIdsBySemanticKey (lib/tikz/ir/tikz-adapter.ts:446:38)
+    at managedConstructionSemantics (lib/tikz/ir/tikz-adapter.ts:515:42)
+    at projectTikzAnalysisToGeometryTruth (lib/tikz/ir/tikz-adapter.ts:1215:19)
+    at useTikzEngine.useMemo[currentGeometryProjection] (components/tikz/use-tikz-engine.ts:210:25)
+    at useTikzEngine (components/tikz/use-tikz-engine.ts:209:51)
+    at TikzStudio (components/tikz-studio.tsx:98:37)
+    at TikzRouteClient (components/tikz/tikz-route-client.tsx:25:5)
+    at TikzHome (app\tikz\page.tsx:24:7)
+  444 |   const candidates = new Map<string, string | null>();
+  445 |   for (const entity of entities) {
+> 446 |     const sourceRange = sourceRanges.get(entity.id);
+      |                                      ^
+  447 |     if (
+  448 |       !sourceRange
+  449 |       || sourceRange.start < managedBodyRange.start
+⚠ Fast Refresh had to perform a full reload due to a runtime error.

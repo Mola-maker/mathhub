@@ -1,0 +1,112 @@
+name: math-geohub
+
+services:
+  web:
+    image: ${WEB_IMAGE:?Set WEB_IMAGE to an immutable ACR digest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      LLM_RELAY_API_KEY: ${LLM_RELAY_API_KEY:?Set LLM_RELAY_API_KEY}
+      LLM_RELAY_MODEL: ${LLM_RELAY_MODEL:-}
+      RATE_LIMIT_REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+      RATE_LIMIT_REDIS_PREFIX: ${RATE_LIMIT_REDIS_PREFIX:-math-geohub:rate}
+      TIKZ_COMPILER_URL: http://compiler-api:8080
+      TIKZ_COMPILER_TOKEN: ${TIKZ_COMPILER_TOKEN:?Set TIKZ_COMPILER_TOKEN}
+      NEXT_PUBLIC_GEOGEBRA_BASE_URL: ${NEXT_PUBLIC_GEOGEBRA_BASE_URL:-}
+    ports:
+      - "127.0.0.1:3000:3000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.5
+    depends_on:
+      compiler-api:
+        condition: service_healthy
+    networks: [frontend, backend]
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  compiler-api:
+    image: ${COMPILER_API_IMAGE:?Set COMPILER_API_IMAGE to an immutable ACR digest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      COMPILER_TOKEN: ${TIKZ_COMPILER_TOKEN:?Set TIKZ_COMPILER_TOKEN}
+      COMPILER_WORKER_IMAGE_REF: ${COMPILER_WORKER_IMAGE_REF:?Set an immutable repository@sha256 Worker reference}
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+      REDIS_PREFIX: ${REDIS_PREFIX:-math-geohub:tikz}
+      MAX_QUEUE_DEPTH: ${MAX_QUEUE_DEPTH:-64}
+      JOB_LEASE_MS: ${JOB_LEASE_MS:-90000}
+      ARTIFACT_DRIVER: oss
+      OSS_REGION: ${OSS_REGION:?Set OSS_REGION}
+      OSS_BUCKET: ${OSS_BUCKET:?Set OSS_BUCKET}
+      OSS_ENDPOINT: ${OSS_ENDPOINT:-}
+      OSS_INTERNAL: "true"
+      OSS_CDN_BASE_URL: ${OSS_CDN_BASE_URL:-}
+      OSS_ALLOW_PUBLIC_ACL: "false"
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:?Inject initial STS access key}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:?Inject initial STS secret}
+      OSS_STS_TOKEN: ${OSS_STS_TOKEN:?Inject initial STS token}
+      OSS_STS_REFRESH_URL: ${OSS_STS_REFRESH_URL:-}
+      OSS_STS_REFRESH_TOKEN: ${OSS_STS_REFRESH_TOKEN:-}
+    expose: ["8080"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    networks: [backend]
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  compiler-worker:
+    image: ${COMPILER_WORKER_IMAGE_REF:?Set an immutable repository@sha256 Worker reference}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      COMPILER_WORKER_IMAGE_REF: ${COMPILER_WORKER_IMAGE_REF:?Set an immutable repository@sha256 Worker reference}
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+      REDIS_PREFIX: ${REDIS_PREFIX:-math-geohub:tikz}
+      MAX_QUEUE_DEPTH: ${MAX_QUEUE_DEPTH:-64}
+      JOB_LEASE_MS: ${JOB_LEASE_MS:-90000}
+      COMPILE_TIMEOUT_MS: ${COMPILE_TIMEOUT_MS:-10000}
+      ARTIFACT_DRIVER: oss
+      OSS_REGION: ${OSS_REGION:?Set OSS_REGION}
+      OSS_BUCKET: ${OSS_BUCKET:?Set OSS_BUCKET}
+      OSS_ENDPOINT: ${OSS_ENDPOINT:-}
+      OSS_INTERNAL: "true"
+      OSS_CDN_BASE_URL: ${OSS_CDN_BASE_URL:-}
+      OSS_ALLOW_PUBLIC_ACL: "false"
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:?Inject initial STS access key}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:?Inject initial STS secret}
+      OSS_STS_TOKEN: ${OSS_STS_TOKEN:?Inject initial STS token}
+      OSS_STS_REFRESH_URL: ${OSS_STS_REFRESH_URL:-}
+      OSS_STS_REFRESH_TOKEN: ${OSS_STS_REFRESH_TOKEN:-}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 768m
+    cpus: 1.5
+    networks: [backend]
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+networks:
+  frontend:
+  backend:

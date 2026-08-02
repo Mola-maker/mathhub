@@ -1,5 +1,7 @@
 # TikZ Studio 架构调研补充（2026-07-27）
 
+> 状态：历史调研，已由 [TikZ Studio v3 架构调研](./2026-07-27-tikz-studio-v3-architecture-research.md) 和 [v3 架构设计](../specs/2026-07-27-tikz-studio-v3-architecture-design.md) 取代。本文中的浏览器 TikZJax 路线不得继续作为生产实施依据。
+
 ## 调研范围
 
 在继续实现前，围绕 Next.js 16 Route Handlers、CodeMirror/Lezer、浏览器
@@ -41,4 +43,3 @@ Tavily 的深度研究端点首次不可用；随后使用 Tavily Advanced Searc
 - [Node-TikZJax](https://github.com/prinsss/node-tikzjax)
 - [`rod2ik/tikzjax`](https://github.com/rod2ik/tikzjax)
 - [DOMPurify threat model](https://github.com/cure53/DOMPurify)
-

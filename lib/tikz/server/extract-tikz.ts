@@ -1,3 +1,5 @@
+import { canonicalizeTikz } from '@/lib/tikz/normalize';
+
 const FORBIDDEN: RegExp[] = [
   /\\(?:input|include)\s*(?:\{[^{}\r\n]*\}|[^\s%]+)/g,
   /\\write18\s*(?:=\s*)?(?:\{[^{}\r\n]*\}|[^\s%]*)/g,
@@ -24,7 +26,7 @@ export function extractTikzBlock(text: string): string | null {
 
 export function sanitizeTikz(code: string): { code: string; stripped: string[] } {
   const stripped: string[] = [];
-  let sanitized = code;
+  let sanitized = canonicalizeTikz(code);
   for (const pattern of FORBIDDEN) {
     sanitized = sanitized.replace(pattern, (match) => {
       const command = /^\\[A-Za-z0-9]+/.exec(match)?.[0] ?? match;

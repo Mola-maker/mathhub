@@ -1,5 +1,7 @@
 'use client';
 
+import { AnimatePresence, motion } from 'motion/react';
+import { TIKZ_HOVER, TIKZ_MOTION, TIKZ_TAP } from './tikz-motion';
 import type { TikzEngine } from './use-tikz-engine';
 
 export function TikzToolbar({
@@ -12,6 +14,8 @@ export function TikzToolbar({
   onRepair,
   stepsOpen = false,
   onToggleSteps,
+  exactMode = false,
+  onToggleExact,
 }: {
   engine: TikzEngine;
   pureMode: boolean;
@@ -22,31 +26,95 @@ export function TikzToolbar({
   onRepair?(): void;
   stepsOpen?: boolean;
   onToggleSteps?(): void;
+  exactMode?: boolean;
+  onToggleExact?(): void;
 }) {
-  const pointCount = engine.scene?.points.size ?? 0;
+  const pointCount = engine.scene
+    ? [...engine.scene.points.values()].filter((point) => !point.internal).length
+    : 0;
   const elementCount = engine.scene?.elements.length ?? 0;
+  const projectionLabel = engine.projection.status === 'complete'
+    ? '构造有效'
+    : engine.projection.status === 'partial'
+      ? `${engine.projection.cst.opaqueNodes.length} 个 opaque 区域`
+      : `${engine.issues.length || engine.projection.cst.errorRanges.length} 个问题`;
   return (
-    <div className="tz-toolbar" aria-label="TikZ Studio 工具栏">
-      <button type="button" onClick={onClose} aria-label="关闭 TikZ Studio">← 返回</button>
+    <motion.div
+      layout
+      className="tz-toolbar"
+      aria-label="TikZ Studio 工具栏"
+      transition={TIKZ_MOTION.softSpring}
+    >
+      <motion.button
+        type="button"
+        onClick={onClose}
+        aria-label="关闭 TikZ Studio"
+        whileHover={TIKZ_HOVER}
+        whileTap={TIKZ_TAP}
+      >
+        ← 工作台
+      </motion.button>
       <span className="tz-toolbar__brand">TikZ Studio</span>
-      <span className="tz-pill">{pointCount} 点 · {elementCount} 图元</span>
-      <span className={`tz-pill${engine.issues.length ? ' tz-pill--warn' : ' tz-pill--ok'}`}>
-        {engine.issues.length ? `${engine.issues.length} 个问题` : '构造有效'}
-      </span>
-      {repairStatus ? <span className="tz-pill" role="status">{repairStatus}</span> : null}
+      <motion.span layout className="tz-pill">{pointCount} 点 · {elementCount} 图元</motion.span>
+      <motion.span
+        layout
+        className={`tz-pill${engine.projection.status === 'complete' ? ' tz-pill--ok' : ' tz-pill--warn'}`}
+      >
+        {projectionLabel}
+      </motion.span>
+      <AnimatePresence>
+        {repairStatus
+          ? (
+            <motion.span
+              key="repair-status"
+              className="tz-pill"
+              role="status"
+              {...TIKZ_MOTION.status}
+              transition={TIKZ_MOTION.spring}
+            >
+              {repairStatus}
+            </motion.span>
+          )
+          : null}
+      </AnimatePresence>
       <span className="tz-toolbar__spacer" />
-      <button type="button" disabled={repairing} onClick={onRepair}>
+      <motion.button
+        type="button"
+        disabled={repairing}
+        onClick={onRepair}
+        whileHover={TIKZ_HOVER}
+        whileTap={TIKZ_TAP}
+      >
         {repairing ? '修复中…' : '🔧 修复'}
-      </button>
-      <button type="button" onClick={onToggleSteps} aria-pressed={stepsOpen}>
+      </motion.button>
+      <motion.button
+        type="button"
+        onClick={onToggleSteps}
+        aria-pressed={stepsOpen}
+        whileHover={TIKZ_HOVER}
+        whileTap={TIKZ_TAP}
+      >
         ☷ 步骤
-      </button>
-      <button type="button" disabled title="精确 TeX 预览将在下一阶段启用">
-        ⌁ 精确预览
-      </button>
-      <button type="button" onClick={onTogglePure} aria-pressed={pureMode}>
+      </motion.button>
+      <motion.button
+        type="button"
+        onClick={onToggleExact}
+        aria-pressed={exactMode}
+        title="使用真实 TeX/TikZ 编译器生成 SVG"
+        whileHover={TIKZ_HOVER}
+        whileTap={TIKZ_TAP}
+      >
+        {exactMode ? '↩ 交互预览' : '⌁ 精确预览'}
+      </motion.button>
+      <motion.button
+        type="button"
+        onClick={onTogglePure}
+        aria-pressed={pureMode}
+        whileHover={TIKZ_HOVER}
+        whileTap={TIKZ_TAP}
+      >
         {pureMode ? '退出纯净' : '纯净模式'}
-      </button>
-    </div>
+      </motion.button>
+    </motion.div>
   );
 }

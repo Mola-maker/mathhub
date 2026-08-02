@@ -1340,13 +1340,6 @@
 }
 .wp-math__model-select:focus { border-color: var(--accent); outline: none; }
 .wp-math__model-select:disabled { opacity: 0.5; }
-.wp-math__model-coze {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--ink-faint);
-  margin: 0;
-}
 .wp-math__model-hint {
   font-family: var(--font-mono);
   font-size: 10px;

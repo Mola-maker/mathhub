@@ -32,9 +32,7 @@ vi.mock('@/lib/provider/settings', async (importOriginal) => {
       apiKey: 'k',
       baseUrl: 'https://api.molamaker.cn',
       model: 'm',
-      botId: '',
       configured: true,
-      protocol: 'openai-compatible' as const,
     })),
   };
 });
@@ -56,7 +54,7 @@ describe('POST /api/tikz', () => {
       mode: 'build',
       problem: '画三角形',
       history: [],
-      provider: 'anthropic',
+      provider: 'relay',
     }));
     const text = await response.text();
     expect(text).toContain('"model":"m"');
@@ -66,10 +64,10 @@ describe('POST /api/tikz', () => {
   });
 
   it('repair：校验必需字段并可返回代码帧', async () => {
-    expect((await POST(request({ mode: 'repair', provider: 'anthropic' }))).status).toBe(400);
+    expect((await POST(request({ mode: 'repair', provider: 'relay' }))).status).toBe(400);
     const response = await POST(request({
       mode: 'repair',
-      provider: 'anthropic',
+      provider: 'relay',
       tikzCode: '\\begin{tikzpicture}\\end{tikzpicture}',
       failures: ['未知引用'],
     }));
@@ -77,15 +75,14 @@ describe('POST /api/tikz', () => {
   });
 
   it('非法 mode/provider → 400', async () => {
-    expect((await POST(request({ mode: 'ask', provider: 'anthropic' }))).status).toBe(400);
+    expect((await POST(request({ mode: 'ask', provider: 'relay' }))).status).toBe(400);
     expect((await POST(request({ mode: 'build', problem: 'x', provider: 'evil' }))).status).toBe(400);
   });
 
   it('超过限流 → 429 并返回 Retry-After', async () => {
     vi.mocked(checkRate).mockResolvedValueOnce({ allowed: false, remaining: 0, resetMs: 5_000 });
-    const response = await POST(request({ mode: 'build', problem: 'x', provider: 'anthropic' }));
+    const response = await POST(request({ mode: 'build', problem: 'x', provider: 'relay' }));
     expect(response.status).toBe(429);
     expect(response.headers.get('retry-after')).toBe('5');
   });
 });
-

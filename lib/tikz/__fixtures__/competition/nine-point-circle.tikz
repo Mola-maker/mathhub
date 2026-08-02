@@ -9,5 +9,5 @@
 \coordinate (Mac) at ($(A)!0.5!(C)$);
 \coordinate (Mbc) at ($(B)!0.5!(C)$);
 \draw (A) -- (B) -- (C) -- cycle;
-\draw (N) circle [through=(Mab)];
+\node[draw,circle through=(Mab)] at (N) {};
 \end{tikzpicture}

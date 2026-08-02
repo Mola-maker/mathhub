@@ -38,6 +38,14 @@ describe('sanitizeTikz', () => {
     expect(code).not.toContain('evil.tex');
     expect(stripped).toEqual(expect.arrayContaining(['\\def', '\\write18', '\\include']));
   });
+
+  it('将历史伪 through 语法规范化为标准 TikZ', () => {
+    const { code } = sanitizeTikz(
+      '\\begin{tikzpicture}\\draw (O) circle [through=(A)];\\end{tikzpicture}',
+    );
+    expect(code).toContain('\\node[draw,circle through=(A)] at (O) {}');
+    expect(code).not.toContain('[through=');
+  });
 });
 
 describe('detectPreviewOnly', () => {
@@ -48,4 +56,3 @@ describe('detectPreviewOnly', () => {
       .toEqual([]);
   });
 });
-

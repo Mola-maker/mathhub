@@ -21,7 +21,7 @@ export function formatMetaCommandResponse(
     case 'model':
       return status.model
         ? `**当前作图模型**\n- Provider: \`${status.provider}\`\n- Model: \`${status.model}\`${status.activeModel && status.activeModel !== status.model ? `\n- 上次请求: \`${status.activeModel}\`` : ''}`
-        : `**当前作图模型**\n- Provider: \`${status.provider}\`\n- Model: （Coze bot / 未选择）`;
+        : `**当前作图模型**\n- Provider: \`${status.provider}\`\n- Model: （尚未从 api.molamaker.cn 的实时目录中选择）`;
 
     case 'status':
       return [

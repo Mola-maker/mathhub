@@ -83,33 +83,45 @@ function sampleLetterPoints(
 ): Array<[number, number]> {
   const pts: Array<[number, number]> = [];
   const twoPi = 2 * Math.PI;
+  const normAngle = (raw: number) => ((raw % twoPi) + twoPi) % twoPi;
 
-  // Outer arc samples — skip the cutout angle ranges.
-  const outerSamples = 44;
+  // Outer-arc KEEP ranges per letter (normalized angles, [0, 2π]).
+  // The cutout (bar slot for G, opening for e) is the complement of
+  // these ranges. For G the bar slot is the SHORT 56° wraparound arc
+  // around 0°/2π, so the outer arc is [barTop, barBot] going through
+  // 90°/180°/270°. For e the opening is the SHORT 20° arc at the
+  // lower-right; the outer arc is two ranges flanking it.
+  type Range = { start: number; end: number };
+  let keepRanges: Range[];
+  if (letter === 'g') {
+    const barBot = normAngle(-Math.PI * 0.11); // ~5.93 rad (340°)
+    const barTop = normAngle(Math.PI * 0.20);  // ~0.628 rad (36°)
+    keepRanges = [{ start: barTop, end: barBot }];
+  } else if (letter === 'e') {
+    const cutBot = normAngle(Math.atan2(-26, outerR)); // ~5.87 rad
+    const cutTop = normAngle(Math.atan2(-4, outerR));  // ~6.22 rad
+    keepRanges = [
+      { start: 0, end: cutBot },
+      { start: cutTop, end: twoPi },
+    ];
+  } else {
+    keepRanges = [{ start: 0, end: twoPi }];
+  }
+
+  const inKeep = (a: number) =>
+    keepRanges.some((r) => a >= r.start && a <= r.end);
+
+  // Outer arc samples — only keep angles in the keep-ranges.
+  const outerSamples = 56;
   for (let i = 0; i < outerSamples; i++) {
     const angle = (i / outerSamples) * twoPi;
-    const a = ((angle % twoPi) + twoPi) % twoPi;
-
-    if (letter === 'g') {
-      const barBot = (-Math.PI * 0.11 + twoPi) % twoPi;
-      const barTop = Math.PI * 0.20;
-      const inCut = barTop < barBot
-        ? a >= barTop && a <= barBot
-        : a >= barTop || a <= barBot;
-      if (inCut) continue;
-    }
-
-    if (letter === 'e') {
-      const cutBot = Math.atan2(-26, outerR) + twoPi;
-      const cutTop = Math.atan2(-4, outerR);
-      const inCut = cutTop < cutBot
-        ? a >= cutTop && a <= cutBot
-        : a >= cutTop || a <= cutBot;
-      if (inCut) continue;
-    }
-
+    const a = normAngle(angle);
+    if (!inKeep(a)) continue;
     pts.push([outerR * Math.cos(angle), outerR * Math.sin(angle)]);
   }
+
+  // Count what we've pushed so far to budget the interior points.
+  const totalBound = pts.length;
 
   // Bar-slot corners (G)
   if (letter === 'g') {
@@ -129,41 +141,70 @@ function sampleLetterPoints(
     pts.push([outerR * Math.cos(Math.atan2(-4, outerR)), -4]);
   }
 
-  // Inner counter boundary (o: full ring; e: half-ring above crossbar)
+  // Inner counter boundary. Dense ring (not sparse) gives the inner edge
+  // a real wireframe look without falling into Delaunay's radial-fan
+  // habit (the interior points now dominate the center).
   if (letter === 'o') {
-    const innerSamples = 28;
+    const innerSamples = 36;
     for (let i = 0; i < innerSamples; i++) {
       const angle = (i / innerSamples) * twoPi;
-      pts.push([innerR * Math.cos(angle), innerR * Math.sin(angle)]);
+      // Mild radius jitter (±1.2 units) breaks perfect concentricity.
+      const r = innerR + Math.sin(angle * 7.3 + i * 1.1) * 1.2;
+      pts.push([r * Math.cos(angle), r * Math.sin(angle)]);
     }
   }
 
   if (letter === 'e') {
-    const innerSamples = 18;
+    // Upper D-counter boundary (top half of inner ring).
+    const innerSamples = 24;
     for (let i = 0; i < innerSamples; i++) {
-      const t = i / innerSamples;
-      const angle = Math.PI - Math.PI * t; // top half: π → 0
+      const t = i / (innerSamples - 1);
+      const angle = Math.PI - Math.PI * t; // π → 0 (top half)
       const y = innerR * Math.sin(angle);
       if (y <= 6) continue;
-      pts.push([innerR * Math.cos(angle), y]);
+      const r = innerR + Math.sin(angle * 5.7 + i * 0.9) * 1.2;
+      pts.push([r * Math.cos(angle), r * Math.sin(angle)]);
     }
-    // Crossbar endpoints seal the D-counter at the bottom.
-    pts.push([-innerR, 6]);
-    pts.push([innerR, 6]);
+    // Crossbar: a horizontal line of samples across the middle of the
+    // letter. Connects the left inner edge of the D to the right edge.
+    const crossbarSamples = 10;
+    for (let i = 0; i < crossbarSamples; i++) {
+      const t = i / (crossbarSamples - 1);
+      const x = -innerR + t * (innerR - (-innerR));
+      pts.push([x, 6]);
+    }
+  }
+
+  // For 'g': explicit horizontal bar through the bowl (visual identity).
+  // Samples along the inner-facing edge of the bar slot.
+  if (letter === 'g') {
+    const barSamples = 8;
+    for (let i = 0; i < barSamples; i++) {
+      const t = i / (barSamples - 1);
+      // The bar runs from the inner edge of the bowl on the left to
+      // a small inset on the right.
+      const x = -innerR + t * (outerR * 0.55);
+      pts.push([x, 6]);
+    }
+    // Lower D (inner counter of the G bowl below the bar).
+    for (let i = 0; i < 16; i++) {
+      const t = i / 15;
+      const angle = Math.PI + Math.PI * t; // bottom half: π → 2π
+      const r = innerR + Math.sin(angle * 4.1 + i * 0.7) * 1.0;
+      pts.push([r * Math.cos(angle), r * Math.sin(angle)]);
+    }
   }
 
   // Interior points via rejection sampling.
   let attempts = 0;
-  const maxAttempts = interiorCount * 40;
+  const maxAttempts = interiorCount * 60;
   while (attempts < maxAttempts) {
     attempts++;
     const x = (rng() * 2 - 1) * outerR;
     const y = (rng() * 2 - 1) * outerR;
     if (!isInsideLetter(x, y, letter, outerR, innerR)) continue;
     pts.push([x, y]);
-    // Count interior points (anything past the boundary samples).
-    const interiorSoFar = pts.length - outerSamples;
-    if (interiorSoFar >= interiorCount) break;
+    if (pts.length >= totalBound + interiorCount) break;
   }
 
   return pts;
@@ -245,7 +286,7 @@ function buildLetter(
 
   const mat = new LineMaterial({
     color: 0x0a0a0a,
-    linewidth: 0.75,
+    linewidth: 1.4,
     transparent: true,
     opacity: 0,
     resolution: new Vector2(1, 1),
@@ -294,11 +335,11 @@ export function buildGeoWordmark(targetWidth = 11): GeoWordmark {
   const oInnerR = 22;
 
   // Deterministic seeds so the mesh is identical on every reload.
-  // Higher interior counts break up the radial-fan artifact that arises
-  // when Delaunay connects two roughly concentric boundary arcs.
-  const g = buildLetter('g', gOuterR, gInnerR, 55, 11);
-  const e = buildLetter('e', eOuterR, eInnerR, 45, 23);
-  const o = buildLetter('o', oOuterR, oInnerR, 55, 47);
+  // Higher interior counts break up the radial-fan artifact and give a
+  // dense triangulated fill that's recognizable as the letter shape.
+  const g = buildLetter('g', gOuterR, gInnerR, 120, 11);
+  const e = buildLetter('e', eOuterR, eInnerR, 100, 23);
+  const o = buildLetter('o', oOuterR, oInnerR, 140, 47);
 
   const gW = g.bbox.maxX - g.bbox.minX;
   const eW = e.bbox.maxX - e.bbox.minX;

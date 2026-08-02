@@ -41,9 +41,9 @@ import {
   type ConstructionStep,
 } from '@/lib/math/geometry-render/steps';
 
-type Provider = 'anthropic' | 'deepseek' | 'coze' | 'dashscope';
+type Provider = 'relay';
 type Message = { role: 'user' | 'assistant'; content: string };
-type ModelRow = { id: string; label: string; probe: { ok: boolean; ms: number; error?: string } };
+type ModelRow = { id: string; label: string };
 
 const MODEL_STORAGE_KEY = 'math-studio-draw-model';
 const MSG_VISIBLE = 12;
@@ -133,13 +133,7 @@ function clearGgbConstruction(api: GGBApi): void {
   } catch { /* older bundle */ }
 }
 
-const PROVIDER_LABELS: Record<Provider, string> = {
-  anthropic: 'Anthropic',
-  deepseek: 'DeepSeek',
-  coze: 'Coze',
-  dashscope: '通义千问',
-};
-const PROVIDER_ORDER: Provider[] = ['anthropic', 'deepseek', 'dashscope', 'coze'];
+const PROVIDER_LABELS: Record<Provider, string> = { relay: 'api.molamaker.cn' };
 
 const GGB_CONTAINER_ID = 'wp-ggb-applet';
 const GGB_SCALE_CLASS = 'wp-ggb-scale';
@@ -185,9 +179,9 @@ function MessageBubble({ msg }: { msg: Message }) {
 
 type StreamResult = { commands: string[]; fullText: string; serverError: string };
 
-export function MathStudio() {
+export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [provider, setProvider] = useState<Provider>('anthropic');
+  const [provider, setProvider] = useState<Provider>('relay');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -203,10 +197,12 @@ export function MathStudio() {
   const [catalogModels, setCatalogModels] = useState<ModelRow[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
   const [modelsLoading, setModelsLoading] = useState(false);
-  const [modelsSource, setModelsSource] = useState<'api' | 'fallback' | ''>('');
+  const [modelsSource, setModelsSource] = useState<
+    'api' | 'cache' | 'stale-cache' | 'unavailable' | ''
+  >('');
   const [modelsError, setModelsError] = useState('');
-  const [studioMounted, setStudioMounted] = useState(false);
-  const [studioOpen, setStudioOpen] = useState(false);
+  const [studioMounted, setStudioMounted] = useState(startOpen);
+  const [studioOpen, setStudioOpen] = useState(startOpen);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [katexPanelOpen, setKatexPanelOpen] = useState(false);
   const [katexView, setKatexView] = useState<'render' | 'source'>('render');
@@ -307,35 +303,51 @@ export function MathStudio() {
     const reqId = ++modelsReqRef.current;
     setModelsLoading(true);
     setModelsError('');
-    setCatalogModels([]);
     try {
-      const r = await fetch(`/api/math/models?provider=${encodeURIComponent(p)}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json() as { models?: ModelRow[]; defaultModel?: string; source?: 'api' | 'fallback'; listError?: string; error?: string };
-      if (reqId !== modelsReqRef.current) return;
-      if (j.error && !j.models?.length) throw new Error(j.error);
-      const rows = j.models ?? [];
-      setCatalogModels(rows);
-      setModelsSource(j.source ?? '');
-      if (j.listError) setModelsError(j.listError);
-      const stored = (() => {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-          const all = JSON.parse(localStorage.getItem(MODEL_STORAGE_KEY) ?? '{}') as Record<string, string>;
-          return all[p]?.trim() ?? '';
-        } catch { return ''; }
-      })();
-      const firstOk = rows.find((m) => m.probe?.ok)?.id;
-      const pick = (stored && rows.some((m) => m.id === stored))
-        ? stored
-        : (j.defaultModel && rows.some((m) => m.id === j.defaultModel))
-          ? j.defaultModel
-          : (firstOk ?? rows[0]?.id ?? '');
-      setSelectedModel(pick);
+          const r = await fetch(`/api/math/models?provider=${encodeURIComponent(p)}`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const j = await r.json() as {
+            models?: ModelRow[];
+            defaultModel?: string;
+            source?: 'api' | 'cache' | 'stale-cache' | 'unavailable';
+            listError?: string;
+            error?: string;
+          };
+          if (reqId !== modelsReqRef.current) return;
+          if (j.error && !j.models?.length) throw new Error(j.error);
+          const rows = j.models ?? [];
+          if (rows.length === 0) throw new Error(j.listError || '模型目录为空');
+          setCatalogModels(rows);
+          setModelsSource(j.source ?? '');
+          setModelsError(j.listError ?? '');
+          const stored = (() => {
+            try {
+              const all = JSON.parse(localStorage.getItem(MODEL_STORAGE_KEY) ?? '{}') as Record<string, string>;
+              return all[p]?.trim() ?? '';
+            } catch { return ''; }
+          })();
+          const pick = (stored && rows.some((m) => m.id === stored))
+            ? stored
+            : (j.defaultModel && rows.some((m) => m.id === j.defaultModel))
+              ? j.defaultModel
+              : (rows[0]?.id ?? '');
+          setSelectedModel(pick);
+          return;
+        } catch (error) {
+          if (reqId !== modelsReqRef.current) return;
+          if (attempt === 2) throw error;
+          setModelsError('模型目录连接波动，正在自动重试…');
+          await new Promise((resolve) => {
+            setTimeout(resolve, attempt === 0 ? 1_200 : 3_000);
+          });
+        }
+      }
     } catch (e) {
       if (reqId !== modelsReqRef.current) return;
-      setModelsError(e instanceof Error ? e.message : 'model list failed');
-      setCatalogModels([]);
-      setSelectedModel('');
+      setModelsSource('unavailable');
+      setModelsError(e instanceof Error ? e.message : '无法读取模型列表，请稍后重试');
     } finally {
       if (reqId === modelsReqRef.current) setModelsLoading(false);
     }
@@ -671,13 +683,17 @@ export function MathStudio() {
       if (e.key !== 'Escape') return;
       if (pureModeRef.current) { setPureMode(false); return; }
       if (stepsOpenRef.current) { setStepsOpen(false); return; }
+      if (startOpen) {
+        window.location.assign('/');
+        return;
+      }
       setStudioOpen(false);
     };
     window.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
-  }, [studioOpen]);
+  }, [startOpen, studioOpen]);
 
   // Pure mode resizes the stage to the viewport — refit the applet after the
   // CSS transition settles (both directions).
@@ -850,7 +866,7 @@ export function MathStudio() {
   const send = useCallback(async () => {
     const raw = input.trim();
     if (!raw || streaming || sendingRef.current) return;
-    if (provider !== 'coze' && !selectedModel) { setError('请先选择作图模型'); return; }
+    if (!selectedModel) { setError('请先选择作图模型'); return; }
 
     const parsed = parseStudioInput(raw);
     if (parsed.kind === 'meta') {
@@ -858,7 +874,7 @@ export function MathStudio() {
       setPaletteIndex(0);
       const reply = formatMetaCommandResponse(parsed.command, {
         provider: PROVIDER_LABELS[provider],
-        model: provider === 'coze' ? null : selectedModel,
+        model: selectedModel,
         messageCount: messages.length,
         ggbReady,
         ggbDrawReady,
@@ -901,7 +917,7 @@ export function MathStudio() {
     let serverError = '';
     try {
       const payload: Record<string, unknown> = { mode: 'build', problem: problemBody, history, provider, drawingCommand };
-      if (provider !== 'coze' && selectedModel) payload.model = selectedModel;
+      if (selectedModel) payload.model = selectedModel;
       if (continueDrawing && previousGgbCommands.length > 0) payload.previousGgbCommands = previousGgbCommands;
 
       res = await streamMath(payload, (txt) => {
@@ -991,20 +1007,13 @@ export function MathStudio() {
 
   const providerPills = (
     <div className="wp-math__providers">
-      {PROVIDER_ORDER.map((p) => {
-        const available = providers.includes(p);
-        return (
-          <button
-            key={p}
-            className={`wp-math__pill${provider === p && available ? ' wp-math__pill--active' : ''}`}
-            onClick={() => available && setProvider(p)}
-            disabled={!available}
-            title={available ? `Use ${PROVIDER_LABELS[p]}` : `${PROVIDER_LABELS[p]} not configured`}
-          >
-            {PROVIDER_LABELS[p]}
-          </button>
-        );
-      })}
+      <button
+        className={`wp-math__pill${providers.includes(provider) ? ' wp-math__pill--active' : ''}`}
+        disabled
+        title="所有请求统一通过 api.molamaker.cn"
+      >
+        {PROVIDER_LABELS[provider]}
+      </button>
     </div>
   );
 
@@ -1012,34 +1021,27 @@ export function MathStudio() {
     <div className="wp-math__model-row">
       <label className="wp-math__model-label" htmlFor="math-studio-draw-model">
         作图模型
-        {modelsLoading && <span className="wp-math__model-probe"> · 拉取并检测中…</span>}
-        {!modelsLoading && modelsSource === 'fallback' && (
-          <span className="wp-math__model-probe" title={modelsError}> · 列表来自备用目录</span>
+        {modelsLoading && <span className="wp-math__model-probe"> · 从 api.molamaker.cn 获取中…</span>}
+        {!modelsLoading && modelsSource === 'unavailable' && (
+          <span className="wp-math__model-probe" title={modelsError}> · 暂未取得模型列表</span>
         )}
       </label>
-      {provider === 'coze' ? (
-        <p className="wp-math__model-coze">使用 Math Studio 环境中的 Coze Bot（已注入 GeoGebra 作图规范）</p>
-      ) : (
-        <select
-          id="math-studio-draw-model"
-          className="wp-math__model-select"
-          value={selectedModel}
-          onChange={(e) => onModelChange(e.target.value)}
-          disabled={streaming || modelsLoading || catalogModels.length === 0}
-        >
-          {catalogModels.length === 0 && (
-            <option value="">{modelsLoading ? '加载中…' : '无可用模型'}</option>
-          )}
-          {catalogModels.map((m) => {
-            const status = m.probe?.ok ? '●' : m.probe ? '○' : '?';
-            return (
-              <option key={m.id} value={m.id} title={m.probe?.ok ? `${m.id} · ${m.probe.ms}ms` : m.probe?.error ?? '不可用'}>
-                {status} {m.label !== m.id ? `${m.label} · ` : ''}{m.id}
-              </option>
-            );
-          })}
-        </select>
-      )}
+      <select
+        id="math-studio-draw-model"
+        className="wp-math__model-select"
+        value={selectedModel}
+        onChange={(e) => onModelChange(e.target.value)}
+        disabled={streaming || modelsLoading || catalogModels.length === 0}
+      >
+        {catalogModels.length === 0 && (
+          <option value="">{modelsLoading ? '加载中…' : '无可用模型'}</option>
+        )}
+        {catalogModels.map((m) => (
+          <option key={m.id} value={m.id} title={m.id}>
+            {m.label !== m.id ? `${m.label} · ` : ''}{m.id}
+          </option>
+        ))}
+      </select>
       {modelsError && !modelsLoading && (
         <p className="wp-math__model-hint" title={modelsError}>模型列表：{modelsError}</p>
       )}
@@ -1048,36 +1050,38 @@ export function MathStudio() {
 
   return (
     <>
-      <div
-        className="wp-tile wp-tile--math"
-        onClick={openStudio}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openStudio(); } }}
-      >
-        <div className="wp-tile__head">
-          <span className="wp-tile__name">Math</span>
-          <span className="wp-tile__status">
-            <span className="wp-tile__dot wp-tile__dot--live" />
-            geogebra
-          </span>
+      {!startOpen ? (
+        <div
+          className="wp-tile wp-tile--math"
+          onClick={openStudio}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openStudio(); } }}
+        >
+          <div className="wp-tile__head">
+            <span className="wp-tile__name">Math</span>
+            <span className="wp-tile__status">
+              <span className="wp-tile__dot wp-tile__dot--live" />
+              geogebra
+            </span>
+          </div>
+          <div className="wp-tile__desc">
+            Describe a geometry construction and watch it drawn live in a full
+            GeoGebra workspace — full toolbar, algebra view, and every native tool.
+          </div>
+          <div className="wp-math__tile-providers" onClick={(e) => e.stopPropagation()}>
+            {providerPills}
+          </div>
+          <div className="wp-tile__actions">
+            <button className="wp-tile__btn wp-tile__btn--primary" onClick={(e) => { e.stopPropagation(); openStudio(); }}>
+              ⛶ Open Studio
+            </button>
+          </div>
+          {providers.length === 0 && (
+            <span className="wp-math__launch-note">请在 .env.local 配置 LLM_RELAY_API_KEY，然后重启开发服务器。</span>
+          )}
         </div>
-        <div className="wp-tile__desc">
-          Describe a geometry construction and watch it drawn live in a full
-          GeoGebra workspace — full toolbar, algebra view, and every native tool.
-        </div>
-        <div className="wp-math__tile-providers" onClick={(e) => e.stopPropagation()}>
-          {providerPills}
-        </div>
-        <div className="wp-tile__actions">
-          <button className="wp-tile__btn wp-tile__btn--primary" onClick={(e) => { e.stopPropagation(); openStudio(); }}>
-            ⛶ Open Studio
-          </button>
-        </div>
-        {providers.length === 0 && (
-          <span className="wp-math__launch-note">No AI provider configured — set ANTHROPIC_API_KEY, DEEPSEEK_API_KEY or DASHSCOPE_API_KEY to enable drawing from prompts.</span>
-        )}
-      </div>
+      ) : null}
 
       {studioMounted && typeof document !== 'undefined' && createPortal(
         <div className={`wp-studio${studioOpen ? ' is-open' : ''}${perfMode ? ' wp-studio--perf' : ''}${sidebarOpen ? '' : ' wp-studio--sidebar-collapsed'}${katexPanelOpen ? ' wp-studio--katex-open' : ''}`}>
@@ -1156,7 +1160,7 @@ export function MathStudio() {
                 disabled={streaming}
                 rows={2}
               />
-              <button className="wp-math__send" onClick={send} disabled={streaming || !input.trim() || (provider !== 'coze' && !selectedModel)}>
+              <button className="wp-math__send" onClick={send} disabled={streaming || !input.trim() || !selectedModel}>
                 {streaming ? '…' : '↵'}
               </button>
             </div>
@@ -1212,7 +1216,13 @@ export function MathStudio() {
                 >⛶</button>
                 <button
                   className="wp-studio__close"
-                  onClick={() => setStudioOpen(false)}
+                  onClick={() => {
+                    if (startOpen) {
+                      window.location.assign('/');
+                      return;
+                    }
+                    setStudioOpen(false);
+                  }}
                   title="Close studio (Esc)"
                   aria-label="Close studio"
                 >×</button>

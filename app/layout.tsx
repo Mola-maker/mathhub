@@ -2,6 +2,7 @@ import './globals.css';
 import 'katex/dist/katex.min.css';
 import './studio.css';
 import './tikz-studio.css';
+import './home-dashboard.css';
 
 export const metadata = {
   title: 'Math & TikZ Studio · molamaker',

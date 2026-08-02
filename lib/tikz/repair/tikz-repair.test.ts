@@ -28,7 +28,7 @@ describe('localRepairTikz', () => {
     );
     const result = await runTikzRepair({
       code: broken,
-      provider: 'anthropic',
+      provider: 'relay',
       request,
       maxRounds: 1,
     });

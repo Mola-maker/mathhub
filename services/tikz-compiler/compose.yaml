@@ -1,0 +1,85 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks: [compiler-backend]
+
+  compiler-api:
+    build:
+      context: ../..
+      dockerfile: services/tikz-compiler/Dockerfile
+      target: api
+    environment:
+      NODE_ENV: development
+      COMPILER_TOKEN: ${TIKZ_COMPILER_TOKEN:-local-tikz-compiler-token}
+      COMPILER_WORKER_IMAGE_REF: dev-tectonic-0.17.0-dvisvgm
+      REDIS_URL: redis://redis:6379
+      JOB_LEASE_MS: "90000"
+      ARTIFACT_DRIVER: local
+      ARTIFACT_LOCAL_DIR: /artifacts
+    ports:
+      - "127.0.0.1:8787:8080"
+    volumes:
+      - artifacts:/artifacts:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [compiler-backend]
+
+  compiler-worker:
+    build:
+      context: ../..
+      dockerfile: services/tikz-compiler/Dockerfile
+      target: worker
+    environment:
+      NODE_ENV: development
+      COMPILER_WORKER_IMAGE_REF: dev-tectonic-0.17.0-dvisvgm
+      REDIS_URL: redis://redis:6379
+      JOB_LEASE_MS: "90000"
+      ARTIFACT_DRIVER: local
+      ARTIFACT_LOCAL_DIR: /artifacts
+    volumes:
+      - artifacts:/artifacts
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=192m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 768m
+    cpus: 1.5
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [compiler-backend]
+
+volumes:
+  redis-data:
+  artifacts:
+
+networks:
+  compiler-backend:
+    internal: true

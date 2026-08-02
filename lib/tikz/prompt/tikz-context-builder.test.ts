@@ -6,7 +6,7 @@ describe('tikz prompt', () => {
   it('按关键词注入配方（外接圆 → 外心配方），且不超过三条', () => {
     const context = buildTikzContextForProblem('作三角形的外接圆并标出圆心，再作垂心与中点和旋转');
     expect(context).toContain('外心');
-    expect(context).toContain('circle [through=');
+    expect(context).toContain('circle through=');
     expect(context.match(/^### /gm)).toHaveLength(3);
   });
 
@@ -14,11 +14,20 @@ describe('tikz prompt', () => {
     expect(buildTikzContextForProblem('画一条线段')).toBe('');
   });
 
-  it('system prompt 含子集规则、输出契约和禁用命令声明', () => {
+  it('system prompt 含双通道规则、输出契约和禁用命令声明', () => {
     const prompt = buildTikzSystemPrompt('作垂心', {});
     expect(prompt).toContain('```tikz');
     expect(prompt).toContain('$(A)!0.5!(B)$');
-    expect(prompt).toContain('禁止使用：\\foreach');
+    expect(prompt).toContain('Tectonic + dvisvgm');
+    expect(prompt).toContain('\\input/\\include');
+  });
+
+  it('九点圆命中完整的九个派生点配方', () => {
+    const context = buildTikzContextForProblem('画一个九点圆');
+    expect(context).toContain('九点圆');
+    expect(context).toContain('coordinate (Ha)');
+    expect(context).toContain('coordinate (Jc)');
+    expect(context).toContain('circle through=(D)');
   });
 
   it('previousCode 只在提供时注入', () => {
@@ -33,4 +42,3 @@ describe('tikz prompt', () => {
     expect(prompt).toContain('SNAP');
   });
 });
-

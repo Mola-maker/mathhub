@@ -1,9 +1,14 @@
 # TikZ Studio 设计规格（v1）
 
 - 日期：2026-07-26
-- 状态：已批准（设计评审通过，直接进入实现）
+- 状态：**历史文档，已由
+  [TikZ Studio v3 architecture design](./2026-07-27-tikz-studio-v3-architecture-design.md)
+  取代**
 - 项目：math_geohub（Next.js 16 App Router · React 19 · TS）
 - 一句话：在 math_geohub 中新增与 GeoGebra 页面平行的 **TikZ Studio** —— LLM 生成构造语义 TikZ 子集 → 自研依赖引擎求值 → 交互 SVG 画布（拖拽联动/样式微调/代码双向同步）→ TikZJax 精确预览，实现高效竞赛几何作图。
+
+> 本文只保留产品起点与历史决策。TikZJax、旧 provider、旧阶段与验收口径均不得
+> 继续作为实施依据；当前唯一架构真源是 v3。
 
 ---
 
@@ -75,7 +80,7 @@ LLM 只输出此子集。**既是合法 TikZ（pdflatex + `\usetikzlibrary{calc,
 |---|---|
 | 折线/多边形 | `\draw[样式] (A) -- (B) -- (C) -- cycle;` |
 | 圆（半径字面量） | `\draw[样式] (O) circle (1.5);` |
-| 圆（过点） | `\draw[样式] (O) circle [through=(A)];`（through 库；外接圆/九点圆的关键原语） |
+| 圆（过点） | `\node[draw,样式,circle through=(A)] at (O) {};`（标准 through 库 node 选项；外接圆/九点圆的关键原语） |
 | 构造路径 | `\path[...]`（不可见，配 name path） |
 | 填充 | `\fill` / `\filldraw`，路径形式同 \draw |
 | 标注 | `\node[锚点] at (coord) {$A$};`（v1 仅 `at` 形式；锚点 above/below/left/right 及组合） |

@@ -1,5 +1,10 @@
 import type { Pt } from '../semantics/calc-eval';
 import type { SourceRange } from '../subset/ast';
+import {
+  applyTextPatch,
+  rangePatch,
+  type TextPatch,
+} from '../document/source-transaction';
 
 function assertRange(code: string, range: SourceRange): void {
   if (
@@ -24,9 +29,19 @@ export function patchCoordinateLiteral(
   range: SourceRange,
   next: Pt,
 ): string {
+  return applyTextPatch(code, coordinateLiteralPatch(code, range, next));
+}
+
+export function coordinateLiteralPatch(
+  code: string,
+  range: SourceRange,
+  next: Pt,
+): TextPatch {
   assertRange(code, range);
-  const replacement = `(${formatCoordNumber(next.x)},${formatCoordNumber(next.y)})`;
-  return `${code.slice(0, range.start)}${replacement}${code.slice(range.end)}`;
+  return rangePatch(
+    range,
+    `(${formatCoordNumber(next.x)},${formatCoordNumber(next.y)})`,
+  );
 }
 
 export function patchStyleOptions(
@@ -35,13 +50,21 @@ export function patchStyleOptions(
   nextRaw: string,
   insertPos: number,
 ): string {
+  return applyTextPatch(code, styleOptionsPatch(code, range, nextRaw, insertPos));
+}
+
+export function styleOptionsPatch(
+  code: string,
+  range: SourceRange | null,
+  nextRaw: string,
+  insertPos: number,
+): TextPatch {
   if (range) {
     assertRange(code, range);
-    return `${code.slice(0, range.start)}[${nextRaw}]${code.slice(range.end)}`;
+    return rangePatch(range, `[${nextRaw}]`);
   }
   if (!Number.isInteger(insertPos) || insertPos < 0 || insertPos > code.length) {
     throw new RangeError(`无效样式插入位置 ${insertPos}`);
   }
-  return `${code.slice(0, insertPos)}[${nextRaw}]${code.slice(insertPos)}`;
+  return { from: insertPos, to: insertPos, insert: `[${nextRaw}]` };
 }
-

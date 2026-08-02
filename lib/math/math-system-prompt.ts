@@ -155,9 +155,4 @@ ${errors}${state}
 Return the full corrected script as ONE \`\`\`geogebra block.`;
 }
 
-/** Coze bots have no system role — prepend the built system prompt to the user turn. */
-export function cozeMathUserContent(problem: string, systemPrompt: string): string {
-  return `[Math Studio — follow GeoGebra drawing rules]\n${systemPrompt}\n\n---\n\nUser problem:\n${problem}`;
-}
-
 export { userMessageHasDrawableContent };

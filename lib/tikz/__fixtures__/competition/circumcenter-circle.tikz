@@ -8,5 +8,5 @@
 \path[name path=p2] ($(M2)!-2!90:(A)$) -- ($(M2)!3!90:(A)$);
 \path[name intersections={of=p1 and p2}] (intersection-1) coordinate (O);
 \draw (A) -- (B) -- (C) -- cycle;
-\draw (O) circle [through=(A)];
+\node[draw,circle through=(A)] at (O) {};
 \end{tikzpicture}

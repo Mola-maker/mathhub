@@ -12,7 +12,7 @@ describe('evaluateScene', () => {
     expect(s.points.get('M')).toMatchObject({ position: { x: 2, y: 0 }, free: false, dependsOn: ['A', 'B'] });
   });
   it('through 圆半径 = center 到 through 点距离', () => {
-    const s = sceneOf('\\coordinate (O) at (1,1);\\coordinate (A) at (4,5);\\draw (O) circle [through=(A)];');
+    const s = sceneOf('\\coordinate (O) at (1,1);\\coordinate (A) at (4,5);\\node[draw,circle through=(A)] at (O) {};');
     const c = s.elements.find(e => e.kind === 'circle');
     expect(c).toMatchObject({ center: { x: 1, y: 1 } });
     expect(c && c.kind === 'circle' ? c.radius : 0).toBeCloseTo(5, 6);

@@ -104,7 +104,7 @@ export function extractDeliverableFromReasoning(reasoning: string): DeliverableE
 }
 
 export const REASONING_MODEL_FALLBACK_MSG =
-  '思考型模型只输出了内部推理，未生成 GeoGebra 作图脚本。请 **Clear chat** 后改用非推理模型（如 **deepseek-chat**、**qwen-plus**、**qwen-turbo**），并确保回复包含 ```geogebra 代码块。';
+  '思考型模型只输出了内部推理，未生成 GeoGebra 作图脚本。请 **Clear chat** 后从 api.molamaker.cn 的模型列表中改用非推理模型，并确保回复包含 ```geogebra 代码块。';
 
 export const TIKZ_INSTEAD_OF_GGB_MSG =
   '模型返回了 TikZ/tkz-euclide 推理或代码，而非 GeoGebra 命令，画布无法自动作图。请 **Clear chat** 后重试，或更换作图模型。';

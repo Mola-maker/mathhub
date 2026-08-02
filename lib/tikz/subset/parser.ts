@@ -138,6 +138,39 @@ function parseLiteralNumber(c: Cursor): { value: number; range: SourceRange } {
   return { value: Number(n.value), range: { start: n.start, end: n.end } };
 }
 
+function offsetNumExprRanges(expr: NumExpr, offset: number): NumExpr {
+  const range = {
+    start: expr.range.start + offset,
+    end: expr.range.end + offset,
+  };
+  switch (expr.kind) {
+    case 'num-lit':
+    case 'num-var':
+    case 'num-comp':
+      return { ...expr, range };
+    case 'num-bin':
+      return {
+        ...expr,
+        left: offsetNumExprRanges(expr.left, offset),
+        right: offsetNumExprRanges(expr.right, offset),
+        range,
+      };
+    case 'num-call':
+      return {
+        ...expr,
+        arg: offsetNumExprRanges(expr.arg, offset),
+        range,
+      };
+    case 'veclen':
+      return {
+        ...expr,
+        x: offsetNumExprRanges(expr.x, offset),
+        y: offsetNumExprRanges(expr.y, offset),
+        range,
+      };
+  }
+}
+
 function parseLiteralOrBraceNumber(c: Cursor): { value: number | NumExpr; range: SourceRange } {
   const t = c.peek();
   if (!t) c.fail('期望数字');
@@ -148,7 +181,10 @@ function parseLiteralOrBraceNumber(c: Cursor): { value: number | NumExpr; range:
     const sub = makeCursor(subTokens, inner.raw);
     const expr = parseNumAddSub(sub);
     if (sub.peek()) sub.fail('花括号数值表达式末尾存在多余内容', sub.peek());
-    return { value: expr, range: { start: inner.range.start, end: inner.range.end } };
+    return {
+      value: offsetNumExprRanges(expr, inner.range.start + 1),
+      range: { start: inner.range.start, end: inner.range.end },
+    };
   }
   return parseLiteralNumber(c);
 }
@@ -196,6 +232,18 @@ function parseNumAtom(c: Cursor): NumExpr {
     const close = c.expect('rparen', "')'");
     return { kind: 'veclen', x: a, y: b, range: { start: cmd.start, end: close.end } };
   }
+  if (t.type === 'name' && (t.value === 'sin' || t.value === 'cos')) {
+    const fn = c.next();
+    c.expect('lparen', "'('");
+    const arg = parseNumAddSub(c);
+    const close = c.expect('rparen', "')'");
+    return {
+      kind: 'num-call',
+      fn: fn.value as 'sin' | 'cos',
+      arg,
+      range: { start: fn.start, end: close.end },
+    };
+  }
   if (t.type === 'name' && t.value === 'veclen') {
     // bare 'veclen' (some sources omit the leading backslash)
     const cmd = c.next();
@@ -217,7 +265,7 @@ function parseNumAtom(c: Cursor): NumExpr {
     const subTokens = lex(inner.raw);
     const sub = makeCursor(subTokens, inner.raw);
     const expr = parseNumAddSub(sub);
-    return { ...expr, range: { start: inner.range.start, end: inner.range.end } };
+    return offsetNumExprRanges(expr, inner.range.start + 1);
   }
   c.fail('无法解析数字因子', t);
 }
@@ -417,6 +465,15 @@ function parsePath(c: Cursor, command: 'draw' | 'path' | 'fill' | 'filldraw'): S
 function parseCircleRadius(c: Cursor): CircleRadius {
   const t = c.peek();
   if (!t) c.fail('圆括号期望');
+  if (t.type === 'name' && t.value === 'through') {
+    const through = c.next();
+    const point = parseCoord(c);
+    return {
+      kind: 'through',
+      point,
+      range: { start: through.start, end: point.range.end },
+    };
+  }
   if (t.type === 'lparen') {
     const open = c.next();
     const num = c.expect('number', '半径数字');
@@ -426,14 +483,14 @@ function parseCircleRadius(c: Cursor): CircleRadius {
   if (t.type === 'lbracket') {
     const br = c.readBracketRaw();
     const m = /^through\s*=\s*/.exec(br.raw.trimStart());
-    if (!m) c.fail('圆括号仅支持 [through=...]', t);
+    if (!m) c.fail('圆括号仅支持标准 circle through (...) 语法', t);
     const inner = br.raw.slice(m[0].length).trim();
     const subTokens = lex(inner);
     const sub = makeCursor(subTokens, inner);
     const coord = parseCoord(sub);
     return { kind: 'through', point: coord, range: { start: br.range.start, end: br.range.end } };
   }
-  c.fail('圆括号或 [through=...]', t);
+  c.fail('圆括号或 circle through (...)', t);
 }
 
 function parseNode(c: Cursor): Statement {
@@ -444,6 +501,32 @@ function parseNode(c: Cursor): Statement {
   const at = parseCoord(c);
   const textBrace = c.readBraceRaw();
   const semi = c.expect('semi', "';'");
+  const throughMatch = options
+    ? /(?:^|,)\s*circle\s+through\s*=\s*\{?\s*(\([^)]+\))\s*\}?/.exec(options.raw)
+    : null;
+  if (throughMatch) {
+    const throughCursor = makeCursor(lex(throughMatch[1]), throughMatch[1]);
+    const throughPoint = parseCoord(throughCursor);
+    if (throughCursor.peek()) throughCursor.fail('circle through 坐标后存在多余内容');
+    const namePath = /(?:^|,)\s*name\s+path\s*=\s*([A-Za-z][A-Za-z0-9_-]*)/.exec(
+      options?.raw ?? '',
+    )?.[1] ?? null;
+    const visible = /(?:^|,)\s*draw(?:\s|,|$)/.test(options?.raw ?? '');
+    return {
+      kind: 'path',
+      command: visible ? 'draw' : 'path',
+      options,
+      specs: [{
+        type: 'circle',
+        center: at,
+        radius: { kind: 'through', point: throughPoint, range: options!.range },
+        range: { start: at.range.start, end: options!.range.end },
+      }],
+      namePath,
+      intersections: null,
+      range: { start: start.start, end: semi.end },
+    };
+  }
   return { kind: 'node', options, at, text: textBrace.raw, range: { start: start.start, end: semi.end } };
 }
 

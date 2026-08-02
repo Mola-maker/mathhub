@@ -89,7 +89,7 @@ describe('parseTikz', () => {
   });
 
   it('through 圆半径', () => {
-    const s = parseTikz('\\begin{tikzpicture}\\draw (O) circle [through=(A)];\\end{tikzpicture}').statements[0];
+    const s = parseTikz('\\begin{tikzpicture}\\node[draw,circle through=(A)] at (O) {};\\end{tikzpicture}').statements[0];
     if (s.kind !== 'path') throw new Error('bad');
     expect(s.specs[0]).toMatchObject({ type: 'circle', radius: { kind: 'through' } });
   });

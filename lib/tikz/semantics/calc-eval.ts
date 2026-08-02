@@ -65,6 +65,10 @@ export function evalNum(e: NumExpr, env: EvalEnvs): number {
       if (Math.abs(r) < EPS) throw new EvalError('除数为 0', 'degenerate');
       return l / r;
     }
+    case 'num-call': {
+      const radians = (evalNum(e.arg, env) * Math.PI) / 180;
+      return e.fn === 'sin' ? Math.sin(radians) : Math.cos(radians);
+    }
     case 'veclen': return Math.hypot(evalNum(e.x, env), evalNum(e.y, env));
   }
 }

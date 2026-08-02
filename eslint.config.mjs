@@ -20,6 +20,7 @@ export default defineConfig([
   },
   globalIgnores([
     '.next/**',
+    'dist/**',
     'coverage/**',
     '.claude/**',
     '.superpowers/**',

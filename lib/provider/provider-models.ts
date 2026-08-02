@@ -1,5 +1,4 @@
 import type { EffectiveProvider, ProviderName } from '@/lib/provider/settings';
-import { DASHSCOPE_MODEL_CATALOG } from '@/lib/provider/dashscope-models';
 
 export type ProviderModelEntry = {
   id: string;
@@ -7,146 +6,160 @@ export type ProviderModelEntry = {
   ownedBy?: string;
 };
 
-const CHAT_SKIP = /embed|embedding|whisper|tts|dall-e|davinci|moderation|realtime|transcribe|speech|ocr|image|vision-pro|inpaint|sora|flux|wanx|text-to-|audio-/i;
+export type ProviderModelSource = 'api' | 'cache' | 'stale-cache' | 'unavailable';
 
-/** Heuristic: keep chat / reasoning models, drop embeddings & media APIs. */
+type CatalogCacheEntry = {
+  models: ProviderModelEntry[];
+  fetchedAt: number;
+};
+
+type ProviderModelRuntime = typeof globalThis & {
+  __mathGeoHubProviderModels?: {
+    cache: Map<string, CatalogCacheEntry>;
+    inFlight: Map<string, Promise<ProviderModelEntry[]>>;
+  };
+};
+
+const CHAT_SKIP = /embed|embedding|whisper|tts|dall-e|davinci|moderation|realtime|transcribe|speech|ocr|image|vision-pro|inpaint|sora|flux|wanx|text-to-|audio-/i;
+const CATALOG_TTL_MS = 5 * 60 * 1_000;
+const CATALOG_STALE_TTL_MS = 24 * 60 * 60 * 1_000;
+const providerModelRuntime = globalThis as ProviderModelRuntime;
+const catalogState = providerModelRuntime.__mathGeoHubProviderModels ?? {
+  cache: new Map<string, CatalogCacheEntry>(),
+  inFlight: new Map<string, Promise<ProviderModelEntry[]>>(),
+};
+providerModelRuntime.__mathGeoHubProviderModels = catalogState;
+
+/** Heuristic: keep chat / reasoning models, drop embeddings and media APIs. */
 export function isLikelyChatModel(id: string): boolean {
-  const s = id.trim();
-  if (!s || s.length > 128) return false;
-  if (CHAT_SKIP.test(s)) return false;
-  return /^[a-zA-Z0-9._\-:/]+$/.test(s);
+  const value = id.trim();
+  if (!value || value.length > 128) return false;
+  if (CHAT_SKIP.test(value)) return false;
+  return /^[a-zA-Z0-9._\-:/]+$/.test(value);
 }
 
 function modelsListUrl(baseUrl: string): string {
-  let b = (baseUrl || '').trim().replace(/\/+$/, '');
-  b = b.replace(/\/chat\/completions$/, '');
-  if (/\/v1$/.test(b)) return `${b}/models`;
-  return `${b}/v1/models`;
+  let base = baseUrl.trim().replace(/\/+$/, '');
+  base = base.replace(/\/chat\/completions$/, '');
+  return /\/v1$/.test(base) ? `${base}/models` : `${base}/v1/models`;
 }
 
-async function fetchOpenAICompatibleModels(cfg: EffectiveProvider): Promise<ProviderModelEntry[]> {
-  const r = await fetch(modelsListUrl(cfg.baseUrl), {
+async function fetchRelayModels(cfg: EffectiveProvider): Promise<ProviderModelEntry[]> {
+  const response = await fetch(modelsListUrl(cfg.baseUrl), {
     headers: {
       Authorization: `Bearer ${cfg.apiKey}`,
       Accept: 'application/json',
     },
     signal: AbortSignal.timeout(15_000),
   });
-  if (!r.ok) throw new Error(`models HTTP ${r.status}`);
-  const j = await r.json() as { data?: Array<{ id?: string; owned_by?: string }> };
-  const rows = j.data ?? [];
-  return rows
+  if (!response.ok) throw new Error(`models HTTP ${response.status}`);
+
+  const body = await response.json() as {
+    data?: Array<{ id?: string; owned_by?: string }>;
+  };
+  return (body.data ?? [])
     .map((row) => ({
       id: String(row.id ?? '').trim(),
       label: String(row.id ?? '').trim(),
       ownedBy: row.owned_by,
     }))
-    .filter((m) => m.id && isLikelyChatModel(m.id));
-}
-
-async function fetchAnthropicModels(cfg: EffectiveProvider): Promise<ProviderModelEntry[]> {
-  const base = (cfg.baseUrl || 'https://api.anthropic.com').replace(/\/+$/, '');
-  const r = await fetch(`${base}/v1/models`, {
-    headers: {
-      'x-api-key': cfg.apiKey,
-      'anthropic-version': '2023-06-01',
-      Accept: 'application/json',
-    },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!r.ok) throw new Error(`models HTTP ${r.status}`);
-  const j = await r.json() as { data?: Array<{ id?: string; display_name?: string }> };
-  return (j.data ?? [])
-    .map((row) => ({
-      id: String(row.id ?? '').trim(),
-      label: String(row.display_name ?? row.id ?? '').trim(),
-    }))
-    .filter((m) => m.id && isLikelyChatModel(m.id));
-}
-
-function staticFallback(name: ProviderName, cfg: EffectiveProvider): ProviderModelEntry[] {
-  switch (name) {
-    case 'anthropic':
-      return [
-        { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-        { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
-        { id: cfg.model, label: cfg.model },
-      ].filter((m, i, a) => m.id && a.findIndex((x) => x.id === m.id) === i);
-    case 'deepseek':
-      return [
-        { id: 'deepseek-chat', label: 'DeepSeek Chat' },
-        { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner' },
-        { id: cfg.model, label: cfg.model },
-      ].filter((m, i, a) => m.id && a.findIndex((x) => x.id === m.id) === i);
-    case 'dashscope':
-      return [
-        ...DASHSCOPE_MODEL_CATALOG.map((m) => ({ id: m.id, label: m.label })),
-        ...(cfg.model ? [{ id: cfg.model, label: `${cfg.model} (configured)` }] : []),
-      ].filter((m, i, a) => m.id && a.findIndex((x) => x.id === m.id) === i);
-    case 'coze':
-      return cfg.botId
-        ? [{ id: cfg.botId, label: `Coze Bot ${cfg.botId.slice(0, 8)}…` }]
-        : [];
-    default:
-      return [];
-  }
-}
-
-/** Fetch model ids from the provider API; fall back to a small static list. */
-export async function listProviderModels(
-  name: ProviderName,
-  cfg: EffectiveProvider,
-): Promise<{ models: ProviderModelEntry[]; source: 'api' | 'fallback'; error?: string }> {
-  if (!cfg.configured) {
-    return { models: [], source: 'fallback', error: 'not configured' };
-  }
-  try {
-    if (cfg.protocol === 'coze') {
-      const models = staticFallback('coze', cfg);
-      return { models, source: 'api' };
-    }
-    if (cfg.protocol === 'anthropic') {
-      const models = await fetchAnthropicModels(cfg);
-      if (models.length) return { models: dedupeModels(models), source: 'api' };
-    } else {
-      const models = await fetchOpenAICompatibleModels(cfg);
-      if (models.length) return { models: dedupeModels(models), source: 'api' };
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'fetch failed';
-    return {
-      models: dedupeModels(staticFallback(name, cfg)),
-      source: 'fallback',
-      error: msg,
-    };
-  }
-  return {
-    models: dedupeModels(staticFallback(name, cfg)),
-    source: 'fallback',
-    error: 'empty model list',
-  };
+    .filter((model) => model.id && isLikelyChatModel(model.id));
 }
 
 function dedupeModels(models: ProviderModelEntry[]): ProviderModelEntry[] {
   const seen = new Set<string>();
-  return models.filter((m) => {
-    if (!m.id || seen.has(m.id)) return false;
-    seen.add(m.id);
+  return models.filter((model) => {
+    if (!model.id || seen.has(model.id)) return false;
+    seen.add(model.id);
     return true;
   });
 }
 
-/** Prefer configured default, then first probe-ok, else first entry. */
+function cloneModels(models: ProviderModelEntry[]): ProviderModelEntry[] {
+  return models.map((model) => ({ ...model }));
+}
+
+function fetchCatalog(cacheKey: string, cfg: EffectiveProvider): Promise<ProviderModelEntry[]> {
+  const pending = catalogState.inFlight.get(cacheKey);
+  if (pending) return pending;
+
+  const request = fetchRelayModels(cfg)
+    .then(dedupeModels)
+    .finally(() => {
+      catalogState.inFlight.delete(cacheKey);
+    });
+  catalogState.inFlight.set(cacheKey, request);
+  return request;
+}
+
+/** Fetch the live catalog from api.molamaker.cn; never invent fallback models. */
+export async function listProviderModels(
+  name: ProviderName,
+  cfg: EffectiveProvider,
+): Promise<{ models: ProviderModelEntry[]; source: ProviderModelSource; error?: string }> {
+  if (!cfg.configured) {
+    return { models: [], source: 'unavailable', error: 'not configured' };
+  }
+
+  const cacheKey = `${name}:${cfg.baseUrl}`;
+  const now = Date.now();
+  const cached = catalogState.cache.get(cacheKey);
+  if (cached && now - cached.fetchedAt < CATALOG_TTL_MS) {
+    return { models: cloneModels(cached.models), source: 'cache' };
+  }
+
+  try {
+    const models = await fetchCatalog(cacheKey, cfg);
+    if (models.length) {
+      catalogState.cache.set(cacheKey, {
+        models: cloneModels(models),
+        fetchedAt: Date.now(),
+      });
+      return { models: cloneModels(models), source: 'api' };
+    }
+    if (cached && now - cached.fetchedAt < CATALOG_STALE_TTL_MS) {
+      return {
+        models: cloneModels(cached.models),
+        source: 'stale-cache',
+        error: '上游模型目录暂不可用，正在使用最近一次成功目录',
+      };
+    }
+    return {
+      models: [],
+      source: 'unavailable',
+      error: '上游模型目录暂不可用，请稍后重试',
+    };
+  } catch {
+    if (cached && now - cached.fetchedAt < CATALOG_STALE_TTL_MS) {
+      return {
+        models: cloneModels(cached.models),
+        source: 'stale-cache',
+        error: '上游模型目录暂不可用，正在使用最近一次成功目录',
+      };
+    }
+    return {
+      models: [],
+      source: 'unavailable',
+      error: '上游模型目录暂不可用，请稍后重试',
+    };
+  }
+}
+
+/** Prefer the configured relay default when present, preserving the upstream ID. */
 export function pickDefaultModel(
   models: ProviderModelEntry[],
   configured: string,
-  probe: Record<string, { ok: boolean }>,
+  probe: Record<string, { ok: boolean }> = {},
 ): string {
-  const cfg = configured.trim();
-  if (cfg && models.some((m) => m.id === cfg) && probe[cfg]?.ok !== false) return cfg;
-  const ok = models.find((m) => probe[m.id]?.ok);
-  if (ok) return ok.id;
-  return models[0]?.id ?? cfg;
+  void probe;
+  const preferred = configured.trim();
+  if (preferred) {
+    const matched = models.find(
+      (model) => model.id.localeCompare(preferred, undefined, { sensitivity: 'accent' }) === 0,
+    );
+    if (matched) return matched.id;
+  }
+  return models[0]?.id ?? '';
 }
 
 export function isThinkingModelId(id: string): boolean {

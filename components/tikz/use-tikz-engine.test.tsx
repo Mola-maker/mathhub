@@ -6,23 +6,29 @@ const GOOD = '\\begin{tikzpicture}\\coordinate (A) at (0,0);\\end{tikzpicture}';
 const GOOD2 = '\\begin{tikzpicture}\\coordinate (B) at (1,1);\\end{tikzpicture}';
 
 describe('useTikzEngine', () => {
-  it('初始场景就绪；坏代码保持上次好场景；恢复后更新', () => {
+  it('坏代码保留上一版只读语义投影；恢复后切回当前 revision', () => {
     const { result } = renderHook(() => useTikzEngine(GOOD));
     expect(result.current.scene?.points.has('A')).toBe(true);
+    expect(result.current.scene?.sourceRevision).toBe(0);
 
     act(() => {
       result.current.setCode('\\begin{tikzpicture}\\draw (0,0)');
     });
     expect(result.current.scene?.points.has('A')).toBe(true);
+    expect(result.current.scene?.sourceRevision).toBe(0);
+    expect(result.current.semanticProjectionState).toBe('stale');
+    expect(result.current.interactiveWritebackSafe).toBe(false);
     expect(result.current.issues.length).toBeGreaterThan(0);
+    expect(result.current.revision).toBe(1);
 
     act(() => {
       result.current.setCode(GOOD2);
     });
     expect(result.current.scene?.points.has('B')).toBe(true);
+    expect(result.current.scene?.sourceRevision).toBe(2);
   });
 
-  it('applyPatch 与 setCode 共享更新语义，交互状态独立', () => {
+  it('applyPatch 产生最小源码交易，交互状态独立', () => {
     const { result } = renderHook(() => useTikzEngine(GOOD));
     act(() => {
       result.current.applyPatch(GOOD2);
@@ -34,6 +40,6 @@ describe('useTikzEngine', () => {
     expect(result.current.selection).toEqual(['B']);
     expect(result.current.activeTool).toBe('drag');
     expect(result.current.viewport.scale).toBe(20);
+    expect(result.current.document.getSnapshot().lastTransaction?.origin).toBe('canvas');
   });
 });
-

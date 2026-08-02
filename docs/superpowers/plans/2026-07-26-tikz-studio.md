@@ -1,5 +1,7 @@
 # TikZ Studio (v1) Implementation Plan
 
+> 状态：历史计划，已由 [TikZ Studio v3 架构设计](../specs/2026-07-27-tikz-studio-v3-architecture-design.md) 取代。本文中的 TikZJax、旧 provider 和旧阶段划分不得继续作为实施依据。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在 math_geohub 中实现 TikZ Studio v1（= spec Phase 0 + Phase 1）：LLM 生成构造语义 TikZ 子集 → 自研依赖引擎 → 交互 SVG 画布（拖拽联动/样式微调/代码双向同步）+ repair 回路 + 步骤面板。
@@ -3076,4 +3078,3 @@ git commit -m "test(tikz): complete competition corpus to 30+ fixtures for v1 ga
 - **Spec 覆盖**：§3 子集 → Task 3/4/5/6/7/8/9；§4 架构（双解析器/服务端轻校验）→ Task 4 + 12 + 18；§5 三通路 → 12/14（①）16/17（②）18（③）；§6 文件布局 → 各任务 Files；§7 修复回路 → 20（TikZJax 失败/子集外兜底属 Phase 2，不在 v1）；§8 接缝 → 10（③④纯渲染+分层+主题参数）、13（状态形状/ephemeralStyles 占位）、17（②工具注册）、12（envelope contextRefs）、9+20（⑤provenance/快照）；§9 中转 → 1；§10 CSP → Phase 2（v1 无浏览器新 CDN 依赖，Task 22 audit 验证不回归）；§11 测试 → 15/22；§12 分期 → 本计划 = Phase 0+1。**无遗漏。**
 - **占位符扫描**：Task 3 括号匹配、Task 13 studio 的 provider pills/model picker 两处注明「复用 math-studio 模式」—— 执行代理需读 `components/math-studio.tsx` 对应段落（1052–1081 tile、393–440 streamMath、provider/model hooks）照搬，已在 Task 14 注明行号。其余代码均完整。
 - **类型一致性**：`AnalysisIssue.severity` 含 `'preview-only'`（Task 12 服务端帧字段同名但语义独立，无冲突）；`GeomPath` 仅在 intersections/scene 使用；`ToolContext.toScenePoint` 签名在 Task 17 两测试一致；`TikzEngine.ephemeralStyles` 为占位只读空对象（接缝③，v1 无写入方）。`style-options.test.ts` 路径笔误修正：放 `lib/tikz/patch/style-options.test.ts`，import `./style-options`。
-

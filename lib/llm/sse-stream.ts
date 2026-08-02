@@ -1,13 +1,12 @@
 import { chatCompletionsUrl } from '@/lib/provider/openai-chat-url';
-import { isThinkingModelId } from '@/lib/provider/provider-models';
 import {
   extractDeliverableFromReasoning,
   REASONING_MODEL_FALLBACK_MSG,
   TIKZ_INSTEAD_OF_GGB_MSG,
   streamTextInChunks,
 } from '@/lib/math/math-response-sanitize';
-import { cozeMathUserContent } from '@/lib/math/math-system-prompt';
 import type { EffectiveProvider, ProviderName } from '@/lib/provider/settings';
+import { extractAiPatchProposal } from '@/lib/tikz/server/extract-ai-patch';
 
 export type Message = { role: 'user' | 'assistant' | 'system'; content: string };
 
@@ -16,6 +15,30 @@ export type SendEvent = (event: Record<string, unknown>) => void;
 
 const MAX_TOKENS = 6144;
 const TIMEOUT_MS = 150_000;
+const TIKZ_REASONING_FALLBACK_MSG =
+  '思考型模型只输出了内部推理，未生成 TikZ 代码。请从 api.molamaker.cn 的实时模型列表中改用可输出正文的模型，或重试并要求返回 ```tikz 代码块。';
+const TIKZ_PATCH_REASONING_FALLBACK_MSG =
+  '思考型模型没有生成可验证的 ```tikz-patch 提案，请重试或改用能输出正文的模型。';
+
+type ReasoningTarget = 'geogebra' | 'tikz' | 'tikz-patch';
+
+function extractTikzDeliverable(reasoning: string): string {
+  const fenced = /```(?:tikz|latex|tex)\s*[\s\S]*?```/i.exec(reasoning)?.[0];
+  if (fenced) {
+    return fenced.replace(/^```(?:latex|tex)/i, '```tikz');
+  }
+  const bare = /\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\}/i.exec(
+    reasoning,
+  )?.[0];
+  return bare ? `\`\`\`tikz\n${bare}\n\`\`\`` : '';
+}
+
+function extractTikzPatchDeliverable(reasoning: string): string {
+  const extracted = extractAiPatchProposal(reasoning);
+  return extracted.proposal
+    ? `\`\`\`tikz-patch\n${JSON.stringify(extracted.proposal, null, 2)}\n\`\`\``
+    : '';
+}
 
 export function makeSseStream(gen: (send: SendToken, sendEvent: SendEvent) => Promise<void>): Response {
   const enc = new TextEncoder();
@@ -67,62 +90,20 @@ async function readUpstreamError(r: Response): Promise<string> {
   }
 }
 
-export async function streamAnthropic(
-  messages: Message[],
-  send: SendToken,
-  cfg: EffectiveProvider,
-  model: string,
-  systemPrompt: string,
-): Promise<string> {
-  const r = await fetch(`${cfg.baseUrl.replace(/\/+$/, '')}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'anthropic-version': '2023-06-01',
-      'x-api-key': cfg.apiKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: MAX_TOKENS,
-      system: systemPrompt,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
-      stream: true,
-    }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  if (!r.ok || !r.body) {
-    const detail = await readUpstreamError(r);
-    throw new Error(`Anthropic ${r.status}${detail ? `：${detail}` : ''}`);
-  }
-  const reader = r.body.getReader();
-  const dec = new TextDecoder();
-  let buf = '';
-  let full = '';
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    const parts = buf.split('\n\n');
-    buf = parts.pop() ?? '';
-    for (const part of parts) {
-      const dataLine = part.split('\n').find((l) => l.startsWith('data:'));
-      if (!dataLine) continue;
-      const raw = dataLine.slice(5).trim();
-      if (raw === '[DONE]') continue;
-      try {
-        const j = JSON.parse(raw) as { type?: string; delta?: { type?: string; text?: string } };
-        if (j.type === 'content_block_delta' && j.delta?.type === 'text_delta' && j.delta.text) {
-          send(j.delta.text);
-          full += j.delta.text;
-        }
-      } catch { /* skip */ }
-    }
-  }
-  if (!full.trim()) throw new Error('Anthropic: empty stream');
-  return full;
-}
+type OpenAIContent = string | Array<{ type?: string; text?: string }>;
+type OpenAIDelta = {
+  content?: OpenAIContent;
+  reasoning_content?: string;
+  reasoning?: string;
+};
 
-type OpenAIDelta = { content?: string; reasoning_content?: string };
+function openAIContentText(content: OpenAIContent | undefined): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+    .join('');
+}
 
 /** Stream an OpenAI-compatible provider, recovering thinking-model output. */
 export async function streamOpenAICompatible(
@@ -133,6 +114,7 @@ export async function streamOpenAICompatible(
   provider: ProviderName,
   label: string,
   systemPrompt: string,
+  reasoningTarget: ReasoningTarget = 'geogebra',
 ): Promise<string> {
   const body: Record<string, unknown> = {
     model,
@@ -143,9 +125,7 @@ export async function streamOpenAICompatible(
     stream: true,
     max_tokens: MAX_TOKENS,
   };
-  if (provider === 'dashscope' && !isThinkingModelId(model)) {
-    body.enable_thinking = false;
-  }
+  void provider;
 
   const r = await fetch(chatCompletionsUrl(cfg.baseUrl), {
     method: 'POST',
@@ -158,43 +138,99 @@ export async function streamOpenAICompatible(
     throw new Error(`${label} ${r.status}${detail ? `：${detail}` : ''}`);
   }
 
-  const reasoningFallback = provider === 'dashscope' || provider === 'deepseek';
+  // The relay can expose thinking models under arbitrary ids, so reasoning-only
+  // recovery must not depend on the old provider name.
+  const reasoningFallback = true;
   const reader = r.body.getReader();
   const dec = new TextDecoder();
   let buf = '';
   let content = '';
   let reasoning = '';
   let sentContent = false;
+  let finishReason = '';
+
+  const processPayload = (rawPayload: string) => {
+    const raw = rawPayload.trim();
+    if (!raw || raw === '[DONE]') return;
+    try {
+      const parsed = JSON.parse(raw) as {
+        type?: string;
+        delta?: string;
+        choices?: Array<{
+          delta?: OpenAIDelta;
+          message?: OpenAIDelta;
+          text?: string;
+          finish_reason?: string | null;
+        }>;
+      };
+      const choice = parsed.choices?.[0];
+      const delta = choice?.delta ?? choice?.message;
+      const isFinalMessageSnapshot = !choice?.delta && Boolean(choice?.message);
+      const outputTextDelta =
+        parsed.type === 'response.output_text.delta' && typeof parsed.delta === 'string'
+          ? parsed.delta
+          : '';
+      const upstreamText = openAIContentText(delta?.content) || choice?.text || outputTextDelta;
+      let text = upstreamText;
+      if (isFinalMessageSnapshot && content && upstreamText) {
+        // Some OpenAI-compatible relays stream normal deltas and then send a
+        // final `message.content` snapshot containing the complete answer.
+        // Treat that frame as reconciliation, not as one more delta.
+        if (upstreamText === content || content.endsWith(upstreamText)) {
+          text = '';
+        } else if (upstreamText.startsWith(content)) {
+          text = upstreamText.slice(content.length);
+        }
+      }
+      if (text) {
+        send(text);
+        content += text;
+        sentContent = true;
+      } else {
+        const reasoningText = delta?.reasoning_content || delta?.reasoning;
+        if (reasoningText) reasoning += reasoningText;
+      }
+      if (choice?.finish_reason) finishReason = choice.finish_reason;
+    } catch {
+      // Ignore keep-alives and non-JSON relay metadata.
+    }
+  };
+
+  const processLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith(':')) return;
+    if (trimmed.startsWith('data:')) {
+      processPayload(trimmed.slice(5));
+    } else if (trimmed.startsWith('{')) {
+      // Some OpenAI-compatible relays return one JSON object despite stream=true.
+      processPayload(trimmed);
+    }
+  };
 
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     buf += dec.decode(value, { stream: true });
-    const parts = buf.split('\n\n');
-    buf = parts.pop() ?? '';
-    for (const part of parts) {
-      const dataLine = part.split('\n').find((l) => l.startsWith('data:'));
-      if (!dataLine) continue;
-      const raw = dataLine.slice(5).trim();
-      if (raw === '[DONE]') continue;
-      try {
-        const j = JSON.parse(raw) as { choices?: Array<{ delta?: OpenAIDelta }> };
-        const delta = j.choices?.[0]?.delta;
-        if (!delta) continue;
-        // Stream content verbatim; the client strips reasoning/TikZ for DISPLAY
-        // (assistantDisplayText) and parses the ```geogebra block from the full text.
-        if (delta.content) {
-          send(delta.content);
-          content += delta.content;
-          sentContent = true;
-        } else if (delta.reasoning_content) {
-          reasoning += delta.reasoning_content;
-        }
-      } catch { /* skip */ }
-    }
+    const lines = buf.split(/\r?\n/);
+    buf = lines.pop() ?? '';
+    lines.forEach(processLine);
   }
+  buf += dec.decode();
+  if (buf.trim()) processLine(buf);
 
   if (!sentContent && reasoningFallback && reasoning.trim()) {
+    if (reasoningTarget === 'tikz-patch') {
+      const patch = extractTikzPatchDeliverable(reasoning);
+      const recovered = patch || TIKZ_PATCH_REASONING_FALLBACK_MSG;
+      await streamTextInChunks(send, recovered);
+      return recovered;
+    }
+    if (reasoningTarget === 'tikz') {
+      const tikz = extractTikzDeliverable(reasoning);
+      const recovered = tikz || TIKZ_REASONING_FALLBACK_MSG;
+      await streamTextInChunks(send, recovered);
+      return recovered;
+    }
     const deliverable = extractDeliverableFromReasoning(reasoning);
     if (deliverable.text) {
       await streamTextInChunks(send, deliverable.text);
@@ -205,62 +241,10 @@ export async function streamOpenAICompatible(
     return msg;
   }
 
-  if (!content.trim()) throw new Error(`${label}: empty stream`);
+  if (!content.trim()) {
+    throw new Error(`${label}: empty stream${finishReason ? ` (${finishReason})` : ''}`);
+  }
   return content;
-}
-
-export async function streamCoze(
-  messages: Message[],
-  send: SendToken,
-  cfg: EffectiveProvider,
-  systemPrompt: string,
-): Promise<string> {
-  const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-  const problem = lastUser?.content ?? '';
-  const r = await fetch(`${cfg.baseUrl}/v3/chat`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      bot_id: cfg.botId,
-      user_id: 'math-studio',
-      stream: true,
-      auto_save_history: false,
-      additional_messages: [{ role: 'user', content: cozeMathUserContent(problem, systemPrompt), content_type: 'text' }],
-    }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  if (!r.ok || !r.body) {
-    const detail = await readUpstreamError(r);
-    throw new Error(`Coze ${r.status}${detail ? `：${detail}` : ''}`);
-  }
-  const reader = r.body.getReader();
-  const dec = new TextDecoder();
-  let buf = '';
-  let full = '';
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    const parts = buf.split('\n\n');
-    buf = parts.pop() ?? '';
-    for (const part of parts) {
-      const lines = part.split('\n');
-      const event = lines.find((l) => l.startsWith('event:'))?.slice(6).trim();
-      const dataLine = lines.find((l) => l.startsWith('data:'));
-      if (event === 'done') return full;
-      if (event !== 'conversation.message.delta' || !dataLine) continue;
-      const raw = dataLine.slice(5).trim();
-      try {
-        const j = JSON.parse(raw) as { role?: string; type?: string; content?: string };
-        if (j.role === 'assistant' && j.type === 'answer' && j.content) {
-          send(j.content);
-          full += j.content;
-        }
-      } catch { /* skip */ }
-    }
-  }
-  if (!full.trim()) throw new Error('Coze: empty stream');
-  return full;
 }
 
 export async function streamProvider(
@@ -270,9 +254,16 @@ export async function streamProvider(
   cfg: EffectiveProvider,
   model: string,
   systemPrompt: string,
+  options: { reasoningTarget?: ReasoningTarget } = {},
 ): Promise<string> {
-  if (cfg.protocol === 'anthropic') return streamAnthropic(messages, send, cfg, model, systemPrompt);
-  if (cfg.protocol === 'coze') return streamCoze(messages, send, cfg, systemPrompt);
-  const label = provider === 'deepseek' ? 'DeepSeek' : provider === 'dashscope' ? 'DashScope' : 'Anthropic';
-  return streamOpenAICompatible(messages, send, cfg, model, provider, label, systemPrompt);
+  return streamOpenAICompatible(
+    messages,
+    send,
+    cfg,
+    model,
+    provider,
+    'api.molamaker.cn',
+    systemPrompt,
+    options.reasoningTarget,
+  );
 }

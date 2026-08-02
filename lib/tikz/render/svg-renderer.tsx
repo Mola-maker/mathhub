@@ -1,5 +1,8 @@
 import type { Pt } from '../semantics/calc-eval';
 import type { Scene, SceneElement, ScenePoint } from '../semantics/scene';
+import type { SourceRange } from '../subset/ast';
+import { labelOffset } from './label-layout';
+import { DEFAULT_ANGLE_MARK_RADIUS } from './svg-decoration-primitives';
 import { sceneToScreen, type Viewport } from './viewport';
 
 export interface RenderTheme {
@@ -7,17 +10,19 @@ export interface RenderTheme {
   handleFill: string;
   handleDerivedFill: string;
   selectionColor: string;
+  hoverColor: string;
   labelFont: string;
   angleRadius: number;
 }
 
 export const defaultTheme: RenderTheme = {
   handleRadius: 4,
-  handleFill: '#c96442',
+  handleFill: '#0a84ff',
   handleDerivedFill: '#ffffff',
-  selectionColor: '#2f6fd6',
+  selectionColor: '#0a84ff',
+  hoverColor: '#64b5ff',
   labelFont: 'italic 13px Georgia, "Times New Roman", serif',
-  angleRadius: 16,
+  angleRadius: DEFAULT_ANGLE_MARK_RADIUS,
 };
 
 interface ElementProps {
@@ -25,6 +30,8 @@ interface ElementProps {
   vp: Viewport;
   theme: RenderTheme;
   selected: boolean;
+  hovered: boolean;
+  sourceRange?: SourceRange;
 }
 
 function unit(from: Pt, to: Pt): Pt | null {
@@ -77,19 +84,6 @@ function Arrows({
   );
 }
 
-function labelOffset(anchor: string): Pt {
-  const normalized = anchor.toLowerCase();
-  let x = 0;
-  let y = 0;
-  if (normalized.includes('above') || normalized.includes('north')) y -= 6;
-  if (normalized.includes('below') || normalized.includes('south')) y += 16;
-  if (normalized.includes('left') || normalized.includes('west')) x -= 6;
-  if (normalized.includes('right') || normalized.includes('east')) x += 6;
-  if (normalized.includes('base')) y += 4;
-  if (normalized.includes('mid')) y += 2;
-  return { x, y };
-}
-
 function anglePath(el: Extract<SceneElement, { kind: 'angle-mark' }>, vp: Viewport, theme: RenderTheme): string {
   const vertex = sceneToScreen(el.vertex, vp);
   const from = sceneToScreen(el.from, vp);
@@ -114,20 +108,45 @@ function anglePath(el: Extract<SceneElement, { kind: 'angle-mark' }>, vp: Viewpo
   return `M ${start.x} ${start.y} A ${radius} ${radius} 0 0 ${sweep} ${end.x} ${end.y}`;
 }
 
-function semanticProps(el: SceneElement, selected: boolean) {
+function semanticProps(
+  el: SceneElement,
+  selected: boolean,
+  hovered: boolean,
+  sourceRange?: SourceRange,
+) {
   return {
+    'data-tikz-id': el.stableId,
+    'data-tikz-source-binding': `binding:${el.stableId}`,
     'data-tikz-stmt': el.stmtIndex,
     'data-tikz-kind': el.kind,
     'data-tikz-refs': el.refs.join(' '),
+    'data-tikz-source-start': sourceRange?.start,
+    'data-tikz-source-end': sourceRange?.end,
     'data-selected': selected ? 'true' : undefined,
+    'data-hovered': hovered ? 'true' : undefined,
   };
 }
 
-function ElementSvg({ el, vp, theme, selected }: ElementProps) {
-  const stroke = selected ? theme.selectionColor : el.style.stroke;
-  const strokeWidth = selected ? el.style.strokeWidth * 1.8 : el.style.strokeWidth;
+function ElementSvg({
+  el,
+  vp,
+  theme,
+  selected,
+  hovered,
+  sourceRange,
+}: ElementProps) {
+  const stroke = selected
+    ? theme.selectionColor
+    : hovered
+      ? theme.hoverColor
+      : el.style.stroke;
+  const strokeWidth = selected
+    ? el.style.strokeWidth * 1.8
+    : hovered
+      ? el.style.strokeWidth * 1.45
+      : el.style.strokeWidth;
   const common = {
-    ...semanticProps(el, selected),
+    ...semanticProps(el, selected, hovered, sourceRange),
     stroke,
     strokeWidth,
     strokeDasharray: el.style.dash ?? undefined,
@@ -167,7 +186,7 @@ function ElementSvg({ el, vp, theme, selected }: ElementProps) {
     const offset = labelOffset(el.anchor);
     return (
       <text
-        {...semanticProps(el, selected)}
+        {...semanticProps(el, selected, hovered, sourceRange)}
         x={at.x + offset.x}
         y={at.y + offset.y}
         fill={selected ? theme.selectionColor : el.style.stroke}
@@ -194,18 +213,30 @@ function HandleSvg({
   vp,
   theme,
   selected,
+  hovered,
+  sourceRange,
 }: {
   point: ScenePoint;
   vp: Viewport;
   theme: RenderTheme;
   selected: boolean;
+  hovered: boolean;
+  sourceRange?: SourceRange;
 }) {
   const screen = sceneToScreen(point.position, vp);
   return (
-    <g data-tikz-handle={point.name}>
+    <g
+      data-tikz-handle={point.name}
+      data-tikz-id={point.stableId}
+      data-tikz-source-binding={`binding:${point.stableId}`}
+      data-tikz-source-start={sourceRange?.start}
+      data-tikz-source-end={sourceRange?.end}
+      data-hovered={hovered ? 'true' : undefined}
+    >
       {selected
         ? (
           <circle
+            className="tz-selection-halo"
             cx={screen.x}
             cy={screen.y}
             r={theme.handleRadius + 3.5}
@@ -216,11 +247,12 @@ function HandleSvg({
         )
         : null}
       <circle
+        className="tz-point-handle"
         cx={screen.x}
         cy={screen.y}
         r={theme.handleRadius}
         fill={point.free ? theme.handleFill : theme.handleDerivedFill}
-        stroke={point.free ? theme.handleFill : theme.handleFill}
+        stroke={hovered ? theme.hoverColor : theme.handleFill}
         data-tikz-point={point.name}
         data-tikz-free={String(point.free)}
         data-selected={selected ? 'true' : undefined}
@@ -235,20 +267,24 @@ export function TikzSceneSvg({
   theme = defaultTheme,
   selection = [],
   selectedStmtIndex = null,
+  hoveredStmtIndex = null,
+  sourceBindingRanges = new Map(),
 }: {
   scene: Scene;
   viewport: Viewport;
   theme?: RenderTheme;
   selection?: string[];
   selectedStmtIndex?: number | null;
+  hoveredStmtIndex?: number | null;
+  sourceBindingRanges?: ReadonlyMap<string, SourceRange>;
 }) {
   const selected = new Set(selection);
   return (
     <>
       <g data-layer="base">
-        {scene.elements.map((element, index) => (
+        {scene.elements.map((element) => (
           <ElementSvg
-            key={`${element.stmtIndex}:${element.kind}:${index}`}
+            key={element.stableId}
             el={element}
             vp={viewport}
             theme={theme}
@@ -256,17 +292,21 @@ export function TikzSceneSvg({
               selectedStmtIndex === element.stmtIndex
               || (selectedStmtIndex === null && element.refs.some((ref) => selected.has(ref)))
             }
+            hovered={hoveredStmtIndex === element.stmtIndex}
+            sourceRange={sourceBindingRanges.get(`binding:${element.stableId}`)}
           />
         ))}
       </g>
       <g data-layer="overlay">
-        {[...scene.points.values()].map((point) => (
+        {[...scene.points.values()].filter((point) => !point.internal).map((point) => (
           <HandleSvg
-            key={point.name}
+            key={point.stableId}
             point={point}
             vp={viewport}
             theme={theme}
             selected={selected.has(point.name)}
+            hovered={hoveredStmtIndex === point.stmtIndex}
+            sourceRange={sourceBindingRanges.get(`binding:${point.stableId}`)}
           />
         ))}
       </g>

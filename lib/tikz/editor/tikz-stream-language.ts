@@ -1,25 +1,28 @@
-import { StreamLanguage, type StringStream } from '@codemirror/language';
+import { LRLanguage } from '@codemirror/language';
+import { styleTags, tags } from '@lezer/highlight';
+import { parser } from './tikz-parser';
 
-export const tikzStreamLanguage = StreamLanguage.define<{ inCalc: boolean }>({
+export const tikzLanguage = LRLanguage.define({
   name: 'tikz',
-  startState: () => ({ inCalc: false }),
-  token(stream: StringStream, state) {
-    if (stream.match(/%.*/)) return 'lineComment';
-    if (stream.match(/\\[a-zA-Z]+/)) return 'keyword';
-    if (stream.match(/\\./)) return 'keyword';
-    if (stream.match(/\d+(?:\.\d+)?/)) return 'number';
-    if (stream.match(/--/)) return 'operator';
-    if (stream.match(/[{}[\]()]/)) return 'bracket';
-    if (stream.match(/[+\-*/=,:;!]/)) return 'operator';
-    if (stream.eat('$')) {
-      state.inCalc = !state.inCalc;
-      return 'atom';
-    }
-    if (stream.match(/[A-Za-z][A-Za-z0-9_-]*/)) {
-      return state.inCalc ? 'variableName' : 'propertyName';
-    }
-    stream.next();
-    return null;
+  parser: parser.configure({
+    props: [
+      styleTags({
+        Command: tags.keyword,
+        Comment: tags.lineComment,
+        Atom: tags.content,
+        BeginTikz: tags.controlKeyword,
+        EndTikz: tags.controlKeyword,
+        BeginScope: tags.controlKeyword,
+        EndScope: tags.controlKeyword,
+      }),
+    ],
+  }),
+  languageData: {
+    commentTokens: { line: '%' },
+    closeBrackets: { brackets: ['(', '[', '{', '$'] },
   },
 });
 
+// Compatibility export for the existing editor seam. This is now a generated
+// Lezer LRLanguage, not the former line-oriented StreamLanguage.
+export const tikzStreamLanguage = tikzLanguage;

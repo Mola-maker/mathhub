@@ -17,6 +17,7 @@ export type NumExpr =
   | { kind: 'num-var'; name: string; range: SourceRange }
   | { kind: 'num-comp'; pvar: string; axis: 'x' | 'y'; range: SourceRange }
   | { kind: 'num-bin'; binop: '+' | '-' | '*' | '/'; left: NumExpr; right: NumExpr; range: SourceRange }
+  | { kind: 'num-call'; fn: 'sin' | 'cos'; arg: NumExpr; range: SourceRange }
   | { kind: 'veclen'; x: NumExpr; y: NumExpr; range: SourceRange };
 
 export type LetBinding =

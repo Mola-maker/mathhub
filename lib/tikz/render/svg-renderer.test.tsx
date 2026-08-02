@@ -5,15 +5,16 @@ import { DEFAULT_STYLE } from './style-resolver';
 import { TikzSceneSvg } from './svg-renderer';
 
 const scene: Scene = {
+  sourceRevision: 0,
   points: new Map([
-    ['A', { name: 'A', position: { x: 0, y: 0 }, free: true, dependsOn: [], stmtIndex: 0 }],
-    ['B', { name: 'B', position: { x: 4, y: 0 }, free: true, dependsOn: [], stmtIndex: 1 }],
-    ['M', { name: 'M', position: { x: 2, y: 0 }, free: false, dependsOn: ['A', 'B'], stmtIndex: 2 }],
+    ['A', { stableId: 'point-a', name: 'A', position: { x: 0, y: 0 }, free: true, dependsOn: [], stmtIndex: 0 }],
+    ['B', { stableId: 'point-b', name: 'B', position: { x: 4, y: 0 }, free: true, dependsOn: [], stmtIndex: 1 }],
+    ['M', { stableId: 'point-m', name: 'M', position: { x: 2, y: 0 }, free: false, dependsOn: ['A', 'B'], stmtIndex: 2 }],
   ]),
   elements: [
-    { kind: 'polyline', points: [{ x: 0, y: 0 }, { x: 4, y: 0 }], cycle: false, stmtIndex: 3, refs: ['A', 'B'], style: DEFAULT_STYLE },
-    { kind: 'circle', center: { x: 2, y: 0 }, radius: 1.5, stmtIndex: 4, refs: ['M'], style: DEFAULT_STYLE },
-    { kind: 'label', at: { x: 0, y: 0 }, text: '$A$', anchor: 'above', stmtIndex: 5, refs: ['A'], style: DEFAULT_STYLE },
+    { stableId: 'line-ab', kind: 'polyline', points: [{ x: 0, y: 0 }, { x: 4, y: 0 }], cycle: false, stmtIndex: 3, refs: ['A', 'B'], style: DEFAULT_STYLE },
+    { stableId: 'circle-1', kind: 'circle', center: { x: 2, y: 0 }, radius: 1.5, definition: null, stmtIndex: 4, refs: ['M'], style: DEFAULT_STYLE },
+    { stableId: 'label-a', kind: 'label', at: { x: 0, y: 0 }, text: '$A$', anchor: 'above', stmtIndex: 5, refs: ['A'], style: DEFAULT_STYLE },
   ],
   issues: [],
   graphOrder: ['A', 'B', 'M'],

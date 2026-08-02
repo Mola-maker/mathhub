@@ -1,0 +1,19 @@
+\documentclass[border=2pt]{standalone}
+\def\pgfsysdriver{pgfsys-dvisvgm.def}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usetikzlibrary{arrows.meta,calc,intersections,through,angles,quotes,patterns,positioning}
+\begin{document}
+\begin{tikzpicture}
+  \coordinate (A) at (0,0);
+  \coordinate (B) at (2,0);
+  \coordinate (C) at (1,1.5);
+  \path[name path=ab] (A) -- (B);
+  \path[name path=cc] (C) circle (1);
+  \path[name intersections={of=ab and cc,by=P}];
+  \draw[-{Stealth}] (A) -- (B);
+  \draw[pattern=north east lines] (A) -- (B) -- (C) -- cycle;
+  \node[draw,circle through=(B)] at (A) {};
+  \pic[draw,"$\alpha$",angle radius=5mm] {angle=B--A--C};
+\end{tikzpicture}
+\end{document}
