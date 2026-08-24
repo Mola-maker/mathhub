@@ -205,7 +205,9 @@ function rankedGraph(statement: GraphStatement): RankedGraph {
     ...component.map((name) => order.get(name) ?? Number.MAX_SAFE_INTEGER),
   ));
   const componentEdges = new Map(components.map((_, index) => [index, new Set<number>()] as const));
-  const indegree = new Map(components.map((_, index) => [index, 0] as const));
+  const indegree = new Map<number, number>(
+    components.map((_, index) => [index, 0]),
+  );
   for (const [from, values] of adjacency) {
     const fromComponent = componentOf.get(from)!;
     for (const to of values) {
@@ -219,7 +221,9 @@ function rankedGraph(statement: GraphStatement): RankedGraph {
     .map((_, index) => index)
     .filter((index) => indegree.get(index) === 0)
     .sort((a, b) => componentOrder[a]! - componentOrder[b]!);
-  const componentRank = new Map(components.map((_, index) => [index, 0] as const));
+  const componentRank = new Map<number, number>(
+    components.map((_, index) => [index, 0]),
+  );
   while (queue.length > 0) {
     const current = queue.shift()!;
     const nextComponents = [...componentEdges.get(current)!]

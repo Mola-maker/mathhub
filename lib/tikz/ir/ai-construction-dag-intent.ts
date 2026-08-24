@@ -30,7 +30,10 @@ export type AiConstructionDagIntentCompilation =
 
 export const isAiConstructionDagIntent = isConstructionDagIntent;
 
-function fail(code: string, message: string): AiConstructionDagIntentCompilation {
+function fail(
+  code: AiPatchValidationError['code'],
+  message: string,
+): AiConstructionDagIntentCompilation {
   return { ok: false, errors: [{ code, message }] };
 }
 

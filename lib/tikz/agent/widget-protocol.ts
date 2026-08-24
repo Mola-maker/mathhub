@@ -147,6 +147,14 @@ export interface GeometryProblemSearchWidget {
     readonly contentHashAlgorithm: 'sha256-utf8';
     readonly contentHashScope: 'normalized-live-snapshot';
     readonly admission: 'search-reference-only';
+    readonly provider?: {
+      readonly datasetId: string;
+      readonly config: string;
+      readonly split: string;
+      readonly rowIndex?: number;
+      readonly revision: null;
+      readonly revisionStatus: 'unpinned-live-viewer';
+    };
     readonly rights: {
       readonly sourceMaterialRights: GeometryProblemSourceMaterialRights;
       readonly redistribution: GeometryProblemUsageDecision;
@@ -397,6 +405,9 @@ export function parseTikzReadOnlyAgentWidget(
     const ids = new Set<string>();
     const results: GeometryProblemSearchWidget['results'][number][] = [];
     for (const candidate of value.results) {
+      const provider = record(candidate) && candidate.provider !== undefined
+        ? candidate.provider
+        : undefined;
       if (
         !record(candidate)
         || !text(candidate.id, 192)
@@ -426,6 +437,19 @@ export function parseTikzReadOnlyAgentWidget(
         || candidate.assetCount < 0
         || candidate.assetCount > 12
         || !stringList(candidate.topics, 12)
+        || (provider !== undefined && (
+          !record(provider)
+          || !text(provider.datasetId, 160)
+          || !text(provider.config, 160)
+          || provider.split !== 'train'
+          || (provider.rowIndex !== undefined && (
+            !Number.isSafeInteger(provider.rowIndex)
+            || (provider.rowIndex as number) < 0
+            || (provider.rowIndex as number) > 1_000_000
+          ))
+          || provider.revision !== null
+          || provider.revisionStatus !== 'unpinned-live-viewer'
+        ))
       ) return null;
       ids.add(candidate.id);
       results.push({
@@ -440,6 +464,18 @@ export function parseTikzReadOnlyAgentWidget(
         contentHashAlgorithm: 'sha256-utf8',
         contentHashScope: 'normalized-live-snapshot',
         admission: 'search-reference-only',
+        ...(provider !== undefined ? {
+          provider: {
+            datasetId: provider.datasetId as string,
+            config: provider.config as string,
+            split: provider.split as string,
+            ...(provider.rowIndex !== undefined
+              ? { rowIndex: provider.rowIndex as number }
+              : {}),
+            revision: null,
+            revisionStatus: 'unpinned-live-viewer',
+          },
+        } : {}),
         rights: {
           sourceMaterialRights: candidate.rights.sourceMaterialRights as GeometryProblemSourceMaterialRights,
           redistribution: candidate.rights.redistribution as GeometryProblemUsageDecision,

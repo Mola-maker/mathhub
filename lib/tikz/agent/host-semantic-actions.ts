@@ -79,6 +79,7 @@ function labelIntentForEntity(
 ): ConstructionIntent | null {
   if (
     context.basis.hashAlgorithm !== 'fnv1a64-utf8'
+    || insertion.id !== 'binding:document:tikzpicture-body-end'
     || !insertion.createCapabilityFingerprint
   ) return null;
   const id = actionId('host-label', context.basis.revision, `${entityId}-${text}`);
@@ -96,7 +97,7 @@ function labelIntentForEntity(
     },
     operation: 'create',
     capability: {
-      bindingId: insertion.id,
+      bindingId: 'binding:document:tikzpicture-body-end',
       fingerprint: insertion.createCapabilityFingerprint,
       scopeFingerprint: context.construction.authorizationScopeFingerprint,
     },

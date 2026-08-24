@@ -36,16 +36,14 @@ describe('tikz prompt', () => {
     expect(prompt).toContain('all-or-none');
   });
 
-  it('九点圆命中完整的九个派生点配方', () => {
+  it('九点圆命中单一宿主管理的复合构造配方', () => {
     const context = buildTikzContextForProblem('画一个九点圆');
     expect(context).toContain('九点圆');
     expect(context).toContain('GeometryIntent/v2');
     expect(context).toContain('toolId "nine-point-circle"');
-    expect(context).toContain('"kind": "transform"');
-    expect(context).toContain('"kind": "delete"');
-    expect(context).toContain('never emit target coordinates');
-    expect(context).toContain('AI deletion is block-only');
     expect(context).toContain('atomically');
+    expect(context).toContain('Never expand a');
+    expect(context).toContain('construction-plan create proposal');
     expect(context).not.toContain('coordinate (Ha)');
   });
 

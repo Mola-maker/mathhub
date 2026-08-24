@@ -40,6 +40,7 @@ export function geometryProblemSearchWidget(
       contentHashAlgorithm: candidate.contentHashAlgorithm,
       contentHashScope: candidate.contentHashScope,
       admission: candidate.admission,
+      provider: candidate.provider,
       rights: candidate.rights,
       hasImages: candidate.hasImages,
       assetCount: Array.isArray(candidate.assets) ? candidate.assets.length : 0,

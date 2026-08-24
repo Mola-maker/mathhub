@@ -210,9 +210,62 @@ describe('AgentMessageWidgets v2', () => {
     expect(screen.getByText('含 1 个题图引用')).toBeTruthy();
     expect(screen.getByRole('link', { name: '查看题源' }).getAttribute('href'))
       .toBe('https://huggingface.co/datasets/Hothan/OlympiadBench');
-    expect(screen.getByRole('note').textContent).toContain('需宿主准入回执');
+    expect(screen.getByRole('note').textContent).toContain('只读回执允许 AI 分析题目');
     expect(screen.queryByRole('button', { name: /分析|构造/u })).toBeNull();
     expect(document.body.textContent).not.toContain('not exposed solution');
     expect(screen.queryByText('应用')).toBeNull();
+  });
+
+  it('offers Host re-attestation only for a live row with a non-blocked rights state', async () => {
+    const onInspectProblemReference = vi.fn(async () => undefined);
+    const contentHash = '0123456789abcdef'.repeat(4);
+    render(<AgentMessageWidgets
+      {...callbacks}
+      onInspectProblemReference={onInspectProblemReference}
+      widgets={[{
+        kind: 'problem-search',
+        title: '找到 1 道几何题',
+        query: 'nine-point circle',
+        results: [{
+          id: 'mathnet:nine-point-fixture',
+          source: 'mathnet',
+          title: 'Nine-point circle problem',
+          statementPreview: 'Let ABC be a triangle.',
+          sourceUrl: 'https://mathnet.mit.edu/explorer.html?p=nine-point-fixture',
+          datasetUrl: 'https://huggingface.co/datasets/ShadenA/MathNet',
+          licenseId: 'CC-BY-4.0',
+          contentHash,
+          contentHashAlgorithm: 'sha256-utf8',
+          contentHashScope: 'normalized-live-snapshot',
+          admission: 'search-reference-only',
+          provider: {
+            datasetId: 'ShadenA/MathNet',
+            config: 'all',
+            split: 'train',
+            rowIndex: 7,
+            revision: null,
+            revisionStatus: 'unpinned-live-viewer',
+          },
+          rights: {
+            sourceMaterialRights: 'conditional',
+            redistribution: 'review-required',
+            commercial: 'review-required',
+            training: 'review-required',
+          },
+          hasImages: false,
+          assetCount: 0,
+          topics: ['Geometry'],
+        }],
+      }]}
+    />);
+
+    fireEvent.click(screen.getByRole('button', {
+      name: '核验并分析 Nine-point circle problem',
+    }));
+    expect(onInspectProblemReference).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'mathnet:nine-point-fixture',
+      contentHash,
+      provider: expect.objectContaining({ rowIndex: 7 }),
+    }));
   });
 });

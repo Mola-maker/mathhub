@@ -75,10 +75,30 @@ export function compileAiWriteProposal(
     return compileAiManagedPresentationIntent(value, context, options);
   }
   if (isAiSemanticDeleteIntent(value)) {
-    return compileAiSemanticDeleteIntent(value, context, options);
+    const source = context.source;
+    if (typeof source !== 'string') {
+      return {
+        ok: false,
+        errors: [{
+          code: 'invalid-shape',
+          message: 'Semantic deletion requires the current source document.',
+        }],
+      };
+    }
+    return compileAiSemanticDeleteIntent(value, { ...context, source }, options);
   }
   if (isAiSelectionTransformIntent(value)) {
-    return compileAiSelectionTransformIntent(value, context, options);
+    const source = context.source;
+    if (typeof source !== 'string') {
+      return {
+        ok: false,
+        errors: [{
+          code: 'invalid-shape',
+          message: 'Semantic transformation requires the current source document.',
+        }],
+      };
+    }
+    return compileAiSelectionTransformIntent(value, { ...context, source }, options);
   }
   if (isAiConstructionIntentProposal(value)) {
     return compileAiConstructionIntentProposal(value, context, options);

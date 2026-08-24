@@ -117,7 +117,7 @@ function interactionExtentPoints(
     first,
     second,
     frame,
-    primitive.kind,
+    primitive.kind === 'ray' ? 'ray' : 'line',
     primitive.kind === 'ray' ? 0 : 16,
   );
 }
@@ -229,7 +229,7 @@ function InteractionExtentGuideSvg({
 function ElementPrimitiveSvg({
   primitive,
   viewport,
-  frame,
+  frame: _frame,
   theme,
   selected,
   hovered,

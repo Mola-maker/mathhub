@@ -31,7 +31,7 @@ describe('AgentRunSteps', () => {
     );
 
     expect(container.querySelectorAll('[data-tool-call-id="call-1"]')).toHaveLength(1);
-    expect(screen.getAllByText('已读取几何上下文')).toHaveLength(2);
+    expect(screen.getAllByText('已读取几何上下文')).toHaveLength(1);
     expect(screen.getByText('read-geometry-context · 已完成')).toBeTruthy();
     expect(screen.queryByText('正在读取几何上下文')).toBeNull();
     expect(screen.getByText(/查看过程（2 步）/)).toBeTruthy();

@@ -37,6 +37,7 @@ export default defineConfig([
     '.next/**',
     'dist/**',
     'coverage/**',
+    'output/**',
     '.claude/**',
     '.superpowers/**',
     'mathhub/**',

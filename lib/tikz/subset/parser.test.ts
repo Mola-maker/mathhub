@@ -33,9 +33,15 @@ describe('parseTikz', () => {
     expect(source.slice(graph.nodes[0]!.range.start, graph.nodes[0]!.range.end)).toBe('A/Alpha');
   });
 
-  it('keeps dynamic graph groups outside the static interactive parser', () => {
+  it('expands bounded static graph groups into deterministic interactive edges', () => {
     const source = String.raw`\begin{tikzpicture}\graph { A -- { B, C } };\end{tikzpicture}`;
-    expect(() => parseTikz(source)).toThrowError(/group|静态名称/u);
+    const graph = parseTikz(source).statements[0];
+    if (graph.kind !== 'graph') throw new Error('bad graph');
+    expect(graph.nodes.map((node) => node.name)).toEqual(['A', 'B', 'C']);
+    expect(graph.edges.map((edge) => [edge.from, edge.to, edge.connector])).toEqual([
+      ['A', 'B', '--'],
+      ['A', 'C', '--'],
+    ]);
   });
 
   it('语句种类与数量正确', () => {

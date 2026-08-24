@@ -134,6 +134,8 @@ const SEARCH_CACHE_TTL_MS = 60_000;
 const SEARCH_NEGATIVE_CACHE_TTL_MS = 10_000;
 const SEARCH_STALE_TTL_MS = 5 * 60_000;
 const SEARCH_SINGLEFLIGHT_MAX = 8;
+const REFERENCE_CACHE_MAX_ENTRIES = 48;
+const REFERENCE_CACHE_TTL_MS = 10 * 60_000;
 
 interface ProblemSearchCacheEntry {
   readonly value: GeometryProblemSearchResult;
@@ -143,6 +145,10 @@ interface ProblemSearchCacheEntry {
 
 const searchCache = new Map<string, ProblemSearchCacheEntry>();
 const searchFlights = new Map<string, Promise<GeometryProblemSearchResult>>();
+const referenceCache = new Map<string, {
+  readonly value: GeometryProblemRecord;
+  readonly expiresAt: number;
+}>();
 
 interface ProblemSourceRequestBudget {
   requests: number;
@@ -151,6 +157,85 @@ interface ProblemSourceRequestBudget {
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export interface GeometryProblemReferenceSelector {
+  readonly source: GeometryProblemSourceId;
+  readonly id: string;
+  readonly contentHash: string;
+  readonly provider: GeometryProblemProviderSnapshot;
+}
+
+function sameProvider(
+  left: GeometryProblemProviderSnapshot,
+  right: GeometryProblemProviderSnapshot,
+): boolean {
+  return left.datasetId === right.datasetId
+    && left.config === right.config
+    && left.split === right.split
+    && left.rowIndex === right.rowIndex
+    && left.revision === null
+    && right.revision === null
+    && left.revisionStatus === 'unpinned-live-viewer'
+    && right.revisionStatus === 'unpinned-live-viewer';
+}
+
+function validReferenceSelector(
+  input: GeometryProblemReferenceSelector,
+): boolean {
+  if (
+    !input
+    || (input.source !== 'mathnet' && input.source !== 'olympiadbench')
+    || !input.id.startsWith(`${input.source}:`)
+    || input.id.length > 192
+    || !/^[a-f0-9]{64}$/u.test(input.contentHash)
+    || !Number.isSafeInteger(input.provider?.rowIndex)
+    || (input.provider.rowIndex ?? -1) < 0
+    || (input.provider.rowIndex ?? 1_000_001) > 1_000_000
+    || input.provider.split !== 'train'
+    || input.provider.revision !== null
+    || input.provider.revisionStatus !== 'unpinned-live-viewer'
+  ) return false;
+  if (input.source === 'mathnet') {
+    return input.provider.datasetId === 'ShadenA/MathNet'
+      && (input.provider.config === 'all' || input.provider.config === 'default');
+  }
+  return input.provider.datasetId === OLYMPIADBENCH_DATASET
+    && (OLYMPIADBENCH_CONFIGS as readonly string[]).includes(input.provider.config);
+}
+
+function referenceKey(input: GeometryProblemReferenceSelector): string {
+  return JSON.stringify({
+    schemaVersion: 'geometry-problem-reference-key/v1',
+    source: input.source,
+    id: input.id,
+    contentHash: input.contentHash,
+    provider: input.provider,
+  });
+}
+
+function recordMatchesReference(
+  value: GeometryProblemRecord,
+  input: GeometryProblemReferenceSelector,
+): boolean {
+  return value.source === input.source
+    && value.id === input.id
+    && value.contentHash === input.contentHash
+    && sameProvider(value.provider, input.provider);
+}
+
+function touchReferenceCache(
+  key: string,
+  value: GeometryProblemRecord,
+  expiresAt = Date.now() + REFERENCE_CACHE_TTL_MS,
+): void {
+  referenceCache.delete(key);
+  referenceCache.set(key, { value, expiresAt });
+  while (referenceCache.size > REFERENCE_CACHE_MAX_ENTRIES) {
+    const oldest = referenceCache.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    referenceCache.delete(oldest);
+  }
 }
 
 function text(value: unknown, max = MAX_PROBLEM_TEXT): string | null {
@@ -309,7 +394,11 @@ function consumeSourceRequest(budget: ProblemSourceRequestBudget): void {
   }
 }
 
-function mathNetRecord(value: unknown, rowIndex?: number): GeometryProblemRecord | null {
+function mathNetRecord(
+  value: unknown,
+  rowIndex?: number,
+  config: 'all' | 'default' = 'all',
+): GeometryProblemRecord | null {
   if (!record(value)) return null;
   const id = text(value.id, 128) ?? text(value.unique_id, 128);
   const statement = text(value.problem_markdown);
@@ -326,7 +415,7 @@ function mathNetRecord(value: unknown, rowIndex?: number): GeometryProblemRecord
   const normalizedId = `mathnet:${id}`;
   const provider: GeometryProblemProviderSnapshot = {
     datasetId: 'ShadenA/MathNet',
-    config: 'all',
+    config,
     split: 'train',
     ...(Number.isSafeInteger(rowIndex) ? { rowIndex } : {}),
     revision: null,
@@ -543,15 +632,23 @@ async function fetchMathNetRows(
     return Array.isArray(body.rows) ? body.rows : [];
   };
   const loadConfig = async (config: 'default' | 'all') => {
-    if (!query.trim()) return { rows: await load(config, false), usedRowFallback: false };
+    if (!query.trim()) return {
+      rows: await load(config, false),
+      usedRowFallback: false,
+      config,
+    };
     try {
-      return { rows: await load(config, true), usedRowFallback: false };
+      return { rows: await load(config, true), usedRowFallback: false, config };
     } catch (error) {
       if (signal.aborted) throw error;
-      return { rows: await load(config, false), usedRowFallback: true };
+      return { rows: await load(config, false), usedRowFallback: true, config };
     }
   };
-  let loaded: { rows: HuggingFaceRow[]; usedRowFallback: boolean };
+  let loaded: {
+    rows: HuggingFaceRow[];
+    usedRowFallback: boolean;
+    config: 'all' | 'default';
+  };
   try {
     // MathNet's published aggregate subset is currently named `all`.
     loaded = await loadConfig('all');
@@ -566,6 +663,7 @@ async function fetchMathNetRows(
       const parsed = mathNetRecord(
         entry.row,
         Number.isSafeInteger(entry.row_idx) ? entry.row_idx as number : undefined,
+        loaded.config,
       );
       return parsed ? [parsed] : [];
     }),
@@ -865,6 +963,63 @@ export async function searchGeometryProblemSources(input: {
   return waitWithCallerAbort(flight, input.signal);
 }
 
+/**
+ * Re-resolve one browser-selected live reference and require the normalized
+ * snapshot hash to match. Browser row coordinates are only a locator; they
+ * never become an integrity or rights assertion.
+ */
+export async function resolveGeometryProblemReference(input: {
+  readonly selector: GeometryProblemReferenceSelector;
+  readonly signal: AbortSignal;
+}): Promise<GeometryProblemRecord | null> {
+  const selector = input.selector;
+  if (!validReferenceSelector(selector)) return null;
+  const key = referenceKey(selector);
+  const now = Date.now();
+  const cached = referenceCache.get(key);
+  if (cached && cached.expiresAt > now) {
+    touchReferenceCache(key, cached.value, cached.expiresAt);
+    return cached.value;
+  }
+  for (const entry of searchCache.values()) {
+    if (entry.staleUntil <= now) continue;
+    const match = entry.value.records.find((candidate) => (
+      recordMatchesReference(candidate, selector)
+    ));
+    if (match) {
+      touchReferenceCache(key, match);
+      return match;
+    }
+  }
+
+  const url = new URL(selector.source === 'mathnet' ? MATHNET_ROWS : OLYMPIADBENCH_ROWS);
+  url.searchParams.set('dataset', selector.provider.datasetId);
+  url.searchParams.set('config', selector.provider.config);
+  url.searchParams.set('split', selector.provider.split);
+  url.searchParams.set('offset', String(selector.provider.rowIndex));
+  url.searchParams.set('length', '1');
+  const budget: ProblemSourceRequestBudget = { requests: 0, bytes: 0 };
+  consumeSourceRequest(budget);
+  const response = await fetch(url, {
+    signal: input.signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw new Error(`Problem reference returned HTTP ${response.status}`);
+  const body = await boundedJsonResponse(response, budget) as { rows?: HuggingFaceRow[] };
+  const row = Array.isArray(body.rows) ? body.rows[0] : undefined;
+  if (!row || row.row_idx !== selector.provider.rowIndex) return null;
+  const parsed = selector.source === 'mathnet'
+    ? mathNetRecord(
+      row.row,
+      row.row_idx as number,
+      selector.provider.config as 'all' | 'default',
+    )
+    : olympiadBenchRecord(row.row, selector.provider.config, row.row_idx as number);
+  if (!parsed || !recordMatchesReference(parsed, selector)) return null;
+  touchReferenceCache(key, parsed);
+  return parsed;
+}
+
 export const __problemGatewayTest = {
   mathNetRecord,
   olympiadBenchRecord,
@@ -874,5 +1029,6 @@ export const __problemGatewayTest = {
   resetGatewayCache(): void {
     searchCache.clear();
     searchFlights.clear();
+    referenceCache.clear();
   },
 };

@@ -62,6 +62,7 @@ import {
 import {
   geometryFlowBasisMatches,
   type GeometryFlowWidget,
+  type GeometryProblemSearchWidget,
 } from '@/lib/tikz/agent/widget-protocol';
 import {
   buildGeometryFlowStepHostAction,
@@ -85,6 +86,11 @@ import {
   type TikzAsyncWorkItem,
 } from '@/lib/tikz/runtime/work-item';
 import type { GeometryDoc } from '@/lib/tikz/ir/geometry-doc';
+import {
+  isProblemInspectionReceipt,
+  problemInspectionDraft,
+  type ProblemInspectionReceipt,
+} from '@/lib/tikz/problems/problem-inspection-protocol';
 
 type Provider = 'relay';
 export type TikzStudioMessage = {
@@ -103,10 +109,20 @@ export interface PendingGeometryFlowActionDraft {
   readonly draft: string;
 }
 
+export interface PendingProblemInspectionDraft {
+  readonly receipt: ProblemInspectionReceipt;
+  readonly draft: string;
+}
+
 export type PendingGeometryFlowActionResolution =
   | { readonly status: 'none'; readonly action: null }
   | { readonly status: 'ready'; readonly action: GeometryFlowStepHostAction }
   | { readonly status: 'rejected'; readonly action: null };
+
+export type PendingProblemInspectionResolution =
+  | { readonly status: 'none'; readonly receipt: null }
+  | { readonly status: 'ready'; readonly receipt: ProblemInspectionReceipt }
+  | { readonly status: 'rejected'; readonly receipt: null };
 
 /**
  * Composer edits never silently discard a typed Host receipt.  The next send
@@ -124,6 +140,21 @@ export function resolvePendingGeometryFlowActionForSend(
   return action
     ? { status: 'ready', action }
     : { status: 'rejected', action: null };
+}
+
+/** A browser edit or expired receipt must fail closed for exactly one send. */
+export function resolvePendingProblemInspectionForSend(
+  pending: PendingProblemInspectionDraft | null,
+  problem: string,
+  now = Date.now(),
+): PendingProblemInspectionResolution {
+  if (!pending) return { status: 'none', receipt: null };
+  if (
+    pending.draft.trim() !== problem
+    || !isProblemInspectionReceipt(pending.receipt)
+    || Date.parse(pending.receipt.expiresAt) <= now
+  ) return { status: 'rejected', receipt: null };
+  return { status: 'ready', receipt: pending.receipt };
 }
 
 export type AgentRunRecoveryState = {
@@ -711,6 +742,8 @@ export function TikzStudio({
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingFlowActionRef = useRef<PendingGeometryFlowActionDraft | null>(null);
+  const pendingProblemInspectionRef = useRef<PendingProblemInspectionDraft | null>(null);
+  const problemInspectionControllerRef = useRef<AbortController | null>(null);
   const studioRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const agentTurnAdmissionRef = useRef<string | null>(null);
@@ -762,6 +795,9 @@ export function TikzStudio({
       return;
     }
     if (mode === 'explain') {
+      problemInspectionControllerRef.current?.abort();
+      problemInspectionControllerRef.current = null;
+      pendingProblemInspectionRef.current = null;
       pendingFlowActionRef.current = null;
       setInput(geometryFlowStepExplanationDraft(flow, step));
       setCatalogError('');
@@ -774,10 +810,77 @@ export function TikzStudio({
       return;
     }
     const draft = geometryFlowStepActionDraft(action);
+    problemInspectionControllerRef.current?.abort();
+    problemInspectionControllerRef.current = null;
+    pendingProblemInspectionRef.current = null;
     pendingFlowActionRef.current = { action, draft };
     setInput(draft);
     setCatalogError('');
     requestAnimationFrame(() => composerInputRef.current?.focus());
+  }, []);
+
+  const prepareProblemInspection = useCallback(async (
+    result: GeometryProblemSearchWidget['results'][number],
+  ) => {
+    if (agentTurnAdmissionRef.current) {
+      setCatalogError('请先等待或停止当前 Agent 运行，再核验新的题源。');
+      return;
+    }
+    const rowIndex = result.provider?.rowIndex;
+    if (!result.provider || !Number.isSafeInteger(rowIndex)) {
+      setCatalogError('该搜索结果缺少可重新核验的上游行坐标。');
+      return;
+    }
+    const controller = new AbortController();
+    problemInspectionControllerRef.current?.abort();
+    problemInspectionControllerRef.current = controller;
+    setCatalogError('');
+    try {
+      const response = await fetch('/api/tikz/problems/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          source: result.source,
+          id: result.id,
+          contentHash: result.contentHash,
+          provider: result.provider,
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        error?: string;
+        receipt?: unknown;
+      };
+      if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
+      if (!isProblemInspectionReceipt(payload.receipt)) {
+        throw new Error('服务端返回了无效的题源核验回执');
+      }
+      if (agentTurnAdmissionRef.current) {
+        throw new Error('当前 Agent 已开始运行；本次题源回执未进入编辑器');
+      }
+      const receipt = payload.receipt;
+      if (
+        receipt.source !== result.source
+        || receipt.sourceId !== result.id
+        || receipt.contentHash !== result.contentHash
+        || receipt.provider.datasetId !== result.provider.datasetId
+        || receipt.provider.config !== result.provider.config
+        || receipt.provider.split !== result.provider.split
+        || receipt.provider.rowIndex !== rowIndex
+      ) throw new Error('题源核验回执与所选搜索结果不一致');
+      const draft = problemInspectionDraft(receipt);
+      pendingFlowActionRef.current = null;
+      pendingProblemInspectionRef.current = { receipt, draft };
+      setInput(draft);
+      requestAnimationFrame(() => composerInputRef.current?.focus());
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setCatalogError(error instanceof Error ? error.message : '题源核验失败');
+    } finally {
+      if (problemInspectionControllerRef.current === controller) {
+        problemInspectionControllerRef.current = null;
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -803,6 +906,9 @@ export function TikzStudio({
       recoveryControllerRef.current = null;
       repairControllerRef.current?.abort();
       repairControllerRef.current = null;
+      problemInspectionControllerRef.current?.abort();
+      problemInspectionControllerRef.current = null;
+      pendingProblemInspectionRef.current = null;
       for (const audit of visualAuditControllers.values()) {
         audit.controller.abort(new DOMException('TikZ Studio closed', 'AbortError'));
       }
@@ -1030,6 +1136,9 @@ export function TikzStudio({
     }
     repairControllerRef.current?.abort();
     repairControllerRef.current = null;
+    problemInspectionControllerRef.current?.abort();
+    problemInspectionControllerRef.current = null;
+    pendingProblemInspectionRef.current = null;
     if (startOpen) {
       window.location.assign('/');
       return;
@@ -1113,6 +1222,20 @@ export function TikzStudio({
   const sendProblem = useCallback(async () => {
     const problem = input.trim();
     if (!problem || streaming || agentTurnAdmissionRef.current) return;
+    if (!pendingProblemInspectionRef.current) {
+      problemInspectionControllerRef.current?.abort();
+      problemInspectionControllerRef.current = null;
+    }
+    const problemInspectionResolution = resolvePendingProblemInspectionForSend(
+      pendingProblemInspectionRef.current,
+      problem,
+    );
+    if (problemInspectionResolution.status === 'rejected') {
+      pendingProblemInspectionRef.current = null;
+      setCatalogError('题源分析回执已过期或固定请求被编辑；请从搜索结果重新核验。');
+      return;
+    }
+    const problemInspectionReceipt = problemInspectionResolution.receipt;
     const pendingFlowAction = pendingFlowActionRef.current;
     const flowActionResolution = resolvePendingGeometryFlowActionForSend(
       pendingFlowAction,
@@ -1123,6 +1246,12 @@ export function TikzStudio({
     if (flowActionResolution.status === 'rejected') {
       pendingFlowActionRef.current = null;
       setCatalogError('动态推导动作已过期或被编辑；请从当前步骤重新发起。');
+      return;
+    }
+    if (problemInspectionReceipt && flowStepAction) {
+      pendingFlowActionRef.current = null;
+      pendingProblemInspectionRef.current = null;
+      setCatalogError('题源分析回执不能与画板步骤动作混用；请重新选择一个操作。');
       return;
     }
     if (!engine.interactiveWritebackSafe) {
@@ -1229,6 +1358,7 @@ export function TikzStudio({
     ]).slice(-MAX_CHAT_MESSAGES));
     setInput('');
     pendingFlowActionRef.current = null;
+    pendingProblemInspectionRef.current = null;
 
     const controller = new AbortController();
     agentControllerRef.current?.abort();
@@ -1262,6 +1392,7 @@ export function TikzStudio({
           semanticKernel,
           contextRefs,
           hostAction: flowStepAction ?? undefined,
+          problemInspectionReceipt: problemInspectionReceipt ?? undefined,
         }),
       });
       if (!response.ok || !response.body) {
@@ -2214,6 +2345,9 @@ export function TikzStudio({
                     content={message.content}
                     pending={streaming && message.id === messages.at(-1)?.id}
                     onChooseClarification={(choice) => {
+                      problemInspectionControllerRef.current?.abort();
+                      problemInspectionControllerRef.current = null;
+                      pendingProblemInspectionRef.current = null;
                       pendingFlowActionRef.current = null;
                       setInput(choice.value);
                       requestAnimationFrame(() => composerInputRef.current?.focus());
@@ -2233,6 +2367,7 @@ export function TikzStudio({
                     });
                   }}
                   onDraftGeometryStep={draftGeometryFlowStep}
+                  onInspectProblemReference={prepareProblemInspection}
                 />
               </motion.div>
             ))}
@@ -2248,6 +2383,8 @@ export function TikzStudio({
                 // Preserve a pending Host receipt. If the user edits its fixed
                 // draft, sendProblem rejects once instead of silently sending
                 // the text as a broad untyped mutation request.
+                problemInspectionControllerRef.current?.abort();
+                problemInspectionControllerRef.current = null;
                 setInput(event.target.value);
               }}
               onKeyDown={(event) => {

@@ -175,7 +175,10 @@ function sameGeometryDocBasis(
     && left.pluginSetDigest === right.pluginSetDigest;
 }
 
-function fail(code: string, message: string): AiSelectionTransformIntentCompilation {
+function fail(
+  code: AiPatchValidationError['code'],
+  message: string,
+): AiSelectionTransformIntentCompilation {
   return { ok: false, errors: [{ code, message }] };
 }
 

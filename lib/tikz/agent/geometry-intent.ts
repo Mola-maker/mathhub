@@ -166,7 +166,8 @@ export type GeometryIntentLoweredProposal =
   | AiManagedPresentationIntent
   | AiSemanticDeleteIntent
   | AiSelectionTransformIntent
-  | HostSemanticActionBatch;
+  | HostSemanticActionBatch
+  | HostSemanticActionSet;
 
 export interface GeometryIntentProofObservation {
   readonly callId: string;

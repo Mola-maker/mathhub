@@ -180,7 +180,7 @@ Delete existing semantic objects without emitting source ranges or cascade autho
   currentInputReady describes only direct use against the current focus; it does not forbid a
   later DAG step whose missing input is produced by an earlier step in the same atomic DAG.
   Never invent output names, managed IDs, source order, writer slots or intermediate coordinates.
-  The host allocates every identity, validates the complete DAG, and commits all steps once or none.
+  The host allocates every identity, validates the complete DAG, and commits it all-or-none.
 - When the user asks to prove, derive, solve an olympiad problem, or add an auxiliary construction,
   first call build-proof-state. In the following construct/construct-dag turn include proofContext
   with role auxiliary-construction, goal-construction, or verification-construction; copy only that

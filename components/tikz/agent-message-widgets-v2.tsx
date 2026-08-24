@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   parseTikzReadOnlyAgentWidget,
   type FunctionPlotWidget,
@@ -379,7 +379,20 @@ function sourceRightsLabel(
   return '题源权利待审查';
 }
 
-function GeometryProblemSearchCard({ widget }: { widget: GeometryProblemSearchWidget }) {
+function GeometryProblemSearchCard({
+  widget,
+  onInspectProblemReference,
+}: {
+  widget: GeometryProblemSearchWidget;
+  onInspectProblemReference?(
+    result: GeometryProblemSearchWidget['results'][number],
+  ): Promise<void> | void;
+}) {
+  const [preparingId, setPreparingId] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
   return (
     <section className="tz-agent-widget tz-agent-widget--problems">
       <header>
@@ -390,29 +403,60 @@ function GeometryProblemSearchCard({ widget }: { widget: GeometryProblemSearchWi
         <span>只读题源</span>
       </header>
       <ol className="tz-problem-search__results">
-        {widget.results.map((result) => (
-          <li key={result.id}>
-            <div className="tz-problem-search__heading">
-              <strong>{result.title}</strong>
-              <span>{PROBLEM_SOURCE_LABELS[result.source]}</span>
-            </div>
-            <p>{result.statementPreview}</p>
-            {result.topics.length > 0 ? (
-              <div className="tz-problem-search__topics" aria-label="题目主题">
-                {result.topics.map((topic) => <span key={topic}>{topic}</span>)}
+        {widget.results.map((result) => {
+          const hasInspectableReference = Number.isSafeInteger(result.provider?.rowIndex)
+            && Boolean(onInspectProblemReference);
+          const canInspect = hasInspectableReference
+            && result.rights.sourceMaterialRights !== 'blocked';
+          const preparing = preparingId === result.id;
+          return (
+            <li key={result.id}>
+              <div className="tz-problem-search__heading">
+                <strong>{result.title}</strong>
+                <span>{PROBLEM_SOURCE_LABELS[result.source]}</span>
               </div>
-            ) : null}
-            <footer>
-              <span>{result.licenseId}（数据集卡）· {sourceRightsLabel(result.rights.sourceMaterialRights)}</span>
-              <span>快照 {result.contentHash.slice(0, 8)}</span>
-              {result.hasImages ? <span>含 {result.assetCount || '未核验'} 个题图引用</span> : null}
-              <a href={result.sourceUrl} target="_blank" rel="noreferrer">查看题源</a>
-              <span className="tz-problem-search__admission" role="note">
-                需宿主准入回执后才能发送给 AI 或进入构造工作流
-              </span>
-            </footer>
-          </li>
-        ))}
+              <p>{result.statementPreview}</p>
+              {result.topics.length > 0 ? (
+                <div className="tz-problem-search__topics" aria-label="题目主题">
+                  {result.topics.map((topic) => <span key={topic}>{topic}</span>)}
+                </div>
+              ) : null}
+              <footer>
+                <span>{result.licenseId}（数据集卡）· {sourceRightsLabel(result.rights.sourceMaterialRights)}</span>
+                <span>快照 {result.contentHash.slice(0, 8)}</span>
+                {result.hasImages ? <span>含 {result.assetCount || '未核验'} 个题图引用</span> : null}
+                <a href={result.sourceUrl} target="_blank" rel="noreferrer">查看题源</a>
+                {hasInspectableReference ? <button
+                  className="tz-problem-search__inspect"
+                  type="button"
+                  disabled={!canInspect || preparingId !== null}
+                  aria-label={`核验并分析 ${result.title}`}
+                  title={canInspect
+                    ? '由服务端重新核验内容哈希并生成一次性只读分析回执'
+                    : result.rights.sourceMaterialRights === 'blocked'
+                      ? '该题源被目录策略阻止'
+                      : '当前搜索结果缺少可重新核验的上游行坐标'}
+                  onClick={() => {
+                    if (!canInspect || !onInspectProblemReference) return;
+                    setPreparingId(result.id);
+                    void Promise.resolve(onInspectProblemReference(result))
+                      .finally(() => {
+                        if (!mountedRef.current) return;
+                        setPreparingId((current) => (
+                          current === result.id ? null : current
+                        ));
+                      });
+                  }}
+                >
+                  {preparing ? '正在核验…' : '核验并分析'}
+                </button> : null}
+                <span className="tz-problem-search__admission" role="note">
+                  只读回执允许 AI 分析题目，不允许修改 Canvas 或源码
+                </span>
+              </footer>
+            </li>
+          );
+        })}
       </ol>
       {widget.sourceStatus && widget.sourceStatus.length > 0 ? (
         <details className="tz-problem-search__status">
@@ -439,6 +483,7 @@ export function AgentMessageWidgets({
   onOpenSource,
   onFocusEntityRefs,
   onDraftGeometryStep,
+  onInspectProblemReference,
 }: {
   widgets: readonly AgentMessageWidget[];
   onLocateCanvas(): void;
@@ -450,6 +495,9 @@ export function AgentMessageWidgets({
     step: GeometryFlowWidget['steps'][number],
     mode: GeometryFlowStepMode,
   ): void;
+  onInspectProblemReference?(
+    result: GeometryProblemSearchWidget['results'][number],
+  ): Promise<void> | void;
 }) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   if (widgets.length === 0) return null;
@@ -475,7 +523,11 @@ export function AgentMessageWidgets({
         }
         if (widget.kind === 'problem-search') {
           return (
-            <GeometryProblemSearchCard key={`${widget.kind}:${index}`} widget={widget} />
+            <GeometryProblemSearchCard
+              key={`${widget.kind}:${index}`}
+              widget={widget}
+              onInspectProblemReference={onInspectProblemReference}
+            />
           );
         }
         if (widget.kind === 'code-example') {

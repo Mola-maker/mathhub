@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   __problemGatewayTest,
   geometryProblemReferenceRecord,
+  resolveGeometryProblemReference,
   searchGeometryProblemSources,
 } from './source-gateway';
 
@@ -241,6 +242,68 @@ describe('geometry problem source gateway', () => {
       signal: new AbortController().signal,
     });
     expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('re-attests an exact live row against its provider config and content hash', async () => {
+    const upstream = {
+      id: 'reference-1',
+      competition: 'Geometry Test',
+      problem_markdown: 'Let ABC be a triangle and prove the three feet are collinear.',
+      solutions_markdown: ['Use directed angles.'],
+      topics_flat: ['Geometry > Triangle'],
+    };
+    const expected = __problemGatewayTest.mathNetRecord(upstream, 17, 'default')!;
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      expect(url.pathname).toBe('/rows');
+      expect(url.searchParams.get('config')).toBe('default');
+      expect(url.searchParams.get('offset')).toBe('17');
+      expect(url.searchParams.get('length')).toBe('1');
+      return Response.json({ rows: [{ row_idx: 17, row: upstream }] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resolved = await resolveGeometryProblemReference({
+      selector: {
+        source: expected.source,
+        id: expected.id,
+        contentHash: expected.contentHash,
+        provider: expected.provider,
+      },
+      signal: new AbortController().signal,
+    });
+
+    expect(resolved?.contentHash).toBe(expected.contentHash);
+    expect(resolved?.provider.config).toBe('default');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a live row whose normalized snapshot changed after search', async () => {
+    const searched = __problemGatewayTest.mathNetRecord({
+      id: 'reference-drift',
+      problem_markdown: 'Original geometry statement.',
+      topics_flat: ['Geometry'],
+    }, 9)!;
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      rows: [{
+        row_idx: 9,
+        row: {
+          id: 'reference-drift',
+          problem_markdown: 'Changed geometry statement.',
+          topics_flat: ['Geometry'],
+        },
+      }],
+    })));
+
+    await expect(resolveGeometryProblemReference({
+      selector: {
+        source: searched.source,
+        id: searched.id,
+        contentHash: searched.contentHash,
+        provider: searched.provider,
+      },
+      signal: new AbortController().signal,
+    })).resolves.toBeNull();
   });
 
   it('queries independent sources concurrently within one wall-clock budget', async () => {

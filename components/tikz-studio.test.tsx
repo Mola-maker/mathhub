@@ -9,6 +9,7 @@ import {
   isCommittedGeometryProjection,
   isVisualAuditAvailable,
   resolvePendingGeometryFlowActionForSend,
+  resolvePendingProblemInspectionForSend,
   reduceTikzStudioAgentStep,
   reduceTikzStudioAgentWidget,
   reduceTikzStudioAssistantContent,
@@ -60,6 +61,53 @@ describe('TikzStudio', () => {
     )).toEqual({ status: 'none', action: null });
   });
 
+  it('rejects an edited or expired problem-inspection draft instead of broadening authority', () => {
+    const now = Date.parse('2026-08-24T00:00:00.000Z');
+    const receipt = {
+      schemaVersion: 'geometry-problem-inspection-receipt/v1' as const,
+      receiptId: 'problem-inspection-test',
+      source: 'mathnet' as const,
+      sourceId: 'mathnet:test',
+      contentHash: '0123456789abcdef'.repeat(4),
+      provider: {
+        datasetId: 'ShadenA/MathNet',
+        config: 'all',
+        split: 'train',
+        rowIndex: 7,
+        revision: null,
+        revisionStatus: 'unpinned-live-viewer' as const,
+      },
+      title: 'Test geometry problem',
+      sourceUrl: 'https://mathnet.mit.edu/explorer.html?p=test',
+      datasetUrl: 'https://huggingface.co/datasets/ShadenA/MathNet',
+      licenseId: 'CC-BY-4.0',
+      sourceMaterialRights: 'conditional' as const,
+      issuedAt: '2026-08-23T23:55:00.000Z',
+      expiresAt: '2026-08-24T00:05:00.000Z',
+      mode: 'read-only-analysis' as const,
+      taint: 'untrusted-external-reference' as const,
+      writeAuthority: 'none' as const,
+      token: 'v1.test-token',
+    };
+    const pending = { receipt, draft: '固定只读分析请求' };
+
+    expect(resolvePendingProblemInspectionForSend(
+      pending,
+      '固定只读分析请求，然后修改画板',
+      now,
+    )).toEqual({ status: 'rejected', receipt: null });
+    expect(resolvePendingProblemInspectionForSend(
+      pending,
+      '固定只读分析请求',
+      Date.parse(receipt.expiresAt),
+    )).toEqual({ status: 'rejected', receipt: null });
+    expect(resolvePendingProblemInspectionForSend(
+      pending,
+      '固定只读分析请求',
+      now,
+    )).toEqual({ status: 'ready', receipt });
+  });
+
   it('accepts only a safe configured default model for immediate fallback', () => {
     expect(configuredProviderDefaultModel({
       providers: { relay: { configured: true, defaultModel: 'Minimax-M3' } },
@@ -106,6 +154,137 @@ describe('TikzStudio', () => {
     expect((screen.getByRole('button', { name: '发送 ↵' }) as HTMLButtonElement).disabled)
       .toBe(false);
     expect(screen.getByText('正在读取 api.molamaker.cn 模型目录…')).toBeTruthy();
+  });
+
+  it('uses real widget clicks to prepare and send a fixed read-only problem receipt', async () => {
+    const contentHash = '0123456789abcdef'.repeat(4);
+    const issuedAt = new Date();
+    const receipt = {
+      schemaVersion: 'geometry-problem-inspection-receipt/v1' as const,
+      receiptId: 'problem-inspection-browser-test',
+      source: 'mathnet' as const,
+      sourceId: 'mathnet:nine-point-browser-test',
+      contentHash,
+      provider: {
+        datasetId: 'ShadenA/MathNet',
+        config: 'all',
+        split: 'train',
+        rowIndex: 31,
+        revision: null,
+        revisionStatus: 'unpinned-live-viewer' as const,
+      },
+      title: 'Nine-point circle olympiad problem',
+      sourceUrl: 'https://mathnet.mit.edu/explorer.html?p=nine-point-browser-test',
+      datasetUrl: 'https://huggingface.co/datasets/ShadenA/MathNet',
+      licenseId: 'CC-BY-4.0',
+      sourceMaterialRights: 'conditional' as const,
+      issuedAt: issuedAt.toISOString(),
+      expiresAt: new Date(issuedAt.getTime() + 10 * 60_000).toISOString(),
+      mode: 'read-only-analysis' as const,
+      taint: 'untrusted-external-reference' as const,
+      writeAuthority: 'none' as const,
+      token: 'v1.browser-test-token',
+    };
+    const buildBodies: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (
+      url: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const path = String(url);
+      if (path.includes('/api/tikz/providers')) {
+        return Response.json({
+          available: ['relay'],
+          providers: { relay: { configured: true, visionConfigured: false } },
+        });
+      }
+      if (path.includes('/api/tikz/models')) {
+        return Response.json({
+          models: [{ id: 'claude-sonnet-4-6' }],
+          defaultModel: 'claude-sonnet-4-6',
+          source: 'api',
+        });
+      }
+      if (path.includes('/api/tikz/problems/prepare')) {
+        return Response.json({
+          schemaVersion: 'geometry-problem-inspection-prepared/v1',
+          receipt,
+        });
+      }
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      buildBodies.push(body);
+      const runId = `problem-widget-run-${buildBodies.length}`;
+      const frames: unknown[] = [{
+        agentEvent: tikzAgentEvent(runId, 0, {
+          type: 'run.started',
+          title: '正在理解你的请求',
+        }),
+      }];
+      if (buildBodies.length === 1) {
+        frames.push({
+          assistantWidget: {
+            kind: 'problem-search',
+            title: '找到 1 道几何题',
+            query: 'nine-point circle',
+            results: [{
+              id: receipt.sourceId,
+              source: receipt.source,
+              title: receipt.title,
+              statementPreview: 'Let ABC be a triangle.',
+              sourceUrl: receipt.sourceUrl,
+              datasetUrl: receipt.datasetUrl,
+              licenseId: receipt.licenseId,
+              contentHash,
+              contentHashAlgorithm: 'sha256-utf8',
+              contentHashScope: 'normalized-live-snapshot',
+              admission: 'search-reference-only',
+              provider: receipt.provider,
+              rights: {
+                sourceMaterialRights: 'conditional',
+                redistribution: 'review-required',
+                commercial: 'review-required',
+                training: 'review-required',
+              },
+              hasImages: false,
+              assetCount: 0,
+              topics: ['Geometry'],
+            }],
+          },
+        });
+      } else {
+        frames.push({ token: '已完成只读分析，画板未改变。' });
+      }
+      frames.push({
+        agentEvent: tikzAgentEvent(runId, 1, {
+          type: 'run.completed',
+          title: '已完成回答',
+          outcome: 'answer',
+        }),
+      });
+      return new Response(
+        frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join('')
+          + 'data: [DONE]\n\n',
+        { headers: { 'Content-Type': 'text/event-stream' } },
+      );
+    }) as unknown as typeof fetch);
+
+    render(<TikzStudio startOpen />);
+    const composer = await screen.findByLabelText('几何构造描述');
+    await screen.findByRole('option', { name: 'claude-sonnet-4-6' });
+    fireEvent.change(composer, { target: { value: '搜索一道九点圆竞赛题' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送 ↵' }));
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: `核验并分析 ${receipt.title}`,
+    }));
+    await waitFor(() => expect((composer as HTMLTextAreaElement).value)
+      .toContain('当前只允许分析，不允许修改画板'));
+    fireEvent.click(screen.getByRole('button', { name: '发送 ↵' }));
+
+    await waitFor(() => expect(buildBodies).toHaveLength(2));
+    expect(buildBodies[1]?.problemInspectionReceipt).toEqual(receipt);
+    expect(String(buildBodies[1]?.problem)).toContain('只读分析');
+    expect(String(buildBodies[1]?.problem)).not.toContain('搜索一道九点圆竞赛题');
+    expect(await screen.findByText('已完成只读分析，画板未改变。')).toBeTruthy();
   });
 
   it('projects terminal-only failures into readable chat instead of an empty success', async () => {

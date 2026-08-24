@@ -143,7 +143,10 @@ function sameGeometryDocBasis(
     && left.pluginSetDigest === right.pluginSetDigest;
 }
 
-function fail(code: string, message: string): AiSemanticDeleteIntentCompilation {
+function fail(
+  code: AiPatchValidationError['code'],
+  message: string,
+): AiSemanticDeleteIntentCompilation {
   return { ok: false, errors: [{ code, message }] };
 }
 

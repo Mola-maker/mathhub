@@ -134,7 +134,8 @@ export type AiPatchValidationErrorCode =
   | 'expected-slice-hash-mismatch'
   | 'insertion-policy'
   | 'overlapping-operations'
-  | 'operation-kind';
+  | 'operation-kind'
+  | 'plan-invalid';
 
 export interface AiPatchValidationError {
   code: AiPatchValidationErrorCode;
