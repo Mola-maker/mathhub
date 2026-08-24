@@ -149,6 +149,18 @@ function managedNinePointRouteFixture() {
     entity.kind === 'circle'
   ));
   if (!circle) throw new TypeError('Managed nine-point circle was not projected');
+  const labelAnchorNames = projected.geometryDoc.semantic.ir.entities
+    .filter((entity) => (
+      entity.kind === 'point'
+      && entity.metadata?.constructionId === plan.id
+      && typeof entity.name === 'string'
+      && entity.name.length > 0
+    ))
+    .slice(0, 3)
+    .map((entity) => entity.name!);
+  if (labelAnchorNames.length !== 3) {
+    throw new TypeError('Managed nine-point label anchors were not projected');
+  }
   const semanticKernel = buildGeometryAiContext(projected.geometryDoc, {
     focusRefs: [circle.id],
     focusDepth: 3,
@@ -159,6 +171,7 @@ function managedNinePointRouteFixture() {
     documentId,
     epoch,
     circleId: circle.id,
+    labelAnchorNames,
     contextRefs: [circle.id],
     semanticKernel,
   };
@@ -538,6 +551,64 @@ describe('POST /api/tikz', () => {
     expect(verifyText).toContain('"type":"run.completed"');
     const replay = await resolvedStore.store.read(runId);
     expect(replay.ok && replay.value?.terminal?.type).toBe('run.completed');
+  });
+
+  it('accepts one model GeometryIntent for an atomic multi-label follow-up', async () => {
+    const fixture = managedNinePointRouteFixture();
+    const modelIntent = `\`\`\`tikz-geometry-intent
+${JSON.stringify({
+  schemaVersion: 'geometry-intent/v2',
+  intentId: 'route-nine-point-multi-label',
+  operation: {
+    kind: 'present',
+    targetRef: fixture.circleId,
+    style: { color: 'blue', width: 'very thick' },
+    labels: fixture.labelAnchorNames.map((anchorRef) => ({
+      anchorRef,
+      text: anchorRef,
+    })),
+  },
+})}
+\`\`\``;
+    vi.mocked(streamProvider).mockImplementationOnce(async () => modelIntent);
+
+    const response = await POST(request({
+      mode: 'build',
+      problem: `把九点圆改成蓝色粗线，并给 ${fixture.labelAnchorNames.join('、')} 添加标签`,
+      history: [{ role: 'assistant', content: '九点圆已经构造完成。' }],
+      provider: 'relay',
+      tikzCode: fixture.source,
+      sourceRevision: 0,
+      sourceHash: fixture.sceneManifest.sourceHash,
+      sceneManifest: fixture.sceneManifest,
+      semanticKernel: fixture.semanticKernel,
+      contextRefs: fixture.contextRefs,
+    }));
+    const text = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(vi.mocked(streamProvider)).toHaveBeenCalledTimes(1);
+    expect(text).toContain('"type":"proposal.ready"');
+    expect(text).not.toContain('动作协议冲突');
+    const runId = /"runId":"([^"]+)"/u.exec(text)?.[1];
+    expect(runId).toBeTruthy();
+    const resolvedStore = await getTikzAgentRunStore();
+    if (!resolvedStore.ok || !runId) throw new Error('Agent RunStore unavailable');
+    const checkpoint = await resolvedStore.store.readProposal(runId);
+    expect(checkpoint.ok && checkpoint.value?.proposal).toMatchObject({
+      schemaVersion: 'host-semantic-action-set/v1',
+      styleIntent: {
+        operation: {
+          targetEntityId: fixture.circleId,
+          style: { color: 'blue', width: 'very thick' },
+        },
+      },
+      labelIntents: [
+        { parameters: { text: fixture.labelAnchorNames[0] } },
+        { parameters: { text: fixture.labelAnchorNames[1] } },
+        { parameters: { text: fixture.labelAnchorNames[2] } },
+      ],
+    });
   });
 
   it('rejects Agent mutations when production has no shared RunStore', async () => {

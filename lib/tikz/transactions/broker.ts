@@ -2796,6 +2796,16 @@ function hostSemanticActionSetStyleConflict(
   if (!isHostSemanticActionSet(proofValue)) {
     return 'Host semantic action set is missing its closed host proof.';
   }
+  if (!proofValue.styleIntent) {
+    const blocks = parseManagedConstructionBlocks(source);
+    if (
+      patches.length !== 1
+      || patches.some((patch) => blocks.some((block) => replacesWholeBlock(patch, block)))
+    ) {
+      return 'A label-only host semantic action set must contain one merged insertion and no managed style replacement.';
+    }
+    return null;
+  }
   const constructionId = proofValue.styleIntent.operation.constructionId;
   const blocks = parseManagedConstructionBlocks(source).filter((block) => (
     block.id === constructionId
@@ -2853,11 +2863,17 @@ function hostSemanticActionSetCreateConflict(
   if (!isHostSemanticActionSet(proofValue)) {
     return 'Host semantic action set is missing its closed host proof.';
   }
-  const currentBlock = parseManagedConstructionBlocks(previousSource).find((block) => (
-    block.id === proofValue.styleIntent.operation.constructionId
-  ));
-  if (!currentBlock) return 'Host semantic action set style owner is detached.';
-  const labelPatches = patches.filter((patch) => !replacesWholeBlock(patch, currentBlock));
+  const currentBlock = proofValue.styleIntent
+    ? parseManagedConstructionBlocks(previousSource).find((block) => (
+      block.id === proofValue.styleIntent!.operation.constructionId
+    ))
+    : null;
+  if (proofValue.styleIntent && !currentBlock) {
+    return 'Host semantic action set style owner is detached.';
+  }
+  const labelPatches = currentBlock
+    ? patches.filter((patch) => !replacesWholeBlock(patch, currentBlock))
+    : [...patches];
   const proofList = request.metadata?.managedConstructionCreateProofs;
   const intentProofList = request.metadata?.constructionIntentProofs;
   if (
@@ -3914,10 +3930,21 @@ export class TikzTransactionBroker {
         || request.metadata?.semanticWrite !== true
         || request.metadata?.managedConstructionOperationKind
           !== 'create-managed-construction'
-        || !isHostSemanticActionSet(
-          request.metadata?.hostSemanticActionSetProof,
-        )
-        || request.metadata?.managedConstructionStyleProof === undefined
+        || (() => {
+          const proof = request.metadata?.hostSemanticActionSetProof;
+          if (!isHostSemanticActionSet(proof)) return true;
+          const sourceOperation = request.operations.length === 1
+            && request.operations[0]?.op === 'source-patch'
+            ? request.operations[0]
+            : null;
+          if (!sourceOperation) return true;
+          const includesStyle = proof.styleIntent !== undefined;
+          return includesStyle
+            ? request.metadata?.managedConstructionStyleProof === undefined
+              || sourceOperation.patches.length !== 2
+            : request.metadata?.managedConstructionStyleProof !== undefined
+              || sourceOperation.patches.length !== 1;
+        })()
         || !Array.isArray(request.metadata?.managedConstructionCreateProofs)
         || !Array.isArray(request.metadata?.constructionIntentProofs)
         || request.metadata?.managedConstructionCreateProof !== undefined
@@ -3929,7 +3956,6 @@ export class TikzTransactionBroker {
         || request.expectedProjectionHash.length === 0
         || request.operations.length !== 1
         || request.operations[0]?.op !== 'source-patch'
-        || request.operations[0].patches.length !== 2
         || request.operations[0].patches.some((patch) => patch.insert.length === 0)
       )
     ) {
@@ -3937,7 +3963,7 @@ export class TikzTransactionBroker {
         request,
         snapshot.revision,
         'invalid-request',
-        'Host semantic action sets require one style replacement and one merged Catalog label insertion in a single atomic transaction.',
+        'Host semantic action sets require one optional style replacement and one merged Catalog label insertion in a single atomic transaction.',
       );
     }
     if (

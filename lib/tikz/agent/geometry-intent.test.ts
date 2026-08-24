@@ -381,6 +381,106 @@ describe('GeometryIntent/v2 host lowering', () => {
     });
   });
 
+  it('lowers one style and several labels as one host-replayed action set', () => {
+    const value = context();
+    value.entities = [
+      ...value.entities,
+      { id: 'point:D', kind: 'point', name: 'D', parameters: { x: 2, y: 0 } },
+      { id: 'point:E', kind: 'point', name: 'E', parameters: { x: 0.5, y: 1.5 } },
+    ];
+    value.focus.resolvedEntityIds = [
+      ...value.focus.resolvedEntityIds,
+      'point:D',
+      'point:E',
+    ];
+    value.focus.closureEntityIds = [
+      ...value.focus.closureEntityIds,
+      'point:D',
+      'point:E',
+    ];
+    const extraBindings: GeometryAiContext['construction']['sourceBindings'] = [
+      {
+        id: 'binding:managed:nine:D',
+        role: 'test',
+        sourceId: 'document-1:tikz',
+        targets: [{ recordType: 'entity', id: 'point:D' }],
+        range: { start: 0, end: 1 },
+        writable: true,
+        opaque: false,
+        insertionPolicy: 'none',
+        writeCapabilities: [],
+        entityIds: ['point:D'],
+        renderTargets: [],
+        managedConstructionId: 'nine-1',
+        managedSourceRecordId: 'midpoint-d',
+      },
+      {
+        id: 'binding:managed:nine:E',
+        role: 'test',
+        sourceId: 'document-1:tikz',
+        targets: [{ recordType: 'entity', id: 'point:E' }],
+        range: { start: 0, end: 1 },
+        writable: true,
+        opaque: false,
+        insertionPolicy: 'none',
+        writeCapabilities: [],
+        entityIds: ['point:E'],
+        renderTargets: [],
+        managedConstructionId: 'nine-1',
+        managedSourceRecordId: 'midpoint-e',
+      },
+    ];
+    value.construction.sourceBindings = [
+      ...value.construction.sourceBindings,
+      ...extraBindings,
+    ];
+    value.construction.authorizedBindingIds = [
+      ...value.construction.authorizedBindingIds,
+      ...extraBindings.map((binding) => binding.id),
+    ];
+
+    const lowered = lowerGeometryIntent({
+      schemaVersion: 'geometry-intent/v2',
+      intentId: 'present-nine-point-set',
+      operation: {
+        kind: 'present',
+        targetRef: 'omega9',
+        style: { color: 'blue', width: 'thick' },
+        labels: [
+          { anchorRef: 'D', text: 'D' },
+          { anchorRef: 'E', text: 'E' },
+          { anchorRef: 'N', text: 'N' },
+        ],
+      },
+    }, value);
+
+    expect(lowered).toMatchObject({
+      ok: true,
+      proposal: {
+        schemaVersion: 'host-semantic-action-set/v1',
+        actionSetId: 'present-nine-point-set',
+        styleIntent: {
+          operation: { targetEntityId: 'circle:nine' },
+        },
+        labelIntents: [
+          { intentId: 'present-nine-point-set:label:1', bindingIds: ['binding:managed:nine:D'] },
+          { intentId: 'present-nine-point-set:label:2', bindingIds: ['binding:managed:nine:E'] },
+          { intentId: 'present-nine-point-set:label:3', bindingIds: ['binding:managed:nine:center'] },
+        ],
+      },
+    });
+    expect(isGeometryIntent({
+      schemaVersion: 'geometry-intent/v2',
+      intentId: 'mixed-label-forms',
+      operation: {
+        kind: 'present',
+        targetRef: 'omega9',
+        label: { anchorRef: 'N', text: 'N' },
+        labels: [{ anchorRef: 'D', text: 'D' }],
+      },
+    })).toBe(false);
+  });
+
   it('lowers a source-ordered Catalog DAG without exposing bindings or allocated names', () => {
     const lowered = lowerGeometryIntent({
       schemaVersion: 'geometry-intent/v2',

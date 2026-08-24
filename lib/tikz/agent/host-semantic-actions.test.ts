@@ -181,6 +181,22 @@ describe('hostSemanticActionForRequest', () => {
         ],
       },
     });
+    const labelOnly = hostSemanticActionForRequest(
+      '给 P、L 和 N 添加标签',
+      multi,
+    );
+    expect(labelOnly).toMatchObject({
+      fence: 'host-semantic-action-set',
+      payload: {
+        schemaVersion: 'host-semantic-action-set/v1',
+        labelIntents: [
+          { parameters: { text: 'P' } },
+          { parameters: { text: 'L' } },
+          { parameters: { text: 'N' } },
+        ],
+      },
+    });
+    expect(labelOnly?.payload).not.toHaveProperty('styleIntent');
   });
 
   it('fails closed when presentation ownership is ambiguous', () => {

@@ -193,9 +193,9 @@ export function hostSemanticActionForRequest(
       );
       return intent ? [intent] : [];
     });
-    if (labelIntents.length !== namedLabels.length || !styleAction) return null;
+    if (labelIntents.length !== namedLabels.length) return null;
     const actionSetId = actionId(
-      'host-style-label-set',
+      styleAction ? 'host-style-label-set' : 'host-label-set',
       context.basis.revision,
       namedLabels.join('-'),
     );
@@ -205,7 +205,7 @@ export function hostSemanticActionForRequest(
         schemaVersion: 'host-semantic-action-set/v1',
         actionSetId,
         idempotencyKey: actionSetId,
-        styleIntent: styleAction.payload,
+        ...(styleAction ? { styleIntent: styleAction.payload } : {}),
         labelIntents,
       },
     };

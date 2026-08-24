@@ -11,6 +11,7 @@ import type { AiManagedPresentationIntent } from '../ir/ai-managed-presentation-
 import type { AiSemanticDeleteIntent } from '../ir/ai-semantic-delete-intent';
 import type { AiSelectionTransformIntent } from '../ir/ai-selection-transform-intent';
 import type { HostSemanticActionBatch } from '../ir/host-semantic-action-batch';
+import type { HostSemanticActionSet } from '../ir/host-semantic-action-set';
 import type { JsonObject, JsonValue } from '../ir/model';
 import type { GeometryProofState } from '../semantics/geometry-proof-state';
 import type { GeometryProofPlanArtifact } from '../semantics/geometry-proof-plan';
@@ -92,11 +93,16 @@ export interface GeometryPresentIntentOperation {
   /** Semantic entity to style or annotate; never a source binding or range. */
   readonly targetRef: string;
   readonly style?: GeometryIntentStyle;
-  readonly label?: {
-    /** Existing point used as the label anchor. */
-    readonly anchorRef: string;
-    readonly text: string;
-  };
+  /** Backward-compatible single annotation form. */
+  readonly label?: GeometryPresentLabel;
+  /** Bounded atomic annotations for several declared points in one intent. */
+  readonly labels?: readonly GeometryPresentLabel[];
+}
+
+export interface GeometryPresentLabel {
+  /** Existing point used as the label anchor. */
+  readonly anchorRef: string;
+  readonly text: string;
 }
 
 export type GeometryIntentTransform =
@@ -462,16 +468,30 @@ export function isGeometryIntent(value: unknown): value is GeometryIntent {
     'kind', 'targetRef',
     ...(operation.style === undefined ? [] : ['style']),
     ...(operation.label === undefined ? [] : ['label']),
+    ...(operation.labels === undefined ? [] : ['labels']),
   ])) return false;
   if (!boundedString(operation.targetRef)) return false;
-  if (operation.style === undefined && operation.label === undefined) return false;
+  if (
+    operation.style === undefined
+    && operation.label === undefined
+    && operation.labels === undefined
+  ) return false;
+  if (operation.label !== undefined && operation.labels !== undefined) return false;
   if (operation.style !== undefined && !validStyle(operation.style)) return false;
-  return operation.label === undefined || (
-    record(operation.label)
-    && exactKeys(operation.label, ['anchorRef', 'text'])
-    && boundedString(operation.label.anchorRef)
-    && safeLabelText(operation.label.text)
+  const validLabel = (label: unknown): label is GeometryPresentLabel => (
+    record(label)
+    && exactKeys(label, ['anchorRef', 'text'])
+    && boundedString(label.anchorRef)
+    && safeLabelText(label.text)
   );
+  if (operation.label !== undefined) return validLabel(operation.label);
+  const labels = operation.labels;
+  if (labels === undefined) return true;
+  return Array.isArray(labels)
+    && labels.length > 0
+    && labels.length <= 16
+    && labels.every(validLabel)
+    && new Set(labels.map((label) => label.anchorRef)).size === labels.length;
 }
 
 function fail(
@@ -886,6 +906,7 @@ function labelProposal(
   context: GeometryAiContext,
   anchor: GeometryAiEntity,
   text: string,
+  index?: number,
 ): ConstructionIntent | null {
   const basis = constructionBasis(context);
   const insertion = insertionBinding(context);
@@ -897,10 +918,13 @@ function labelProposal(
     && tool.maxInputs === 1
   ));
   if (!basis || !insertion || !binding || !labelTool || anchor.kind !== 'point') return null;
+  const labelIntentId = index === undefined
+    ? `${intent.intentId}:label`
+    : `${intent.intentId}:label:${index + 1}`;
   return {
     schemaVersion: 'construction-intent/v1',
-    intentId: `${intent.intentId}:label`,
-    idempotencyKey: `${intent.intentId}:label`,
+    intentId: labelIntentId,
+    idempotencyKey: labelIntentId,
     basis,
     operation: 'create',
     capability: {
@@ -948,40 +972,65 @@ function lowerPresentation(
       `Entity ${target.id} does not own one authorized managed presentation slot.`,
     );
   }
-  const anchor = operation.label
-    ? resolveEntity(context, operation.label.anchorRef)
-    : null;
-  if (anchor && 'ok' in anchor) return anchor;
-  const label = operation.label && anchor
-    ? labelProposal(intent, context, anchor, operation.label.text)
-    : null;
-  if (operation.label && !label) {
-    return fail(
-      'capability-unavailable',
-      'The requested label anchor has no unique authorized label construction capability.',
+  const requestedLabels = operation.label
+    ? [operation.label]
+    : operation.labels ?? [];
+  const labels: ConstructionIntent[] = [];
+  for (let index = 0; index < requestedLabels.length; index += 1) {
+    const requestedLabel = requestedLabels[index]!;
+    const anchor = resolveEntity(context, requestedLabel.anchorRef);
+    if ('ok' in anchor) return anchor;
+    const label = labelProposal(
+      intent,
+      context,
+      anchor,
+      requestedLabel.text,
+      requestedLabels.length === 1 ? undefined : index,
     );
-  }
-  if (operation.label && anchor && target.id !== anchor.id) {
-    const targetOwner = managedOwnerForEntity(context, target.id);
-    const anchorOwner = managedOwnerForEntity(context, anchor.id);
-    if (!targetOwner || targetOwner !== anchorOwner) {
+    if (!label) {
       return fail(
-        'target-ambiguous',
-        'The annotation target and label anchor must belong to the same managed construction.',
+        'capability-unavailable',
+        'A requested label anchor has no unique authorized label construction capability.',
       );
     }
+    if (target.id !== anchor.id) {
+      const targetOwner = managedOwnerForEntity(context, target.id);
+      const anchorOwner = managedOwnerForEntity(context, anchor.id);
+      if (!targetOwner || targetOwner !== anchorOwner) {
+        return fail(
+          'target-ambiguous',
+          'The annotation target and every label anchor must belong to the same managed construction.',
+        );
+      }
+    }
+    if (style) {
+      const labelBinding = context.construction.sourceBindings.find((binding) => (
+        binding.id === label.bindingIds[0]
+      ));
+      if (
+        !labelBinding?.managedConstructionId
+        || labelBinding.managedConstructionId !== style.operation.constructionId
+      ) {
+        return fail(
+          'target-ambiguous',
+          'Style target and every label anchor must belong to the same managed construction.',
+        );
+      }
+    }
+    labels.push(label);
   }
+  if (labels.length > 1) {
+    const proposal: HostSemanticActionSet = {
+      schemaVersion: 'host-semantic-action-set/v1',
+      actionSetId: intent.intentId,
+      idempotencyKey: intent.intentId,
+      ...(style ? { styleIntent: style } : {}),
+      labelIntents: labels,
+    };
+    return { ok: true, intent, proposal };
+  }
+  const label = labels[0] ?? null;
   if (style && label) {
-    const styleOwner = style.operation.constructionId;
-    const labelBinding = context.construction.sourceBindings.find((binding) => (
-      binding.id === label.bindingIds[0]
-    ));
-    if (!labelBinding?.managedConstructionId || labelBinding.managedConstructionId !== styleOwner) {
-      return fail(
-        'target-ambiguous',
-        'Style target and label anchor must belong to the same managed construction.',
-      );
-    }
     const proposal: HostSemanticActionBatch = {
       schemaVersion: 'host-semantic-action-batch/v1',
       batchId: intent.intentId,

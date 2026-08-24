@@ -270,6 +270,24 @@ describe('managed-presentation-intent/v1', () => {
     expect(patches).toHaveLength(2);
     expect(compiled.transaction.metadata?.managedConstructionCreateProofs)
       .toHaveLength(3);
+    const labelOnly = compileHostSemanticActionSet({
+      schemaVersion: 'host-semantic-action-set/v1',
+      actionSetId: 'three-labels-without-style',
+      idempotencyKey: 'three-labels-without-style',
+      labelIntents,
+    }, {
+      basis: value.basis,
+      bindings: aiBindings(context),
+      allowedBindingIds: context.construction.authorizedBindingIds,
+      source: value.source,
+      geometryDoc: value.geometryDoc,
+    });
+    if (!labelOnly.ok) throw new TypeError(JSON.stringify(labelOnly.errors));
+    expect(labelOnly.transaction.operations[0]?.op === 'source-patch'
+      ? labelOnly.transaction.operations[0].patches
+      : []).toHaveLength(1);
+    expect(labelOnly.transaction.metadata?.managedConstructionStyleProof)
+      .toBeUndefined();
 
     const evidence = {
       hash: value.basis.sourceHash,
@@ -283,6 +301,19 @@ describe('managed-presentation-intent/v1', () => {
         context.construction.authorizationScopeFingerprint,
       createCapabilityFingerprint: insertion.createCapabilityFingerprint,
     };
+    const labelOnlyDocument = new StudioDocument(value.source, {
+      documentId: value.basis.documentId,
+      epoch: value.basis.epoch,
+    });
+    expect(new TikzTransactionBroker(labelOnlyDocument).commit(
+      labelOnly.transaction,
+      evidence,
+    )).toMatchObject({ ok: true, toRevision: 1 });
+    const labelOnlySource = labelOnlyDocument.getSnapshot().source;
+    for (const label of ['{P}', '{L}', '{N}']) {
+      expect(labelOnlySource).toContain(label);
+    }
+
     const forged = structuredClone(compiled.transaction);
     const forgedProof = forged.metadata?.hostSemanticActionSetProof as {
       labelIntents: { parameters: { text: string } }[];

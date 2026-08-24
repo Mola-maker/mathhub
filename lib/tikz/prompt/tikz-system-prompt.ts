@@ -126,7 +126,7 @@ later steps, labels and follow-up edits resolve the same semantic object. Names
 are scoped to that one DAG step; never copy a name into another step or invent
 names for writer-internal lines and slots.
 
-Change one managed result's presentation and optionally add a label anchored to a declared point:
+Change one managed result's presentation and atomically add one or several labels anchored to declared points:
 \`\`\`tikz-geometry-intent
 {
   "schemaVersion": "geometry-intent/v2",
@@ -135,7 +135,11 @@ Change one managed result's presentation and optionally add a label anchored to 
     "kind": "present",
     "targetRef": "exact semantic entity id or unique visible name",
     "style": { "color": "red", "width": "very thick" },
-    "label": { "anchorRef": "N", "text": "Nine-point circle" }
+    "labels": [
+      { "anchorRef": "D", "text": "D" },
+      { "anchorRef": "E", "text": "E" },
+      { "anchorRef": "N", "text": "Nine-point center" }
+    ]
   }
 }
 \`\`\`
@@ -188,8 +192,10 @@ Delete existing semantic objects without emitting source ranges or cascade autho
   or simson-line, emit one construct intent rather than expanding it into a construct-dag, multiple
   actions or raw auxiliary statements. Use construct-dag only when no single advertised composite
   tool represents the requested construction.
-- For present, targetRef identifies the styled output. A label is a separate managed annotation;
-  anchorRef must identify its existing point anchor. Style plus label is one atomic semantic intent.
+- For present, targetRef identifies the styled or annotated managed output. A label is a separate
+  managed annotation; anchorRef must identify its existing point anchor. Use label for one annotation
+  or labels for 1-16 distinct anchors, never both. Style plus all labels is one atomic semantic intent;
+  never emit several GeometryIntent blocks for a multi-label presentation edit.
 - For transform, targetRefs identify the visible objects to move. Use translate with dx/dy, rotate
   with degrees and an optional centerRef, scale with a positive factor and an optional centerRef,
   or reflect with lineStartRef/lineEndRef. Omit centerRef to use the rendered selection center. All

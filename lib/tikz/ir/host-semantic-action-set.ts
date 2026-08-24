@@ -28,7 +28,8 @@ export interface HostSemanticActionSet {
   readonly schemaVersion: typeof HOST_SEMANTIC_ACTION_SET_SCHEMA_VERSION;
   readonly actionSetId: string;
   readonly idempotencyKey: string;
-  readonly styleIntent: AiManagedPresentationIntent;
+  /** Optional because a model may request several labels without a style edit. */
+  readonly styleIntent?: AiManagedPresentationIntent;
   readonly labelIntents: readonly ConstructionIntent[];
 }
 
@@ -48,7 +49,7 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 function sameBasis(
-  left: AiManagedPresentationIntent['basis'],
+  left: AiManagedPresentationIntent['basis'] | ConstructionIntent['basis'],
   right: ConstructionIntent['basis'],
 ): boolean {
   return left.documentId === right.documentId
@@ -72,7 +73,7 @@ export function isHostSemanticActionSet(
     'idempotencyKey',
     'labelIntents',
     'schemaVersion',
-    'styleIntent',
+    ...(value.styleIntent === undefined ? [] : ['styleIntent']),
   ])) return false;
   if (
     value.schemaVersion !== HOST_SEMANTIC_ACTION_SET_SCHEMA_VERSION
@@ -82,7 +83,10 @@ export function isHostSemanticActionSet(
     || typeof value.idempotencyKey !== 'string'
     || value.idempotencyKey.length === 0
     || value.idempotencyKey.length > 256
-    || !isAiManagedPresentationIntent(value.styleIntent)
+    || (
+      value.styleIntent !== undefined
+      && !isAiManagedPresentationIntent(value.styleIntent)
+    )
     || !Array.isArray(value.labelIntents)
     || value.labelIntents.length === 0
     || value.labelIntents.length > MAX_LABEL_ACTIONS
@@ -114,9 +118,10 @@ function fail(code: string, message: string): HostSemanticActionSetCompilation {
 }
 
 /**
- * Host-only lowering for one style rewrite plus several label creations. The
- * model still emits closed semantic intents; the host merges equal-position
- * insertions into one deterministic patch and the Broker replays every intent.
+ * Host-only lowering for several label creations and an optional style
+ * rewrite. The model still emits one closed GeometryIntent; the host merges
+ * equal-position insertions into one deterministic patch and the Broker
+ * replays every public intent.
  */
 export function compileHostSemanticActionSet(
   value: unknown,
@@ -126,8 +131,10 @@ export function compileHostSemanticActionSet(
   if (!isHostSemanticActionSet(value)) {
     return fail('invalid-shape', 'Host semantic action set has an invalid or open shape.');
   }
+  const sharedBasis = value.styleIntent?.basis ?? value.labelIntents[0]?.basis;
   if (
-    value.labelIntents.some((intent) => !sameBasis(value.styleIntent.basis, intent.basis))
+    !sharedBasis
+    || value.labelIntents.some((intent) => !sameBasis(sharedBasis, intent.basis))
     || new Set(value.labelIntents.map((intent) => intent.intentId)).size
       !== value.labelIntents.length
     || new Set(value.labelIntents.map((intent) => intent.bindingIds[0])).size
@@ -141,27 +148,25 @@ export function compileHostSemanticActionSet(
     return fail('basis-mismatch', 'Host semantic actions must be unique label creates on one source basis.');
   }
 
-  const style = compileAiManagedPresentationIntent(
-    value.styleIntent,
-    context,
-    options,
-  );
-  if (!style.ok) return { ok: false, errors: style.errors };
+  const style = value.styleIntent
+    ? compileAiManagedPresentationIntent(value.styleIntent, context, options)
+    : null;
+  if (style && !style.ok) return { ok: false, errors: style.errors };
   const labels = value.labelIntents.map((intent) => (
     compileAiConstructionIntentProposal(intent, context, options)
   ));
   const failed = labels.find((label) => !label.ok);
   if (failed && !failed.ok) return { ok: false, errors: failed.errors };
 
-  const stylePatches = sourcePatches(style.transaction);
+  const styleTransaction = style && style.ok ? style.transaction : null;
+  const stylePatches = styleTransaction ? sourcePatches(styleTransaction) : [];
   const labelTransactions = labels.flatMap((label) => (
     label.ok ? [label.transaction] : []
   ));
   const labelPatches = labelTransactions.flatMap(sourcePatches);
   const firstLabelPatch = labelPatches[0];
   if (
-    stylePatches.length !== 1
-    || !stylePatches[0]?.insert
+    (styleTransaction !== null && (stylePatches.length !== 1 || !stylePatches[0]?.insert))
     || labelPatches.length !== value.labelIntents.length
     || !firstLabelPatch
     || labelPatches.some((patch) => (
@@ -172,24 +177,27 @@ export function compileHostSemanticActionSet(
       || patch.insert.length === 0
     ))
   ) {
-    return fail('compile-failed', 'Host semantic actions did not compile to one style patch and one shared insertion site.');
+    return fail('compile-failed', 'Host semantic actions did not compile to one optional style patch and one shared insertion site.');
   }
   const mergedLabelPatch: SourceTextPatch = {
     ...firstLabelPatch,
     insert: labelPatches.map((patch) => patch.insert).join(''),
   };
-  const patches = [stylePatches[0], mergedLabelPatch]
+  const patches = [...stylePatches, mergedLabelPatch]
     .sort((left, right) => right.range.start - left.range.start);
-  if (
+  if (patches.length === 2 && (
     patches[0]!.range.start < patches[1]!.range.end
     && patches[1]!.range.start < patches[0]!.range.end
-  ) {
+  )) {
     return fail('compile-failed', 'Host semantic action patches overlap.');
   }
 
   const labelMetadata = labelTransactions.map((transaction) => transaction.metadata ?? {});
   if (
-    style.transaction.metadata?.managedConstructionStyleProof === undefined
+    (
+      styleTransaction !== null
+      && styleTransaction.metadata?.managedConstructionStyleProof === undefined
+    )
     || labelMetadata.some((metadata) => (
       metadata.managedConstructionCreateProof === undefined
       || metadata.constructionIntentProof === undefined
@@ -198,28 +206,29 @@ export function compileHostSemanticActionSet(
     return fail('compile-failed', 'Host semantic actions are missing trusted writer proofs.');
   }
   const preconditions = uniqueByJson<GeometryPrecondition>([
-    ...(style.transaction.preconditions ?? []),
+    ...(styleTransaction?.preconditions ?? []),
     ...labelTransactions.flatMap((transaction) => transaction.preconditions ?? []),
   ]);
   const readSet = uniqueByJson<GeometryResourceReference>([
-    ...style.transaction.readSet,
+    ...(styleTransaction?.readSet ?? []),
     ...labelTransactions.flatMap((transaction) => transaction.readSet),
   ]);
   const writeSet = uniqueByJson<GeometryResourceReference>([
-    ...style.transaction.writeSet,
+    ...(styleTransaction?.writeSet ?? []),
     ...labelTransactions.flatMap((transaction) => transaction.writeSet),
   ]);
   const focusBindingIds = uniqueByJson<string>([
-    ...value.styleIntent.focusBindingIds,
+    ...(value.styleIntent?.focusBindingIds ?? []),
     ...value.labelIntents.flatMap((intent) => intent.bindingIds),
   ]);
   const readBindingIds = uniqueByJson<string>([
-    ...value.styleIntent.readBindingIds,
+    ...(value.styleIntent?.readBindingIds ?? []),
     ...value.labelIntents.flatMap((intent) => [
       ...intent.bindingIds,
       intent.capability.bindingId,
     ]),
   ]);
+  const basisTransaction = styleTransaction ?? labelTransactions[0]!;
 
   return {
     ok: true,
@@ -228,15 +237,15 @@ export function compileHostSemanticActionSet(
       schemaVersion: 'geometry-transaction/v1',
       transactionId: value.actionSetId,
       idempotencyKey: value.idempotencyKey,
-      documentId: style.transaction.documentId,
-      documentEpoch: style.transaction.documentEpoch,
+      documentId: basisTransaction.documentId,
+      documentEpoch: basisTransaction.documentEpoch,
       origin: 'ai',
       stage: 'proposed',
-      expectedRevision: style.transaction.expectedRevision,
-      sourceHash: style.transaction.sourceHash,
-      expectedKernelHash: style.transaction.expectedKernelHash,
-      expectedProjectionHash: style.transaction.expectedProjectionHash,
-      pluginSetDigest: style.transaction.pluginSetDigest,
+      expectedRevision: basisTransaction.expectedRevision,
+      sourceHash: basisTransaction.sourceHash,
+      expectedKernelHash: basisTransaction.expectedKernelHash,
+      expectedProjectionHash: basisTransaction.expectedProjectionHash,
+      pluginSetDigest: basisTransaction.pluginSetDigest,
       readSet,
       writeSet,
       preconditions,
@@ -249,7 +258,7 @@ export function compileHostSemanticActionSet(
       actorId: options.actorId,
       correlationId: options.correlationId,
       metadata: {
-        ...(style.transaction.metadata ?? {}),
+        ...(styleTransaction?.metadata ?? {}),
         ...options.metadata,
         proposalSchemaVersion: HOST_SEMANTIC_ACTION_SET_SCHEMA_VERSION,
         sourceEditOrigin: 'ai',

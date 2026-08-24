@@ -1416,7 +1416,11 @@ export async function POST(req: NextRequest): Promise<Response> {
                 ? '\u6b63\u5728\u7ed1\u5b9a\u552f\u4e00\u56fe\u5143\u7684\u6837\u5f0f\u4fee\u6539'
                 : hostAction.fence === 'tikz-construction-intent'
                   ? '\u6b63\u5728\u7ed1\u5b9a\u6807\u7b7e\u5230\u6784\u9020\u8f93\u51fa'
-                  : '\u6b63\u5728\u7ec4\u5408\u6837\u5f0f\u4e0e\u6807\u7b7e\u7684\u539f\u5b50\u6279\u6b21',
+                  : hostAction.fence === 'host-semantic-action-set'
+                    ? hostAction.payload.styleIntent
+                      ? '\u6b63\u5728\u7ec4\u5408\u6837\u5f0f\u4e0e\u591a\u6807\u7b7e\u7684\u539f\u5b50\u6279\u6b21'
+                      : '\u6b63\u5728\u7ec4\u5408\u591a\u6807\u7b7e\u539f\u5b50\u6279\u6b21'
+                    : '\u6b63\u5728\u7ec4\u5408\u6837\u5f0f\u4e0e\u6807\u7b7e\u7684\u539f\u5b50\u6279\u6b21',
             }));
           hostProposal = hostAction.payload;
           full = '';
