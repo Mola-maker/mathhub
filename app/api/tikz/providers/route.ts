@@ -10,6 +10,7 @@ export async function GET() {
   const entry = {
     name: CLIENT_PROVIDER,
     configured: cfg.configured,
+    defaultModel: cfg.configured && isSafeModelId(cfg.model) ? cfg.model : '',
     visionConfigured: isSafeModelId(cfg.visionModel),
     endpoint: relayBaseUrl(),
   };

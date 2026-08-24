@@ -1250,6 +1250,7 @@ export function TikzCanvas({
       },
       selectAllGeometry() {
         engine.selectAllGeometry();
+        onSelectionTransformRequest?.(true);
       },
     };
     const result = commandRegistry.dispatch({
@@ -1264,6 +1265,7 @@ export function TikzCanvas({
     context,
     engine,
     interactionSession,
+    onSelectionTransformRequest,
     setConstructionPreview,
     setDragPreviewCode,
     useExactRenderer,

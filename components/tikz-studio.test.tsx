@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   assistantFallbackForTikzAgentTerminal,
   claimTikzAgentTurn,
+  configuredProviderDefaultModel,
   explicitGeometryAiContextRefs,
   inferredGeometryAiContextRefs,
   isCommittedGeometryProjection,
@@ -41,6 +42,54 @@ function stubCatalogs() {
 }
 
 describe('TikzStudio', () => {
+  it('accepts only a safe configured default model for immediate fallback', () => {
+    expect(configuredProviderDefaultModel({
+      providers: { relay: { configured: true, defaultModel: 'Minimax-M3' } },
+    })).toBe('Minimax-M3');
+    expect(configuredProviderDefaultModel({
+      providers: { relay: { configured: true, defaultModel: 'bad model id' } },
+    })).toBe('');
+    expect(configuredProviderDefaultModel({
+      providers: { relay: { configured: false, defaultModel: 'Minimax-M3' } },
+    })).toBe('');
+  });
+
+  it('keeps chat usable while the live model catalog is still pending', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) => {
+      const path = String(url);
+      if (path.includes('/api/tikz/providers')) {
+        return Response.json({
+          available: ['relay'],
+          providers: {
+            relay: {
+              configured: true,
+              defaultModel: 'Minimax-M3',
+              visionConfigured: false,
+            },
+          },
+        });
+      }
+      if (path.includes('/api/tikz/models')) {
+        return await new Promise<Response>(() => undefined);
+      }
+      return new Response('data: [DONE]\n\n', {
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+    }) as unknown as typeof fetch);
+
+    render(<TikzStudio startOpen />);
+
+    expect(await screen.findByRole('option', {
+      name: 'Minimax-M3 (配置默认)',
+    })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('几何构造描述'), {
+      target: { value: '解释当前图形' },
+    });
+    expect((screen.getByRole('button', { name: '发送 ↵' }) as HTMLButtonElement).disabled)
+      .toBe(false);
+    expect(screen.getByText('正在读取 api.molamaker.cn 模型目录…')).toBeTruthy();
+  });
+
   it('projects terminal-only failures into readable chat instead of an empty success', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) => {
       const path = String(url);

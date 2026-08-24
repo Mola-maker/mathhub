@@ -34,6 +34,7 @@ describe('GET /api/tikz/providers', () => {
         relay: {
           name: 'relay',
           configured: true,
+          defaultModel: 'MiniMax-M3',
           visionConfigured: false,
           endpoint: 'https://api.molamaker.cn',
         },
@@ -53,5 +54,6 @@ describe('GET /api/tikz/providers', () => {
     const payload = await (await GET()).json();
 
     expect(payload.providers.relay.visionConfigured).toBe(false);
+    expect(payload.providers.relay.defaultModel).toBe('');
   });
 });

@@ -39,7 +39,13 @@ function searchableText(tool: Tool): string {
   ].join(' ').toLocaleLowerCase();
 }
 
-export function TikzToolPalette({ engine }: { engine: TikzEngine }) {
+export function TikzToolPalette({
+  engine,
+  onSelectionTransformRequest,
+}: {
+  engine: TikzEngine;
+  onSelectionTransformRequest?(): void;
+}) {
   const active = AUTHORING_TOOLS.find((tool) => tool.id === engine.activeTool);
   const [category, setCategory] = useState<ConstructionCategory>(
     active?.category ?? 'primitive',
@@ -190,6 +196,35 @@ export function TikzToolPalette({ engine }: { engine: TikzEngine }) {
               <small>{tool.label}</small>
             </motion.button>
           ))}
+          {category === 'transform'
+            ? (
+              <motion.button
+                layout
+                key="selection-transform"
+                type="button"
+                aria-label="整体变换"
+                disabled={engine.selectionTargets.length === 0}
+                title={engine.selectionTargets.length > 0
+                  ? `平移、旋转、缩放或反射当前 ${engine.selectionTargets.length} 个对象`
+                  : '先用选择/拖拽框选多个对象'}
+                onClick={() => onSelectionTransformRequest?.()}
+                {...TIKZ_MOTION.listItem}
+                whileHover={engine.selectionTargets.length > 0
+                  ? { y: -1, scale: 1.015 }
+                  : undefined}
+                whileTap={engine.selectionTargets.length > 0 ? TIKZ_TAP : undefined}
+                transition={TIKZ_MOTION.spring}
+              >
+                <span aria-hidden="true">⤧</span>
+                <small>
+                  整体变换
+                  {engine.selectionTargets.length > 0
+                    ? ` · ${engine.selectionTargets.length}`
+                    : ''}
+                </small>
+              </motion.button>
+            )
+            : null}
         </AnimatePresence>
       </div>
       <motion.button

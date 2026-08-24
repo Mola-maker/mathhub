@@ -182,6 +182,22 @@ function availableProviders(payload: unknown): Provider[] {
   return raw.filter((value): value is Provider => PROVIDER_ORDER.includes(value as Provider));
 }
 
+export function configuredProviderDefaultModel(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return '';
+  const providers = (payload as { providers?: unknown }).providers;
+  if (!providers || typeof providers !== 'object') return '';
+  const relay = (providers as Record<string, unknown>).relay;
+  if (!relay || typeof relay !== 'object') return '';
+  const provider = relay as { configured?: unknown; defaultModel?: unknown };
+  if (provider.configured !== true) return '';
+  const model = provider.defaultModel;
+  return typeof model === 'string'
+    && model.length <= 128
+    && /^[a-zA-Z0-9._\-:/]+$/u.test(model)
+    ? model
+    : '';
+}
+
 export function isVisualAuditAvailable(payload: unknown): boolean {
   if (!payload || typeof payload !== 'object') return false;
   const providers = (payload as { providers?: unknown }).providers;
@@ -769,8 +785,15 @@ export function TikzStudio({
       })
       .then((data) => {
         const next = availableProviders(data);
+        const configuredDefault = configuredProviderDefaultModel(data);
         setVisualAuditAvailable(isVisualAuditAvailable(data));
         setProviders(next);
+        if (configuredDefault) {
+          setModels((current) => current.length > 0
+            ? current
+            : [{ id: configuredDefault, label: `${configuredDefault} (配置默认)` }]);
+          setModel((current) => current || configuredDefault);
+        }
         setProvider((current) => (
           next.length > 0 && !next.includes(current) ? next[0] : current
         ));
@@ -1869,6 +1892,7 @@ export function TikzStudio({
         );
         try {
           let replay: Awaited<ReturnType<typeof fetchTikzAgentRunReplay>>;
+          let recoveryPollCount = 0;
           for (;;) {
             replay = await fetchTikzAgentRunReplay({
               runId: activeAgentRunId,
@@ -1900,12 +1924,13 @@ export function TikzStudio({
               || replayHasPendingProposal
               || recoveryController.signal.aborted
             ) break;
-            // A disconnected build can briefly be non-terminal without a
-            // verification claim while the server persists cancellation or a
-            // provider failure. Keep polling until terminal/proposal instead
-            // of treating `verificationPending=false` as completion. The
-            // two-second cadence remains below the replay API's 60/min limit.
-            await new Promise<void>((resolve) => window.setTimeout(resolve, 2_000));
+            // A disconnected build can briefly be non-terminal while the
+            // server persists cancellation or a provider failure. Make one
+            // fast follow-up so Stop feels immediate, then settle on the
+            // two-second cadence required by the replay API's 60/min limit.
+            const retryDelay = recoveryPollCount === 0 ? 250 : 2_000;
+            recoveryPollCount += 1;
+            await new Promise<void>((resolve) => window.setTimeout(resolve, retryDelay));
           }
           if (agentControllerRef.current === controller && !recoveryController.signal.aborted) {
             const pendingProposal = replay.proposal && !terminalRunIds.has(replay.runId)
@@ -2159,7 +2184,10 @@ export function TikzStudio({
             exactMode={exactMode}
             onToggleExact={() => setExactMode((value) => !value)}
           />
-          <TikzToolPalette engine={engine} />
+          <TikzToolPalette
+            engine={engine}
+            onSelectionTransformRequest={() => setSelectionTransformOpen(true)}
+          />
           <div className="tz-canvas-stack">
             <TikzCanvas
               engine={engine}

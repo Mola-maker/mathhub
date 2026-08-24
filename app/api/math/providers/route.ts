@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { CLIENT_PROVIDER, getEffectiveProvider, relayBaseUrl } from '@/lib/provider/settings';
+import { isSafeModelId } from '@/lib/provider/provider-models';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,7 @@ export async function GET() {
   const entry = {
     name: CLIENT_PROVIDER,
     configured: cfg.configured,
+    defaultModel: cfg.configured && isSafeModelId(cfg.model) ? cfg.model : '',
     endpoint: relayBaseUrl(),
   };
 

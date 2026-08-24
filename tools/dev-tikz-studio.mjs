@@ -1,4 +1,5 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -59,7 +60,27 @@ async function compilerAlreadyListening() {
 function stopChildren(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
-  for (const child of children) child.kill(signal);
+  for (const child of children) {
+    if (!child.pid) continue;
+    if (process.platform === 'win32') {
+      // Next.js and MiKTeX both create descendants. child.kill() only stops
+      // the immediate launcher on Windows, leaving ports and TeX helpers alive
+      // after Ctrl+C. Terminate each owned process tree without a shell.
+      const taskkill = join(
+        process.env.SystemRoot ?? 'C:\\Windows',
+        'System32',
+        'taskkill.exe',
+      );
+      const result = spawnSync(
+        taskkill,
+        ['/PID', String(child.pid), '/T', '/F'],
+        { stdio: 'ignore', windowsHide: true },
+      );
+      if (result.status !== 0) child.kill(signal);
+    } else {
+      child.kill(signal);
+    }
+  }
   setTimeout(() => process.exit(0), 1_000).unref();
 }
 
