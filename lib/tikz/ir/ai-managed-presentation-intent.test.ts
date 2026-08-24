@@ -264,6 +264,7 @@ describe('managed-presentation-intent/v1', () => {
       geometryDoc: value.geometryDoc,
     });
     if (!compiled.ok) throw new TypeError(JSON.stringify(compiled.errors));
+    expect(compiled.transaction.expectedProjectionHash).toBe(value.basis.projectionHash);
     const patches = compiled.transaction.operations.flatMap((operation) => (
       operation.op === 'source-patch' ? operation.patches : []
     ));

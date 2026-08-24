@@ -152,7 +152,7 @@ export const GEOMETRY_EVALUATION_CORPUS: readonly GeometryEvaluationCase[] = [
       expectationProfile: 'full-triad',
       authorship: 'independently-authored',
       sourceSha256: '874e56e46c236de65ddf31ef781be529b490daad365edb0e0be1dd30064d23db',
-      expectationsSha256: '19ed3a2540e056de5339e2950cf4f2837f1222de675dea1f81d4cf3b746cf986',
+      expectationsSha256: '1297d824f650c0612d522c7ae96cf3809cbd5816d129d28c0d731c5974051c7b',
     },
     turns: [
       {

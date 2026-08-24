@@ -500,6 +500,14 @@ describe('construction-intent/v1', () => {
     expect(result.plan.inputs[0]?.ref).toBe(
       `managed:${result.adoptions[0]!.constructionId}:circle`,
     );
+    const evaluated = evaluateConstructionPlan(result.plan, new Map([
+      ['O', { x: 0, y: 0 }],
+    ]));
+    expect(evaluated).toMatchObject({ status: 'valid', diagnostics: [] });
+    expect(evaluated.points.get(result.plan.result)).toEqual({
+      x: expect.closeTo(Math.SQRT2, 10),
+      y: expect.closeTo(Math.SQRT2, 10),
+    });
   });
 
   it.each([

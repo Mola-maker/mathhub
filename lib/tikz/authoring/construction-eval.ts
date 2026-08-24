@@ -16,6 +16,7 @@ import type {
   PerpendicularBisectorConstructionPlan,
   PerpendicularFootConstructionPlan,
   PerpendicularLineConstructionPlan,
+  PointOnCircleConstructionPlan,
   ReflectLineConstructionPlan,
   ReflectPointConstructionPlan,
   RadicalAxisConstructionPlan,
@@ -1010,6 +1011,57 @@ function evaluateTangent(
   registerLine(state, plan, plan.line, touch, result);
 }
 
+function evaluatePointOnCircle(
+  plan: PointOnCircleConstructionPlan,
+  source: ReadonlyMap<string, Pt>,
+  state: MutableEvaluationState,
+): void {
+  const center = pointAt(state, source, plan.circle.center, 'circle.center');
+  if (!center) return;
+
+  let radiusVector: Pt | null = null;
+  if (plan.circle.through) {
+    const through = pointAt(state, source, plan.circle.through, 'circle.through');
+    if (!through) return;
+    radiusVector = subtract(through, center);
+  } else {
+    const radius = typeof plan.circle.radius === 'number'
+      ? plan.circle.radius
+      : plan.circle.evaluatedRadius;
+    if (typeof radius === 'number' && finitePositive(radius)) {
+      radiusVector = { x: radius, y: 0 };
+    }
+  }
+  if (!radiusVector || !finitePositive(Math.hypot(radiusVector.x, radiusVector.y))) {
+    diagnostic(
+      state,
+      'invalid-radius',
+      'circle.radius',
+      'Point-on-circle preview requires a resolved finite positive circle radius.',
+    );
+    return;
+  }
+
+  const angleDegrees = typeof plan.circle.angleDegrees === 'number'
+    ? plan.circle.angleDegrees
+    : 0;
+  if (!Number.isFinite(angleDegrees)) {
+    diagnostic(
+      state,
+      'invalid-geometry',
+      'circle.angleDegrees',
+      'Point-on-circle angle must be finite.',
+    );
+    return;
+  }
+  registerPoint(
+    state,
+    plan,
+    plan.result,
+    add(center, rotateByDegrees(radiusVector, angleDegrees)),
+  );
+}
+
 function unsupportedResult(
   plan: ConstructionPlan,
   source: ReadonlyMap<string, Pt>,
@@ -1052,6 +1104,7 @@ function visibleNames(plan: ConstructionPlan): readonly string[] {
   switch (plan.kind) {
     case 'midpoint':
     case 'perpendicular-foot':
+    case 'point-on-circle':
       return [plan.result];
     case 'parallel-line':
     case 'perpendicular-line': {
@@ -1161,6 +1214,9 @@ export function evaluateConstructionPlan(
       break;
     case 'perpendicular-foot':
       evaluatePerpendicularFoot(plan, source, state);
+      break;
+    case 'point-on-circle':
+      evaluatePointOnCircle(plan, source, state);
       break;
     case 'parallel-line':
       evaluateParallelLine(plan, source, state);

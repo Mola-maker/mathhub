@@ -423,7 +423,7 @@ function requestPatches(request: GeometryTransactionRequest): TextPatch[] {
           insert: patch.insert,
         }))
       : []
-  ));
+  )).sort((left, right) => left.from - right.from || left.to - right.to);
 }
 
 function samePatch(left: TextPatch, right: TextPatch): boolean {

@@ -43,6 +43,7 @@
               "kind": "proposal-schema",
               "allowed": [
                 "construction-plan-proposal/v1",
+                "ai-construction-dag-intent/v1",
                 "ai-construction-intent-batch-proposal/v1",
                 "canvas-construction-batch-proposal/v1"
               ]
