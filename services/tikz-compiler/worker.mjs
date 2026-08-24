@@ -94,6 +94,7 @@ async function run() {
         wrapperId: result.wrapperId,
         wrapperDigest: result.wrapperDigest,
         bundleIdentity: result.bundleIdentity,
+        profileManifestDigest: result.profileManifestDigest,
         renderer: result.renderer,
         compileMs: result.compileMs,
         convertMs: result.convertMs,

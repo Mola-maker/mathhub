@@ -70,6 +70,19 @@ export function staticCheck(pic: TikzPicture): CheckIssue[] {
       } else {
         pointDefs.set(s.name, { stmtIndex: idx, range: s.range });
       }
+    } else if (s.kind === 'graph') {
+      for (const graphNode of s.nodes) {
+        if (pointDefs.has(graphNode.name)) {
+          issues.push({
+            severity: 'error',
+            message: `点 '${graphNode.name}' 重复定义`,
+            range: graphNode.range,
+            stmtIndex: idx,
+          });
+        } else {
+          pointDefs.set(graphNode.name, { stmtIndex: idx, range: graphNode.range });
+        }
+      }
     }
   });
 
@@ -108,6 +121,34 @@ export function staticCheck(pic: TikzPicture): CheckIssue[] {
               }
             }
           }
+        } else if (spec.type === 'rectangle') {
+          for (const point of [spec.first, spec.opposite]) {
+            for (const ref of collectPathRefsFromCoord(point)) {
+              if (!pointDefs.has(ref)) {
+                issues.push({ severity: 'error', message: `未定义的点 '${ref}'`, range: point.range, stmtIndex: idx });
+              }
+            }
+          }
+        } else if (spec.type === 'cubic-bezier') {
+          for (const point of [spec.start, spec.control1, spec.control2, spec.end]) {
+            for (const ref of collectPathRefsFromCoord(point)) {
+              if (!pointDefs.has(ref)) {
+                issues.push({ severity: 'error', message: `未定义的点 '${ref}'`, range: point.range, stmtIndex: idx });
+              }
+            }
+          }
+        } else if (spec.type === 'circular-arc') {
+          for (const ref of collectPathRefsFromCoord(spec.start)) {
+            if (!pointDefs.has(ref)) {
+              issues.push({ severity: 'error', message: `未定义的点 '${ref}'`, range: spec.start.range, stmtIndex: idx });
+            }
+          }
+        } else if (spec.type === 'ellipse') {
+          for (const ref of collectPathRefsFromCoord(spec.center)) {
+            if (!pointDefs.has(ref)) {
+              issues.push({ severity: 'error', message: `未定义的点 '${ref}'`, range: spec.center.range, stmtIndex: idx });
+            }
+          }
         } else if (spec.type === 'circle') {
           for (const ref of collectPathRefsFromCoord(spec.center)) {
             if (!pointDefs.has(ref)) {
@@ -128,6 +169,14 @@ export function staticCheck(pic: TikzPicture): CheckIssue[] {
         for (const name of s.intersections.of) {
           if (!pathDefs.has(name)) {
             issues.push({ severity: 'error', message: `未定义的命名路径 '${name}'`, range: s.range, stmtIndex: idx });
+          }
+        }
+      }
+    } else if (s.kind === 'graph') {
+      for (const edge of s.edges) {
+        for (const ref of [edge.from, edge.to]) {
+          if (!pointDefs.has(ref)) {
+            issues.push({ severity: 'error', message: `未定义的 graph 节点 '${ref}'`, range: edge.range, stmtIndex: idx });
           }
         }
       }

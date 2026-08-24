@@ -1,0 +1,56 @@
+{
+  "schema": "pgf-upstream-registry-shard/v1",
+  "id": "static-command-0001",
+  "surface": "command",
+  "status": "static",
+  "entries": [
+    {
+      "id": "pgf-3.1.11a:command:\\makeglossary:957984d302",
+      "title": "macro \\makeglossary",
+      "surface": "command",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/basiclayer/pgfcoreexternal.code.tex",
+        "line": [
+          139,
+          139
+        ]
+      },
+      "namespaces": [
+        "/tikz"
+      ],
+      "valueGrammar": {
+        "kind": "balanced-group",
+        "description": "Macro arguments and balanced TeX body"
+      },
+      "effects": {
+        "scope": "group",
+        "expansion": "macro",
+        "outputs": []
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+/* ============================================================
+   SCENE 2 — "Gesture becomes source"
+   Asymmetric composition: large hero geometry left-of-center,
+   narrow source fragment strip offset to the right. Everything
+   floats on the cobalt field — hairlines only, no cards.
+   Motion: transform / opacity only.
+   ============================================================ */
+
+.scene-2 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- dominant object: hero geometry, left-of-center ---- */
+
+.scene-2__canvas {
+  position: absolute;
+  left: 11%;
+  top: 48%;
+  width: min(58vmin, 620px);
+  aspect-ratio: 1;
+  will-change: transform, opacity;
+}
+
+.scene-2__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- hint ring at point A: subtle pulse (scale + opacity) ---- */
+
+.scene-2__hint {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: opacity 0.45s;
+}
+
+.scene-2__hint-ring {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: scene-2-pulse 2.4s ease-out infinite;
+}
+
+@keyframes scene-2-pulse {
+  0% {
+    transform: scale(0.72);
+    opacity: 0.85;
+  }
+  70% {
+    transform: scale(1.18);
+    opacity: 0.18;
+  }
+  100% {
+    transform: scale(1.18);
+    opacity: 0;
+  }
+}
+
+.scene-2__hint-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  /* zh copy ("拖动 A") is wider than "drag A" — let the label size
+     itself, never clip or truncate */
+  width: max-content;
+  max-width: none;
+  white-space: nowrap;
+  overflow: visible;
+  text-align: center;
+}
+
+/* ---- transient Δ A transaction trace near the gesture point ---- */
+
+.scene-2__tx {
+  position: absolute;
+  pointer-events: none;
+  animation: scene-2-txin 0.5s ease-out both;
+}
+
+@keyframes scene-2-txin {
+  from {
+    opacity: 0;
+    transform: translate(14px, -22px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(14px, -32px);
+  }
+}
+
+/* ---- source fragment strip: narrow, secondary, synchronized ---- */
+
+.scene-2__source {
+  max-width: 250px;
+}
+
+/* ---- figure switcher: hairline-separated text tabs above the source ---- */
+
+.scene-2__figtabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0 0 6px;
+  padding: 0;
+}
+
+.scene-2__figtab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  line-height: 1.7;
+  color: var(--mist);
+  cursor: pointer;
+  transition: color 0.25s;
+}
+
+.scene-2__figtab + .scene-2__figtab {
+  border-left: 1px solid var(--line-strong);
+}
+
+.scene-2__figtab:hover {
+  color: var(--paper);
+}
+
+.scene-2__figtab.is-active {
+  color: var(--paper);
+}
+
+.scene-2__figtab:focus-visible {
+  outline: 1px solid var(--paper);
+  outline-offset: 2px;
+}
+
+/* ---- figure cross-fade on switch (opacity / transform only) ---- */
+
+.scene-2__figure-fade {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.scene-2__figure-fade.is-swapping {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+.scene-2__lines {
+  position: relative;
+}
+
+.scene-2__delta {
+  color: var(--paper);
+  transition: opacity 0.3s;
+}
+
+/* paper → mist emphasis: a paper duplicate over the dimmed A
+   line, fading out with opacity only. */
+.scene-2__line-flash {
+  position: absolute;
+  left: 0;
+  /* the A line is the 2nd line: one line-height (11.5px × 1.7) down,
+     plus the Δ marker indent (≈ 2ch) */
+  top: calc(11.5px * 1.7);
+  padding-left: 2ch;
+  font-family: var(--font-code);
+  font-size: 11.5px;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+  color: var(--paper);
+  white-space: pre;
+  pointer-events: none;
+  animation: scene-2-lineflash 0.7s ease-out both;
+}
+
+@keyframes scene-2-lineflash {
+  from {
+    opacity: 0.95;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* ---- quiet editorial caption ---- */
+
+.scene-2__caption {
+  position: absolute;
+  left: 11%;
+  top: 87%;
+  transition: opacity 0.3s;
+}
+
+/* ---- reduced motion: no ambient pulse, no flash shimmer, no swap
+       transition. Geometry interactivity and state are untouched. ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-2__hint-ring {
+    animation: none;
+    opacity: 0.5;
+    transform: none;
+  }
+  .scene-2__line-flash {
+    animation: none;
+    opacity: 0;
+  }
+  .scene-2__tx {
+    animation: none;
+    transform: translate(14px, -32px);
+  }
+  .scene-2__figure-fade {
+    transition: none;
+  }
+  .scene-2__figtab {
+    transition: none;
+  }
+}
+
+/* ---- Mobile: ONE geometry construction, centered; the single
+       source fragment docks beneath it. Mood before density. ---- */
+
+@media (max-width: 720px) {
+  .scene-2__canvas {
+    left: 50%;
+    top: 40%;
+    width: min(78vmin, 420px);
+    /* horizontal centering without touching the inline transform */
+    margin-left: calc(min(78vmin, 420px) * -0.5);
+  }
+
+  .scene-2__source {
+    left: 8% !important; /* override Frag inline x/y for the stack */
+    top: 74% !important;
+    max-width: 78vw;
+  }
+
+  .scene-2__figtab {
+    padding: 1px 4px;
+    letter-spacing: 0.06em;
+  }
+
+  .scene-2__caption {
+    left: 8%;
+    top: 93%;
+  }
+}

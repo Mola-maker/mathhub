@@ -7,6 +7,7 @@ import {
 } from '../semantics/managed-construction';
 import type { SceneElement, ScenePoint } from '../semantics/scene';
 import { tikzPictureBodyEndOffset } from '../document/tikz-envelope';
+import { hashSource } from '../document/source-hash';
 import { diagnoseConstraintStructure } from '../solver/constraint-diagnostics';
 import {
   qualifiedManagedEntityReference,
@@ -35,17 +36,71 @@ import {
   type SourceDocument,
   type SourceDocumentReference,
 } from './model';
+import {
+  managedBlockBindingId,
+  managedRecordBindingId,
+} from './managed-binding-id';
+import {
+  CONSTRUCTION_PLAN_CODEC_ABI_VERSION,
+  decodeManagedConstructionPlan,
+} from '../authoring/construction-plan-codec';
+import { MANAGED_CONSTRUCTION_V3_ENVELOPE_SCHEMA } from '../semantics/managed-construction-v3';
+import { CONSTRUCTION_PLAN_FOOTPRINT_ABI_VERSION } from '../authoring/construction-plan-footprint';
+import { CONSTRUCTION_CATALOG_DIGEST } from '../authoring/construction-catalog';
 
 export const TIKZ_SEMANTIC_ADAPTER_ID = 'mathgeo.tikz.semantic-adapter';
-export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.11.0';
-export const TIKZ_PLUGIN_SET_DIGEST =
-  `${TIKZ_SEMANTIC_ADAPTER_ID}@${TIKZ_SEMANTIC_ADAPTER_VERSION}`;
+export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.24.0';
+export const TIKZ_PLUGIN_SET_DIGEST = [
+  `${TIKZ_SEMANTIC_ADAPTER_ID}@${TIKZ_SEMANTIC_ADAPTER_VERSION}`,
+  MANAGED_CONSTRUCTION_V3_ENVELOPE_SCHEMA,
+  CONSTRUCTION_PLAN_CODEC_ABI_VERSION,
+  CONSTRUCTION_PLAN_FOOTPRINT_ABI_VERSION,
+  CONSTRUCTION_CATALOG_DIGEST,
+].join('|');
 
 export interface TikzGeometryProjectionInput {
   analysis: Analysis;
   source: string;
   basis: GeometryRevisionBasis;
   hashAlgorithm: string;
+}
+
+function managedWritePolicy(
+  source: string,
+  block: ManagedConstructionBlock,
+  ambiguousIds: ReadonlySet<string>,
+): string {
+  if (ambiguousIds.has(block.id)) return 'ambiguous-managed-id-read-only';
+  if (block.metadataStatus !== 'valid') {
+    return `managed-read-only:metadata-${block.metadataStatus}`;
+  }
+  if (block.integrityStatus !== 'valid') {
+    return `managed-read-only:integrity-${block.integrityStatus}`;
+  }
+  const decoded = decodeManagedConstructionPlan(source, block);
+  return decoded.ok
+    ? 'managed-recompile-only'
+    : `managed-read-only:${decoded.issues[0]?.code ?? 'decode-rejected'}`;
+}
+
+type ManagedWritePolicyMap = ReadonlyMap<ManagedConstructionBlock, string>;
+
+function managedWritePolicyMap(
+  source: string,
+  blocks: readonly ManagedConstructionBlock[],
+  ambiguousIds: ReadonlySet<string>,
+): ManagedWritePolicyMap {
+  return new Map(blocks.map((block) => [
+    block,
+    managedWritePolicy(source, block, ambiguousIds),
+  ] as const));
+}
+
+function cachedManagedWritePolicy(
+  policies: ManagedWritePolicyMap,
+  block: ManagedConstructionBlock,
+): string {
+  return policies.get(block) ?? 'managed-read-only:projection-policy-unavailable';
 }
 
 function sourceDocumentOf(input: TikzGeometryProjectionInput): SourceDocument {
@@ -87,27 +142,146 @@ function styleProperties(element: SceneElement): JsonObject {
     stroke: element.style.stroke,
     strokeWidth: element.style.strokeWidth,
     dash: element.style.dash,
+    dashOffset: element.style.dashOffset,
+    lineCap: element.style.lineCap,
+    lineJoin: element.style.lineJoin,
+    miterLimit: element.style.miterLimit,
     arrow: element.style.arrow,
+    arrowTip: element.style.arrowTip,
     fill: element.style.fill,
+    strokeOpacity: element.style.strokeOpacity,
     fillOpacity: element.style.fillOpacity,
+    textOpacity: element.style.textOpacity,
     opacity: element.style.opacity,
   };
 }
 
+function stylePresentationMetadata(
+  analysis: Analysis,
+  stmtIndex: number,
+): JsonObject | undefined {
+  const statement = analysis.stmts?.[stmtIndex];
+  if (!statement || !('options' in statement) || !statement.options) return undefined;
+  const sequence = statement.options.sequence;
+  return {
+    optionSequence: {
+      schema: sequence.schema,
+      ordered: true,
+      balanced: sequence.balanced,
+      range: { start: sequence.range.start, end: sequence.range.end },
+      entries: sequence.entries.map((entry) => ({
+        ordinal: entry.ordinal,
+        raw: entry.raw,
+        interpreted: entry.interpreted,
+        interpretedKey: entry.interpretedKey,
+        interpretedValue: entry.interpretedValue,
+        range: { start: entry.range.start, end: entry.range.end },
+        interpretedRange: entry.interpretedRange
+          ? { start: entry.interpretedRange.start, end: entry.interpretedRange.end }
+          : null,
+        key: entry.key,
+        keyRange: { start: entry.keyRange.start, end: entry.keyRange.end },
+        value: entry.value,
+        valueRange: entry.valueRange
+          ? { start: entry.valueRange.start, end: entry.valueRange.end }
+          : null,
+      })),
+    },
+  };
+}
+
+function pointDefinitionExpression(point: ScenePoint): GeometryExpression | undefined {
+  const definition = point.definition;
+  if (!definition) return undefined;
+  const pointReference = (name: string): GeometryExpression => ({
+    kind: 'entity-reference',
+    entityId: `point:${name}`,
+  });
+  switch (definition.kind) {
+    case 'reference':
+      return pointReference(definition.pointName);
+    case 'interpolate':
+      return {
+        kind: 'operation',
+        operator: Math.abs(definition.t - 0.5) <= 1e-12 ? 'midpoint' : 'interpolate',
+        arguments: [
+          pointReference(definition.startName),
+          pointReference(definition.endName),
+        ],
+        parameters: { t: definition.t },
+      };
+    case 'perpendicular-foot':
+      return {
+        kind: 'operation',
+        operator: 'perpendicular-foot',
+        arguments: [
+          pointReference(definition.pointName),
+          pointReference(definition.lineStartName),
+          pointReference(definition.lineEndName),
+        ],
+      };
+    case 'rotate':
+      return {
+        kind: 'operation',
+        operator: 'rotate',
+        arguments: [
+          pointReference(definition.centerName),
+          pointReference(definition.pointName),
+        ],
+        parameters: {
+          scale: definition.scale,
+          angleDegrees: definition.angleDegrees,
+        },
+      };
+  }
+}
+
 function pointEntity(point: ScenePoint): GeometryEntity {
+  const definition = pointDefinitionExpression(point);
+  const coordinateTransform = point.coordinateTransform
+    ? {
+      a: point.coordinateTransform.a,
+      b: point.coordinateTransform.b,
+      c: point.coordinateTransform.c,
+      d: point.coordinateTransform.d,
+      e: point.coordinateTransform.e,
+      f: point.coordinateTransform.f,
+    }
+    : null;
   return {
     recordType: 'entity',
     id: point.stableId,
     kind: 'point',
     name: point.name,
     dimension: 0,
+    ...(definition ? { definition } : {}),
     parameters: {
       x: point.position.x,
       y: point.position.y,
       free: point.free,
+      ...(coordinateTransform ? { coordinateTransform } : {}),
     },
     sourceBindingIds: [`binding:${point.stableId}`],
-    tags: point.free ? ['free'] : ['derived'],
+    tags: point.free
+      ? ['free']
+      : point.writable === false
+        ? ['derived', 'library-product']
+        : ['derived'],
+  };
+}
+
+function elementTransformParameters(element: SceneElement): JsonObject {
+  const transform = element.coordinateTransform;
+  if (!transform) return {};
+  return {
+    coordinateTransform: {
+      a: transform.a,
+      b: transform.b,
+      c: transform.c,
+      d: transform.d,
+      e: transform.e,
+      f: transform.f,
+    },
   };
 }
 
@@ -125,8 +299,161 @@ function elementEntity(element: SceneElement): GeometryEntity {
         dimension: 1,
         parameters: {
           points: element.points.map((point) => ({ x: point.x, y: point.y })),
+          ...(element.pointOrigins
+            ? { pointOrigins: element.pointOrigins.map((origin) => ({ ...origin })) }
+            : {}),
           cycle: element.cycle,
+          sourcePathOperator: element.sourcePathOperator ?? 'polyline',
           references: element.refs,
+          ...elementTransformParameters(element),
+        },
+      };
+    case 'cubic-bezier':
+      return {
+        ...common,
+        kind: 'cubic-bezier',
+        dimension: 1,
+        parameters: {
+          start: { x: element.start.x, y: element.start.y },
+          control1: { x: element.control1.x, y: element.control1.y },
+          control2: { x: element.control2.x, y: element.control2.y },
+          end: { x: element.end.x, y: element.end.y },
+          pointOrigins: element.pointOrigins.map((origin) => ({ ...origin })),
+          references: element.refs,
+          ...elementTransformParameters(element),
+        },
+      };
+    case 'circular-arc':
+      return {
+        ...common,
+        kind: 'circular-arc',
+        dimension: 1,
+        parameters: {
+          center: { x: element.center.x, y: element.center.y },
+          radius: element.radius,
+          startAngleDeg: element.startAngleDeg,
+          endAngleDeg: element.endAngleDeg,
+          start: { x: element.start.x, y: element.start.y },
+          end: { x: element.end.x, y: element.end.y },
+          sourceArcParameters: {
+            startAngle: {
+              range: {
+                start: element.parameterSources.startAngle.range.start,
+                end: element.parameterSources.startAngle.range.end,
+              },
+              value: element.parameterSources.startAngle.value,
+            },
+            endAngle: {
+              range: {
+                start: element.parameterSources.endAngle.range.start,
+                end: element.parameterSources.endAngle.range.end,
+              },
+              value: element.parameterSources.endAngle.value,
+            },
+            radius: {
+              range: {
+                start: element.parameterSources.radius.range.start,
+                end: element.parameterSources.radius.range.end,
+              },
+              value: element.parameterSources.radius.value,
+            },
+            coordinateScale: element.parameterSources.coordinateScale,
+            coordinateRotationDegrees:
+              element.parameterSources.coordinateRotationDegrees,
+          },
+          references: element.refs,
+          ...elementTransformParameters(element),
+        },
+      };
+    case 'elliptical-arc':
+      return {
+        ...common,
+        kind: 'elliptical-arc',
+        dimension: 1,
+        parameters: {
+          center: { x: element.center.x, y: element.center.y },
+          axisX: { x: element.axisX.x, y: element.axisX.y },
+          axisY: { x: element.axisY.x, y: element.axisY.y },
+          xRadius: element.xRadius,
+          yRadius: element.yRadius,
+          rotationDegrees: element.rotationDegrees,
+          startAngleDeg: element.startAngleDeg,
+          endAngleDeg: element.endAngleDeg,
+          start: { x: element.start.x, y: element.start.y },
+          end: { x: element.end.x, y: element.end.y },
+          sourceShapeKind: element.parameterSources.sourceKind,
+          sourceArcParameters: {
+            sourceKind: element.parameterSources.sourceKind,
+            startAngle: {
+              range: { ...element.parameterSources.startAngle.range },
+              value: element.parameterSources.startAngle.value,
+            },
+            endAngle: {
+              range: { ...element.parameterSources.endAngle.range },
+              value: element.parameterSources.endAngle.value,
+            },
+            radius: {
+              range: { ...element.parameterSources.radius.range },
+              value: element.parameterSources.radius.value,
+            },
+            coordinateTransformSimilarity: false,
+          },
+          references: element.refs,
+          ...elementTransformParameters(element),
+        },
+      };
+    case 'ellipse':
+      return {
+        ...common,
+        kind: 'ellipse',
+        dimension: 1,
+        parameters: {
+          center: { x: element.center.x, y: element.center.y },
+          xRadius: element.xRadius,
+          yRadius: element.yRadius,
+          rotationDegrees: element.rotationDegrees,
+          sourceShapeKind: element.parameterSources.sourceKind,
+          sourceEllipseParameters: element.parameterSources.sourceKind === 'ellipse'
+            ? {
+              sourceKind: 'ellipse',
+              xRadius: {
+                range: { ...element.parameterSources.xRadius.range },
+                value: element.parameterSources.xRadius.value,
+              },
+              yRadius: {
+                range: { ...element.parameterSources.yRadius.range },
+                value: element.parameterSources.yRadius.value,
+              },
+              coordinateScale: element.parameterSources.coordinateScale,
+              coordinateRotationDegrees:
+                element.parameterSources.coordinateRotationDegrees,
+              coordinateTransformSimilarity:
+                element.parameterSources.coordinateTransformSimilarity,
+              localRotation: element.parameterSources.localRotation
+                ? {
+                  range: { ...element.parameterSources.localRotation.range },
+                  value: element.parameterSources.localRotation.value,
+                }
+                : null,
+            }
+            : {
+              sourceKind: 'circle',
+              radius: {
+                range: { ...element.parameterSources.radius.range },
+                value: element.parameterSources.radius.value,
+              },
+              coordinateScale: null,
+              coordinateRotationDegrees: null,
+              coordinateTransformSimilarity: false,
+              localRotation: element.parameterSources.localRotation
+                ? {
+                  range: { ...element.parameterSources.localRotation.range },
+                  value: element.parameterSources.localRotation.value,
+                }
+                : null,
+            },
+          references: element.refs,
+          ...elementTransformParameters(element),
         },
       };
     case 'circle': {
@@ -140,7 +467,20 @@ function elementEntity(element: SceneElement): GeometryEntity {
           parameters: {
             center: { x: element.center.x, y: element.center.y },
             radius: element.radius,
+            ...(element.radiusSource
+              ? {
+                sourceRadius: {
+                  range: {
+                    start: element.radiusSource.range.start,
+                    end: element.radiusSource.range.end,
+                  },
+                  value: element.radiusSource.value,
+                  coordinateScale: element.radiusSource.coordinateScale,
+                },
+              }
+              : {}),
             references: element.refs,
+            ...elementTransformParameters(element),
             ...(element.definition
               ? { circleDefinition: { ...element.definition } }
               : {}),
@@ -150,6 +490,22 @@ function elementEntity(element: SceneElement): GeometryEntity {
             : {}),
         };
       }
+    case 'graph-node':
+      return {
+        ...common,
+        kind: 'graph-node',
+        name: element.refs[0],
+        dimension: 0,
+        parameters: {
+          center: { x: element.center.x, y: element.center.y },
+          radius: element.radius,
+          text: element.text,
+          outlined: element.outlined,
+          references: element.refs,
+          ...elementTransformParameters(element),
+        },
+        tags: ['graph-node', 'library-product'],
+      };
     case 'label':
       return {
         ...common,
@@ -160,6 +516,7 @@ function elementEntity(element: SceneElement): GeometryEntity {
           text: element.text,
           anchor: element.anchor,
           references: element.refs,
+          ...elementTransformParameters(element),
         },
       };
     case 'angle-mark':
@@ -172,6 +529,7 @@ function elementEntity(element: SceneElement): GeometryEntity {
           from: { x: element.from.x, y: element.from.y },
           to: { x: element.to.x, y: element.to.y },
           references: element.refs,
+          ...elementTransformParameters(element),
         },
       };
   }
@@ -193,6 +551,42 @@ function dependencyRelations(
         : pointIdsByName.get(dependency) ?? `unresolved:point:${dependency}` },
     ],
   })));
+}
+
+function graphRelationsOf(
+  input: TikzGeometryProjectionInput,
+  elements: readonly SceneElement[],
+): GeometryRelation[] {
+  const nodeIdsByName = new Map(elements.flatMap((element) => (
+    element.kind === 'graph-node' && element.refs[0]
+      ? [[element.refs[0], element.stableId] as const]
+      : []
+  )));
+  return (input.analysis.stmts ?? []).flatMap((statement, statementIndex) => (
+    statement.kind === 'graph'
+      ? statement.edges.map((edge, edgeIndex): GeometryRelation => ({
+        recordType: 'relation',
+        id: `relation:graph-edge:${statementIndex}:${edgeIndex}`,
+        kind: 'graph-edge',
+        directed: edge.connector !== '--' && edge.connector !== '-!-',
+        participants: [
+          {
+            role: edge.connector === '<-' ? 'target' : 'source',
+            entityId: nodeIdsByName.get(edge.from) ?? `unresolved:graph-node:${edge.from}`,
+          },
+          {
+            role: edge.connector === '<-' ? 'source' : 'target',
+            entityId: nodeIdsByName.get(edge.to) ?? `unresolved:graph-node:${edge.to}`,
+          },
+        ],
+        properties: {
+          connector: edge.connector,
+          visible: edge.connector !== '-!-',
+          bidirectional: edge.connector === '<->',
+        },
+      }))
+      : []
+  ));
 }
 
 function publicSemanticPoints(
@@ -334,6 +728,31 @@ const MANAGED_ARGUMENT_ROLES: Readonly<Record<
     inputs: ['point-a', 'point-b', 'point-c'],
     outputs: ['center', 'circle'],
   },
+  'fermat-point': {
+    inputs: ['triangle-vertex-a', 'triangle-vertex-b', 'triangle-vertex-c'],
+    outputs: [
+      'equilateral-vertex-ab',
+      'equilateral-vertex-ac',
+      'fermat-point',
+      'equilateral-triangle-ab',
+      'equilateral-triangle-ac',
+      'fermat-ray-a',
+      'fermat-ray-b',
+      'fermat-ray-c',
+    ],
+  },
+  'simson-line': {
+    inputs: ['triangle-vertex-a', 'triangle-vertex-b', 'triangle-vertex-c'],
+    outputs: [
+      'circumcenter',
+      'circumcircle',
+      'circumcircle-point',
+      'pedal-foot-ab',
+      'pedal-foot-bc',
+      'pedal-foot-ca',
+      'simson-line',
+    ],
+  },
   'tangent-at-point': {
     inputs: ['circle'],
     outputs: ['touch-point', 'direction-point', 'line'],
@@ -473,6 +892,7 @@ function constraintParametersOf(
     case 'radical-axis':
     case 'cyclic':
     case 'complete-quadrilateral':
+    case 'collinear':
       return undefined;
     default:
       return assertNever(record);
@@ -538,19 +958,21 @@ function managedEntitySemanticKey(record: ManagedEntityRecord): string | null {
     case 'rectangle':
       return `polygon:${record.corners.join('\u0000')}`;
     case 'circle': {
-      const definitionReference = qualifiedSourceCircleReference(
-        'through' in record
-          ? {
-            kind: 'center-through',
-            centerName: record.center,
-            throughName: record.through,
-          }
-          : {
+      // Test the value, not the key: the center-radius variant declares
+      // `through?: never`, so the key can be present while undefined.
+      const definitionReference = typeof record.through === 'string'
+        ? qualifiedSourceCircleReference({
+          kind: 'center-through',
+          centerName: record.center,
+          throughName: record.through,
+        })
+        : typeof record.radius === 'number'
+          ? qualifiedSourceCircleReference({
             kind: 'center-radius',
             centerName: record.center,
             radius: record.radius,
-          },
-      );
+          })
+          : null;
       return definitionReference
         ? `circle-definition:${definitionReference}`
         : null;
@@ -581,7 +1003,7 @@ function managedEntityReferences(
     case 'rectangle':
       return record.corners;
     case 'circle':
-      return 'through' in record
+      return typeof record.through === 'string'
         ? [record.center, record.through]
         : [record.center];
     case 'label':
@@ -640,24 +1062,6 @@ function ambiguousManagedConstructionIds(
     [...counts].flatMap(([id, count]) => count > 1 ? [id] : []),
   );
 }
-
-function managedBlockBindingId(
-  block: ManagedConstructionBlock,
-  ambiguousIds: ReadonlySet<string>,
-): string {
-  return ambiguousIds.has(block.id)
-    ? `binding:managed:${block.id}:ambiguous:${block.range.start}`
-    : `binding:managed:${block.id}`;
-}
-
-function managedRecordBindingId(
-  blockBindingId: string,
-  recordType: string,
-  recordId: string,
-): string {
-  return `${blockBindingId}:record:${recordType}:${recordId}`;
-}
-
 
 function managedConstructionSemantics(
   blocks: readonly ManagedConstructionBlock[],
@@ -762,7 +1166,10 @@ function managedConstructionSemantics(
   };
 
   for (const block of blocks) {
-    const bindingId = managedBlockBindingId(block, ambiguousIds);
+    const bindingId = managedBlockBindingId(
+      block.id,
+      ambiguousIds.has(block.id) ? block.range.start : undefined,
+    );
     if (ambiguousIds.has(block.id)) {
       // Duplicate construction IDs make the writer target ambiguous. Preserve
       // source rendering, but do not project either block as writable managed
@@ -932,7 +1339,7 @@ function managedConstructionSemantics(
             arguments: record.corners.map(entityReference),
           };
         case 'circle':
-          return 'through' in record
+          return typeof record.through === 'string'
             ? {
               kind: 'operation',
               operator: 'circle-through-point',
@@ -1172,6 +1579,7 @@ function managedConstructionSemantics(
               ];
             case 'cyclic':
             case 'complete-quadrilateral':
+            case 'collinear':
               return record.points.map((reference, index) => ({
                 role: `point-${index + 1}`,
                 entityId: resolve(reference),
@@ -1350,6 +1758,7 @@ function duplicateManagedIdDiagnosticsOf(
 function managedConstructionSummaries(
   blocks: readonly ManagedConstructionBlock[],
   ambiguousIds: ReadonlySet<string>,
+  writePolicies: ManagedWritePolicyMap,
 ): readonly JsonObject[] {
   return blocks.map((block): JsonObject => {
     const inputRecords = block.records.filter(
@@ -1397,9 +1806,7 @@ function managedConstructionSummaries(
       metadataStatus: block.metadataStatus,
       integrityStatus: block.integrityStatus,
       idAmbiguous: ambiguousIds.has(block.id),
-      writePolicy: ambiguousIds.has(block.id)
-        ? 'ambiguous-managed-id-read-only'
-        : 'managed-recompile-only',
+      writePolicy: cachedManagedWritePolicy(writePolicies, block),
       inputs,
       outputs,
       entityRecordIds: block.records.flatMap((record) => (
@@ -1412,7 +1819,10 @@ function managedConstructionSummaries(
         record.recordType === 'relation' ? [record.id] : []
       )),
       metadataIssueCodes: block.metadataIssues.map((item) => item.code),
-      bindingId: managedBlockBindingId(block, ambiguousIds),
+      bindingId: managedBlockBindingId(
+        block.id,
+        ambiguousIds.has(block.id) ? block.range.start : undefined,
+      ),
       sourceRange: { start: block.range.start, end: block.range.end },
       contentFingerprint: block.contentFingerprint,
       semanticRecords: block.records as unknown as JsonObject[],
@@ -1460,22 +1870,25 @@ function bindingsOf(
   points: readonly ScenePoint[],
   elements: readonly SceneElement[],
   managedBlocks: readonly ManagedConstructionBlock[],
-  ambiguousManagedIds: ReadonlySet<string>,
+  writePolicies: ManagedWritePolicyMap,
 ): ConstructionBinding[] {
   const records: Array<{
     id: string;
     recordType: 'entity';
     stmtIndex: number;
+    writable: boolean;
   }> = [
     ...points.map((point) => ({
       id: point.stableId,
       recordType: 'entity' as const,
       stmtIndex: point.stmtIndex,
+      writable: point.writable !== false,
     })),
     ...elements.map((element) => ({
       id: element.stableId,
       recordType: 'entity' as const,
       stmtIndex: element.stmtIndex,
+      writable: element.writable !== false,
     })),
   ];
 
@@ -1493,16 +1906,14 @@ function bindingsOf(
       role: 'definition' as const,
       targets: [{ recordType: record.recordType, id: record.id }],
       source: sourceReference(document, input.source, range),
-      writable: !managedBlock,
+      writable: !managedBlock && record.writable,
       cstNodeType: input.analysis.stmts?.[record.stmtIndex]?.kind ?? 'statement',
       cstRanges: { node: range },
       ...(managedBlock
         ? {
           metadata: {
             managedConstructionId: managedBlock.id,
-            writePolicy: ambiguousManagedIds.has(managedBlock.id)
-              ? 'ambiguous-managed-id-read-only'
-              : 'managed-recompile-only',
+            writePolicy: cachedManagedWritePolicy(writePolicies, managedBlock),
           },
         }
         : {}),
@@ -1514,7 +1925,7 @@ function namedPathBindingsOf(
   input: TikzGeometryProjectionInput,
   document: SourceDocument,
   managedBlocks: readonly ManagedConstructionBlock[],
-  ambiguousManagedIds: ReadonlySet<string>,
+  writePolicies: ManagedWritePolicyMap,
 ): ConstructionBinding[] {
   const seen = new Set<string>();
   return (input.analysis.stmts ?? []).flatMap((statement, statementIndex) => {
@@ -1547,9 +1958,7 @@ function namedPathBindingsOf(
         ? {
           metadata: {
             managedConstructionId: managedBlock.id,
-            writePolicy: ambiguousManagedIds.has(managedBlock.id)
-              ? 'ambiguous-managed-id-read-only'
-              : 'managed-recompile-only',
+            writePolicy: cachedManagedWritePolicy(writePolicies, managedBlock),
           },
         }
         : {}),
@@ -1562,6 +1971,7 @@ function managedBindingsOf(
   document: SourceDocument,
   blocks: readonly ManagedConstructionBlock[],
   ambiguousManagedIds: ReadonlySet<string>,
+  writePolicies: ManagedWritePolicyMap,
   targetsByBlock: ReadonlyMap<
     string,
     readonly GeometryBindableRecordReference[]
@@ -1572,7 +1982,10 @@ function managedBindingsOf(
   >,
 ): ConstructionBinding[] {
   return blocks.flatMap((block) => {
-    const blockBindingId = managedBlockBindingId(block, ambiguousManagedIds);
+    const blockBindingId = managedBlockBindingId(
+      block.id,
+      ambiguousManagedIds.has(block.id) ? block.range.start : undefined,
+    );
     const ambiguousId = ambiguousManagedIds.has(block.id);
     const blockBinding: ConstructionBinding = {
       recordType: 'source-binding' as const,
@@ -1593,9 +2006,7 @@ function managedBindingsOf(
         integrityStatus: block.integrityStatus,
         contentFingerprint: block.contentFingerprint,
         semanticRecordCount: block.records.length,
-        writePolicy: ambiguousId
-          ? 'ambiguous-managed-id-read-only'
-          : 'managed-recompile-only',
+        writePolicy: cachedManagedWritePolicy(writePolicies, block),
         ambiguousConstructionId: ambiguousId,
         headerStart: block.headerRange.start,
         headerEnd: block.headerRange.end,
@@ -1609,7 +2020,7 @@ function managedBindingsOf(
         })),
       },
     };
-    const recordBindings = block.records.flatMap((record) => {
+    const recordBindings = block.records.flatMap((record, recordIndex) => {
       const id = managedRecordBindingId(
         blockBindingId,
         record.recordType,
@@ -1623,7 +2034,11 @@ function managedBindingsOf(
         kind: 'source-range' as const,
         role: 'custom' as const,
         targets,
-        source: sourceReference(document, input.source, block.range),
+        source: sourceReference(
+          document,
+          input.source,
+          block.semanticRecordRanges[recordIndex] ?? block.range,
+        ),
         writable: false,
         syntaxNodeType: 'mathgeo-managed-record',
         syntaxPath: [
@@ -1640,7 +2055,7 @@ function managedBindingsOf(
           constructionSyntaxKind: block.kind,
           sourceRecordType: record.recordType,
           sourceRecordId: record.id,
-          writePolicy: 'managed-recompile-only',
+          writePolicy: cachedManagedWritePolicy(writePolicies, block),
         },
       } satisfies ConstructionBinding];
     });
@@ -1662,6 +2077,18 @@ function documentInsertionBindingOf(
   const range = emptyDocument
     ? { start: 0, end: input.source.length }
     : { start: insertionOffset, end: insertionOffset };
+  const writable = emptyDocument || endMarkerStart !== null;
+  const capabilityFingerprint = hashSource(JSON.stringify({
+    capability: 'create-managed-construction-batch',
+    documentId: input.basis.documentId,
+    epoch: input.basis.epoch,
+    revision: input.basis.revision,
+    sourceId: document.sourceId,
+    sourceHash: document.hash,
+    range,
+    emptyDocument,
+    pluginSetDigest: input.basis.pluginSetDigest ?? '',
+  }));
   return {
     recordType: 'source-binding',
     id: 'binding:document:tikzpicture-body-end',
@@ -1669,7 +2096,7 @@ function documentInsertionBindingOf(
     role: 'custom',
     targets: [],
     source: sourceReference(document, input.source, range),
-    writable: emptyDocument || endMarkerStart !== null,
+    writable,
     syntaxNodeType: emptyDocument
       ? 'empty-tikz-document'
       : 'tikzpicture-body-end',
@@ -1678,6 +2105,10 @@ function documentInsertionBindingOf(
       purpose: 'append-construction',
       emptyDocument,
       requiresFullEnvironment: emptyDocument,
+      writeCapabilities: writable
+        ? ['create-managed-construction-batch']
+        : [],
+      capabilityFingerprint,
     },
   };
 }
@@ -1761,7 +2192,9 @@ function renderPrimitive(
     metadata: {
       sourceBindingIds,
       statementIndex: element.stmtIndex,
-      sourceSyntaxKind: element.kind,
+      sourceSyntaxKind: element.kind === 'elliptical-arc'
+        ? 'circular-arc'
+        : element.kind,
       semanticKind: entity.kind,
       sourceStableId: element.stableId,
     },
@@ -1800,10 +2233,19 @@ export function projectTikzAnalysisToGeometryTruth(
   input: TikzGeometryProjectionInput,
 ): GeometryTruthSet {
   const document = sourceDocumentOf(input);
+  // Scene.stableId may be replaced by the UI-only EntityIdentityRegistry to
+  // preserve selection continuity. GeometryDoc identities must instead be a
+  // deterministic function of source so an isolated Broker can replay them.
   const points = input.analysis.scene
-    ? publicSemanticPoints([...input.analysis.scene.points.values()])
+    ? publicSemanticPoints([...input.analysis.scene.points.values()]).map((point) => ({
+      ...point,
+      stableId: `point:${point.name}`,
+    }))
     : [];
-  const elements = input.analysis.scene?.elements ?? [];
+  const elements = input.analysis.scene?.elements.map((element, index) => ({
+    ...element,
+    stableId: `element:${element.stmtIndex}:${index}`,
+  })) ?? [];
   const namedPaths = namedPathEntitiesOf(input);
   const sourceEntities = [
     ...points.map(pointEntity),
@@ -1825,6 +2267,11 @@ export function projectTikzAnalysisToGeometryTruth(
   ]);
   const managedBlocks = parseManagedConstructionBlocks(input.source);
   const ambiguousManagedIds = ambiguousManagedConstructionIds(managedBlocks);
+  const managedWritePolicies = managedWritePolicyMap(
+    input.source,
+    managedBlocks,
+    ambiguousManagedIds,
+  );
   const managed = managedConstructionSemantics(
     managedBlocks,
     ambiguousManagedIds,
@@ -1913,22 +2360,27 @@ export function projectTikzAnalysisToGeometryTruth(
         )),
       ))
     )),
+    ...graphRelationsOf(input, elements),
     ...managed.relations,
   ];
-  const styles: GeometryStyle[] = elements.map((element) => ({
-    recordType: 'style',
-    id: `style:${element.stableId}`,
-    selector: { entityIds: [element.stableId] },
-    properties: styleProperties(element),
-    sourceBindingIds: [`binding:${element.stableId}`],
-  }));
+  const styles: GeometryStyle[] = elements.map((element) => {
+    const metadata = stylePresentationMetadata(input.analysis, element.stmtIndex);
+    return {
+      recordType: 'style',
+      id: `style:${element.stableId}`,
+      selector: { entityIds: [element.stableId] },
+      properties: styleProperties(element),
+      sourceBindingIds: [`binding:${element.stableId}`],
+      ...(metadata ? { metadata } : {}),
+    };
+  });
   const sourceBindings = [
     documentInsertionBindingOf(input, document),
     ...namedPathBindingsOf(
       input,
       document,
       managedBlocks,
-      ambiguousManagedIds,
+      managedWritePolicies,
     ),
     ...bindingsOf(
       input,
@@ -1936,13 +2388,14 @@ export function projectTikzAnalysisToGeometryTruth(
       points,
       elements,
       managedBlocks,
-      ambiguousManagedIds,
+      managedWritePolicies,
     ),
     ...managedBindingsOf(
       input,
       document,
       managedBlocks,
       ambiguousManagedIds,
+      managedWritePolicies,
       managed.targetsByBlock,
       managed.targetsByRecordBinding,
     ),
@@ -1990,6 +2443,7 @@ export function projectTikzAnalysisToGeometryTruth(
     metadata: {
       adapterId: TIKZ_SEMANTIC_ADAPTER_ID,
       adapterVersion: TIKZ_SEMANTIC_ADAPTER_VERSION,
+      pluginSetDigest: TIKZ_PLUGIN_SET_DIGEST,
       semanticCoverage: input.analysis.cst.coverage.semanticRatio,
       managedConstructionCount: managedBlocks.length,
       constraintDiagnosticsMode: 'structural-planning-only',
@@ -2003,19 +2457,81 @@ export function projectTikzAnalysisToGeometryTruth(
     },
     extensions: {
       'mathgeo.managed-constructions/v1':
-        managedConstructionSummaries(managedBlocks, ambiguousManagedIds),
+        managedConstructionSummaries(
+          managedBlocks,
+          ambiguousManagedIds,
+          managedWritePolicies,
+        ),
     },
+  };
+  const interactivePrimitives = [
+    ...points.map((point) => renderPointPrimitive(
+      point,
+      entitiesById.get(point.stableId) ?? pointEntity(point),
+      input.analysis,
+    )),
+    ...elements.map((element) => renderPrimitive(
+      element,
+      entitiesById.get(element.stableId) ?? elementEntity(element),
+      input.analysis,
+    )),
+  ];
+  // These identities are derived here, never accepted from a client. The
+  // kernel hash covers semantic meaning; the projection hash additionally
+  // covers source bindings, opaque preservation and renderer primitives.
+  const basis = {
+    ...input.basis,
+    kernelHash: hashSource(JSON.stringify({
+      schemaVersion: 'geometry-kernel-hash/v1',
+      adapterId: TIKZ_SEMANTIC_ADAPTER_ID,
+      adapterVersion: TIKZ_SEMANTIC_ADAPTER_VERSION,
+      pluginSetDigest: TIKZ_PLUGIN_SET_DIGEST,
+      entities: ir.entities,
+      constraints: ir.constraints,
+      relations: ir.relations,
+      styles: ir.styles,
+      extensions: ir.extensions,
+    })),
+    projectionHash: hashSource(JSON.stringify({
+      schemaVersion: 'geometry-projection-hash/v1',
+      adapterId: TIKZ_SEMANTIC_ADAPTER_ID,
+      adapterVersion: TIKZ_SEMANTIC_ADAPTER_VERSION,
+      pluginSetDigest: TIKZ_PLUGIN_SET_DIGEST,
+      sourceId: document.sourceId,
+      sourceHash: document.hash,
+      sourceBindings: sourceBindings.map((binding) => ({
+        id: binding.id,
+        kind: binding.kind,
+        role: binding.role,
+        targets: binding.targets,
+        writable: binding.writable,
+        range: binding.source.range,
+        sliceHash: binding.source.sliceHash,
+        metadata: binding.metadata,
+        ...('syntaxNodeType' in binding
+          ? { syntaxNodeType: binding.syntaxNodeType }
+          : {}),
+        ...('cstNodeType' in binding ? { cstNodeType: binding.cstNodeType } : {}),
+      })),
+      opaqueNodes: opaqueNodes.map((node) => ({
+        id: node.id,
+        impact: node.impact,
+        reason: node.reason,
+        range: node.source.range,
+      })),
+      primitives: interactivePrimitives,
+    })),
   };
   const semantic: SemanticTruth = {
     kind: 'semantic',
-    basis: input.basis,
+    basis,
     status: input.analysis.status,
     ir,
     diagnostics,
   };
   const construction: ConstructionTruth = {
     kind: 'construction',
-    basis: input.basis,
+    basis,
     status: input.analysis.status,
     sources: [document],
     bindings: sourceBindings,
@@ -2024,23 +2540,12 @@ export function projectTikzAnalysisToGeometryTruth(
   };
   const interactive: RenderingTruth = {
     kind: 'rendering',
-    basis: input.basis,
-    renderRevision: input.basis.revision,
+    basis,
+    renderRevision: basis.revision,
     rendererId: 'mathgeo.interactive-svg',
     target: 'interactive-svg',
     status: input.analysis.status,
-    primitives: [
-      ...points.map((point) => renderPointPrimitive(
-        point,
-        entitiesById.get(point.stableId) ?? pointEntity(point),
-        input.analysis,
-      )),
-      ...elements.map((element) => renderPrimitive(
-        element,
-        entitiesById.get(element.stableId) ?? elementEntity(element),
-        input.analysis,
-      )),
-    ],
+    primitives: interactivePrimitives,
     artifacts: [],
     diagnostics,
     metadata: {

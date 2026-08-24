@@ -15,6 +15,8 @@ import type {
 import type { GeometryProjection } from './projection';
 
 export const GEOMETRY_TRANSACTION_SCHEMA_VERSION = 'geometry-transaction/v1' as const;
+export const GEOMETRY_WORKSPACE_EDIT_SCHEMA_VERSION =
+  'geometry-workspace-edit/v1' as const;
 
 export type GeometryTransactionLifecycleState =
   | 'proposed'
@@ -41,6 +43,35 @@ export type GeometryTransactionOrigin =
   | 'external'
   | `plugin:${string}`
   | `integration:${string}`;
+
+export interface GeometryChangeAnnotation {
+  /** Short, user-facing summary suitable for a review card. */
+  label: string;
+  description?: string;
+  needsConfirmation?: boolean;
+  /** Canonical semantic IDs affected by this change; never aliases. */
+  semanticTargetIds?: readonly string[];
+}
+
+export interface GeometryOperationChangeAnnotation {
+  operationId: string;
+  annotationId: string;
+  /** One annotation per source patch, in patch order. */
+  patchAnnotationIds?: readonly string[];
+}
+
+/**
+ * Review metadata for an atomic Geometry transaction.
+ *
+ * Source edits remain in `operations`; this descriptor deliberately references
+ * them by ID/index so the review UI cannot become a second patch truth.
+ */
+export interface GeometryWorkspaceEdit {
+  schemaVersion: typeof GEOMETRY_WORKSPACE_EDIT_SCHEMA_VERSION;
+  failureHandling: 'atomic';
+  changeAnnotations: Readonly<Record<string, GeometryChangeAnnotation>>;
+  operationAnnotations: readonly GeometryOperationChangeAnnotation[];
+}
 
 export type GeometryPrecondition =
   | {
@@ -188,11 +219,14 @@ export interface GeometryTransactionRequest {
   expectedRevision: number;
   sourceHash: string;
   expectedKernelHash?: string;
+  /** Exact renderer/source-map projection identity used by typed authoring intents. */
+  expectedProjectionHash?: string;
   pluginSetDigest?: string;
   readSet: readonly GeometryResourceReference[];
   writeSet: readonly GeometryResourceReference[];
   preconditions?: readonly GeometryPrecondition[];
   operations: readonly GeometryOperation[];
+  workspaceEdit?: GeometryWorkspaceEdit;
   actorId?: string;
   correlationId?: string;
   metadata?: JsonObject;
@@ -203,6 +237,7 @@ export type GeometryConflictCode =
   | 'revision-mismatch'
   | 'source-hash-mismatch'
   | 'kernel-hash-mismatch'
+  | 'projection-hash-mismatch'
   | 'read-set-changed'
   | 'write-set-conflict'
   | 'plugin-set-mismatch'

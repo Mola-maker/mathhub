@@ -8,6 +8,8 @@ import type { SourceRange } from '../subset/ast';
 export type SelectionTarget =
   | {
     kind: 'entity';
+    /** Revision whose semantic/source projection produced this identity. */
+    sourceRevision: number;
     stableId: string;
     stmtIndex: number;
     entityKind: 'point' | 'element';
@@ -19,6 +21,8 @@ export type SelectionTarget =
   }
   | {
     kind: 'statement';
+    /** Revision whose statement/source map produced this identity. */
+    sourceRevision: number;
     stmtIndex: number;
     refs: readonly string[];
     semanticEntityId?: string;

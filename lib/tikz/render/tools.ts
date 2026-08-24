@@ -2,26 +2,27 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   applyTextPatch,
   applyTextPatches,
-  minimalTextPatch,
   type TextPatch,
 } from '../document/source-transaction';
 import {
-  insertBeforeTikzEndPatch,
   nextPointName,
   type AuthoringAnchor,
   type AuthoringElementKind,
 } from '../authoring/source-builder';
 import {
+  createConstructionIdentityAllocators,
+  createConstructionIdentitySnapshot,
+  type ConstructionIdentitySnapshot,
+} from '../authoring/construction-identity';
+import {
   CONSTRUCTION_TOOL_SPECS,
   constructionSpecRegistry,
+  createCatalogConstructionPlan,
   createPrimitiveConstructionPlan,
-  isPrimitiveConstructionKind,
   type ConstructionCategory,
   type ConstructionToolSpec,
 } from '../authoring/construction-catalog';
 import {
-  compileConstructionPlan,
-  compileSourceCircleAdoption,
   ConstructionPlanValidationError,
   type ConstructionPlan,
 } from '../authoring/construction-ir';
@@ -30,6 +31,7 @@ import {
   type ConstructionPreviewIR,
 } from '../authoring/preview-ir';
 import { qualifiedManagedEntityReference } from '../ir/persistent-entity-reference';
+import type { CanvasCircleAdoptionIntent } from '../ir/canvas-construction-batch-proposal';
 import type { SourceEditOrigin } from '../document/studio-document';
 import type { SelectionTarget } from '../authoring/selection-target';
 import {
@@ -40,8 +42,11 @@ import type { Pt } from '../semantics/calc-eval';
 import type { Scene } from '../semantics/scene';
 import type { SceneCircleDefinition } from '../semantics/scene';
 import type { SourceRange } from '../subset/ast';
+import {
+  sourceCoordinateForWorldPoint,
+  type TikzCoordinateTransform,
+} from '../subset/coordinate-transform';
 import type { DerivedDragResult } from '../solver/protocol';
-import { parseManagedConstructionBlocks } from '../semantics/managed-construction';
 import { shortcutForTool } from '../commands/default-commands';
 import { hitTestElement, hitTestPointHandle } from './hit-test';
 import { sceneToScreen, type Viewport } from './viewport';
@@ -56,6 +61,7 @@ export const AUTHORING_CIRCLE_HIT_TOLERANCE_PX = 18;
 
 export interface ToolElementHit {
   readonly kind: string;
+  readonly pointName?: string;
   readonly sourceStableId?: string;
   readonly semanticEntityId: string;
   readonly renderPrimitiveId?: string;
@@ -68,6 +74,8 @@ export interface ToolElementHit {
 
 export interface ToolCircleHit {
   readonly stableId: string;
+  readonly semanticEntityId: string;
+  readonly sourceBindingId: string;
   readonly stmtIndex: number;
   readonly sourceRange?: SourceRange;
   readonly refs: readonly string[];
@@ -86,15 +94,41 @@ export interface ToolContext {
   scene: Scene;
   viewport: Viewport;
   freePointRanges: Map<string, SourceRange>;
+  freePointTransforms?: Map<string, TikzCoordinateTransform>;
   applySourcePatches(
     patches: readonly TextPatch[],
     origin: SourceEditOrigin,
     expectedRevision?: number,
   ): boolean;
+  commitCanvasPointMove?(
+    sourceStableId: string,
+    pointName: string,
+    target: Pt,
+    expectedRevision: number,
+  ): { readonly handled: boolean; readonly committed: boolean; readonly message?: string };
+  commitCanvasDragPatches?(
+    mode: 'path-angle' | 'derived-coordinates' | 'selection-transform',
+    sourceStableId: string,
+    pointName: string,
+    patches: readonly TextPatch[],
+    expectedRevision: number,
+  ): { readonly handled: true; readonly committed: boolean; readonly message?: string };
+  commitCanvasConstructionBatch?(
+    plans: readonly ConstructionPlan[],
+    primaryConstructionId: string,
+    adoptions: readonly CanvasCircleAdoptionIntent[],
+    expectedRevision: number,
+  ): {
+    readonly handled: true;
+    readonly committed: boolean;
+    readonly message?: string;
+    readonly insertedRange?: { readonly start: number; readonly end: number };
+  };
   solveDerivedDrag?(
     pointName: string,
     target: Pt,
     sourceRevision: number,
+    signal?: AbortSignal,
   ): Promise<DerivedDragResult>;
   setSolverStatus?(status: string): void;
   /** Drag-derived source preview; creation uses ConstructionPreview instead. */
@@ -109,11 +143,21 @@ export interface ToolContext {
     tolerance: number,
   ): ToolCircleHit | null;
   setSelection(refs: string[], stmtIndex?: number | null): void;
+  selectionTargets?: readonly SelectionTarget[];
   setSelectionTargets?(targets: readonly SelectionTarget[]): void;
   setHoveredStmtIndex?(stmtIndex: number | null): void;
   setViewport(viewport: Viewport): void;
   toScenePoint(clientX: number, clientY: number): Pt;
   toClientPoint(scenePoint: Pt): Pt;
+  promoteInteraction?(
+    pointerId: number,
+    phase: Exclude<ToolInteractionPhase, 'idle'>,
+  ): void;
+  completeInteraction?(pointerId: number): void;
+  cancelInteraction?(
+    pointerId: number,
+    reason: 'stale-revision' | 'commit-rejected' | 'solver-failed',
+  ): void;
 }
 
 export interface Tool {
@@ -146,7 +190,9 @@ export interface ConstructionPreview {
 }
 
 interface DragState {
+  pointerId: number;
   mode: 'free' | 'derived' | 'path';
+  sourceStableId: string;
   pointName: string;
   baseCode: string;
   baseRevision: number;
@@ -158,11 +204,14 @@ interface DragState {
     angleRanges: readonly SourceRange[];
   };
   pendingPatches: TextPatch[];
+  latestTarget: Pt | null;
   solving: boolean;
   queuedTarget: Pt | null;
   requestSequence: number;
   activeRequestSequence: number;
   released: boolean;
+  /** Owns every coalesced Worker request for this one revision-bound drag. */
+  abortController: AbortController;
 }
 
 interface AuthoringState {
@@ -174,8 +223,7 @@ interface AuthoringState {
   anchors: AuthoringAnchor[];
   resultName: string | null;
   /** Identity snapshot for the revision-bound source used by this gesture. */
-  managedConstructionIds: ReadonlySet<string>;
-  managedReferenceMarkers: ReadonlySet<string>;
+  identitySnapshot: ConstructionIdentitySnapshot;
 }
 
 interface PanState {
@@ -184,31 +232,9 @@ interface PanState {
   viewport: Viewport;
 }
 
-interface ManagedIdentityCache {
-  readonly constructionIds: ReadonlySet<string>;
-  readonly referenceMarkers: ReadonlySet<string>;
-}
-
 interface ConstructionAllocators {
   readonly nextName: (prefix: string) => string;
   readonly nextConstructionId: (prefix: string) => string;
-}
-
-/** Cache identity lookups once per authoring revision, not once per pointer move. */
-function managedIdentityCache(source: string): ManagedIdentityCache {
-  const constructionIds = new Set(
-    parseManagedConstructionBlocks(source).map((block) => block.id),
-  );
-  const referenceMarkers = new Set<string>();
-  const referencePattern = /managed:([A-Za-z0-9:_.%-]+):/g;
-  let match: RegExpExecArray | null;
-  while ((match = referencePattern.exec(source))) {
-    const segments = match[1].split(':');
-    for (let count = 1; count <= segments.length; count += 1) {
-      referenceMarkers.add(`managed:${segments.slice(0, count).join(':')}:`);
-    }
-  }
-  return { constructionIds, referenceMarkers };
 }
 
 /**
@@ -217,47 +243,44 @@ function managedIdentityCache(source: string): ManagedIdentityCache {
  */
 function constructionAllocators(
   pointNames: Iterable<string>,
-  identity: ManagedIdentityCache,
+  source: string,
   previewOnly = false,
+  identitySnapshot?: ConstructionIdentitySnapshot,
 ): ConstructionAllocators {
-  const reservedNames = new Set(pointNames);
-  const reservedConstructionIds = new Set(identity.constructionIds);
-  const nextName = (prefix: string): string => {
-    const name = nextPointName(reservedNames, prefix);
-    reservedNames.add(name);
-    return name;
-  };
-  const nextConstructionId = (prefix: string): string => {
-    const candidatePrefix = previewOnly ? `preview-${prefix}` : prefix;
-    const referenced = (candidate: string): boolean => (
-      identity.referenceMarkers.has(`managed:${candidate}:`)
-    );
-    if (
-      !reservedConstructionIds.has(candidatePrefix)
-      && (previewOnly || !referenced(candidatePrefix))
-    ) {
-      reservedConstructionIds.add(candidatePrefix);
-      return candidatePrefix;
-    }
-    for (let index = 2; index < 10_000; index += 1) {
-      const candidate = `${candidatePrefix}-${index}`;
-      if (
-        !reservedConstructionIds.has(candidate)
-        && (previewOnly || !referenced(candidate))
-      ) {
-        reservedConstructionIds.add(candidate);
-        return candidate;
-      }
-    }
-    throw new RangeError(`鏃犳硶鍒嗛厤鏂扮殑鏋勯€犳爣璇嗭細${candidatePrefix}`);
-  };
-  return { nextName, nextConstructionId };
+  return createConstructionIdentityAllocators({
+    source,
+    pointNames,
+    previewOnly,
+    identitySnapshot,
+  });
 }
 
 export interface ToolInteractionSession {
   drag: DragState | null;
   authoring: AuthoringState | null;
   pan: PanState | null;
+}
+
+export type ToolInteractionPhase =
+  | 'idle'
+  | 'dragging'
+  | 'constructing'
+  | 'panning'
+  | 'committing';
+
+/**
+ * Project the mutable tool implementation state into the single Canvas
+ * interaction state machine. This is deliberately the only phase adapter:
+ * components must not infer lifecycle independently from tool ids or DOM
+ * events.
+ */
+export function toolInteractionPhase(
+  session: ToolInteractionSession,
+): ToolInteractionPhase {
+  if (session.drag) return session.drag.released ? 'committing' : 'dragging';
+  if (session.authoring) return 'constructing';
+  if (session.pan) return 'panning';
+  return 'idle';
 }
 
 export function createToolInteractionSession(): ToolInteractionSession {
@@ -272,6 +295,9 @@ export function cancelActiveToolInteraction(
   session: ToolInteractionSession,
   context?: ToolContext,
 ): void {
+  session.drag?.abortController.abort(
+    new DOMException('Canvas interaction cancelled', 'AbortError'),
+  );
   session.drag = null;
   session.authoring = null;
   session.pan = null;
@@ -338,6 +364,7 @@ function hitTestToolElement(
 
 function selectionTargetForElementHit(
   hit: ToolElementHit,
+  sourceRevision: number,
 ): SelectionTarget {
   const provenance = {
     semanticEntityId: hit.semanticEntityId,
@@ -348,14 +375,16 @@ function selectionTargetForElementHit(
   return hit.sourceStableId
     ? {
       kind: 'entity',
+      sourceRevision,
       stableId: hit.sourceStableId,
       stmtIndex: hit.stmtIndex,
-      entityKind: 'element',
+      entityKind: hit.kind === 'point' ? 'point' : 'element',
       refs: hit.refs,
       ...provenance,
     }
     : {
       kind: 'statement',
+      sourceRevision,
       stmtIndex: hit.stmtIndex,
       refs: hit.refs,
       ...provenance,
@@ -372,25 +401,60 @@ function hitTestCircle(
 }
 
 function clearDrag(context: ToolContext): void {
+  context.session.drag?.abortController.abort(
+    new DOMException('Canvas drag completed or cancelled', 'AbortError'),
+  );
   context.session.drag = null;
   context.previewPatch?.(null);
 }
 
 function commitDrag(state: DragState, context: ToolContext): void {
   let committed = true;
-  if (state.pendingPatches.length > 0) {
-    committed = context.applySourcePatches(
-      state.pendingPatches,
-      'canvas',
+  let failureMessage: string | undefined;
+  const managedMove = (
+    state.mode === 'free'
+    && state.latestTarget
+    && context.commitCanvasPointMove
+  )
+    ? context.commitCanvasPointMove(
+      state.sourceStableId,
+      state.pointName,
+      state.latestTarget,
       state.baseRevision,
-    );
+    )
+    : null;
+  const typedDrag = (
+    state.mode !== 'free'
+    && state.pendingPatches.length > 0
+    && context.commitCanvasDragPatches
+  )
+    ? context.commitCanvasDragPatches(
+      state.mode === 'path' ? 'path-angle' : 'derived-coordinates',
+      state.sourceStableId,
+      state.pointName,
+      state.pendingPatches,
+      state.baseRevision,
+    )
+    : null;
+  if (managedMove?.handled) {
+    committed = managedMove.committed;
+    failureMessage = managedMove.message;
+  } else if (typedDrag?.handled) {
+    committed = typedDrag.committed;
+    failureMessage = typedDrag.message;
+  } else if (state.pendingPatches.length > 0) {
+    committed = false;
+    failureMessage = '当前拖拽缺少可由 Broker 重放的 typed proposal，未写入源码。';
   }
   context.setSolverStatus?.(
     committed
       ? ''
-      : '画板在拖动期间已更新，本次拖动未提交；请基于最新图形重试',
+      : failureMessage
+        ?? '画板在拖动期间已更新，本次拖动未提交；请基于最新图形重试',
   );
   clearDrag(context);
+  if (committed) context.completeInteraction?.(state.pointerId);
+  else context.cancelInteraction?.(state.pointerId, 'commit-rejected');
 }
 
 function requestDerivedSolve(state: DragState, context: ToolContext, target: Pt): void {
@@ -405,7 +469,12 @@ function requestDerivedSolve(state: DragState, context: ToolContext, target: Pt)
   const requestSequence = ++state.requestSequence;
   state.activeRequestSequence = requestSequence;
   context.setSolverStatus?.(`正在保持约束拖动 ${state.pointName}…`);
-  void context.solveDerivedDrag(state.pointName, target, state.baseRevision)
+  void context.solveDerivedDrag(
+    state.pointName,
+    target,
+    state.baseRevision,
+    state.abortController.signal,
+  )
     .then((result) => {
       if (
         context.session.drag !== state
@@ -451,7 +520,10 @@ function requestDerivedSolve(state: DragState, context: ToolContext, target: Pt)
       context.setSolverStatus?.(
         error instanceof Error ? `约束求解失败：${error.message}` : '约束求解失败',
       );
-      if (state.released) clearDrag(context);
+      if (state.released) {
+        clearDrag(context);
+        context.cancelInteraction?.(state.pointerId, 'solver-failed');
+      }
     });
 }
 
@@ -504,6 +576,8 @@ function authoringAnchor(
       existing: true,
       circle: {
         stableId: circle.stableId,
+        semanticEntityId: circle.semanticEntityId,
+        sourceBindingId: circle.sourceBindingId,
         stmtIndex: circle.stmtIndex,
         sourceRange: circle.sourceRange,
         centerName,
@@ -563,30 +637,18 @@ function draftPreviewPlan(
     ...context.scene.points.keys(),
     ...anchors.map((anchor) => anchor.name),
   ];
-  const identity: ManagedIdentityCache = state
-    ? {
-      constructionIds: state.managedConstructionIds,
-      referenceMarkers: state.managedReferenceMarkers,
-    }
-    : { constructionIds: new Set(), referenceMarkers: new Set() };
-  const allocators = constructionAllocators(pointNames, identity, !state);
-  const plan = spec.plan?.({
+  const source = state?.baseCode ?? context.code;
+  const allocators = constructionAllocators(
+    pointNames,
+    source,
+    !state,
+    state?.identitySnapshot,
+  );
+  const plan = createCatalogConstructionPlan(spec, {
     anchors,
     nextName: allocators.nextName,
     nextConstructionId: allocators.nextConstructionId,
-  })
-    ?? (
-      spec.category === 'primitive'
-      && spec.kind
-      && isPrimitiveConstructionKind(spec.kind)
-        ? createPrimitiveConstructionPlan(spec.kind, {
-          anchors,
-          nextName: allocators.nextName,
-          nextConstructionId: allocators.nextConstructionId,
-        })
-        : undefined
-    );
-  if (!plan) return null;
+  });
   const points = new Map<string, Pt>();
   for (const [name, scenePoint] of context.scene.points) {
     const position = scenePoint.position;
@@ -680,6 +742,8 @@ function constructionPreview(
       ? {
         circle: {
           stableId: circleElement.stableId,
+          semanticEntityId: circleElement.semanticEntityId,
+          sourceBindingId: circleElement.sourceBindingId,
           stmtIndex: circleElement.stmtIndex,
           sourceRange: circleElement.sourceRange,
           centerName: circleElement.centerName,
@@ -726,33 +790,6 @@ function constructionPreview(
   });
 }
 
-function sourceRangeOverlapsManagedDirectiveRegion(
-  source: string,
-  range: { readonly start: number; readonly end: number },
-): boolean {
-  const directive = /^[ \t]*%[ \t]*@mathgeo[ \t]+(begin|end)\b[^\r\n]*(?:\r?\n|$)/gmi;
-  const openBegins: number[] = [];
-  const protectedRanges: Array<{ start: number; end: number }> = [];
-  let match: RegExpExecArray | null;
-  while ((match = directive.exec(source))) {
-    if (match[1].toLowerCase() === 'begin') {
-      openBegins.push(match.index);
-      continue;
-    }
-    const start = openBegins.pop();
-    protectedRanges.push({
-      start: start ?? match.index,
-      end: directive.lastIndex,
-    });
-  }
-  for (const start of openBegins) {
-    protectedRanges.push({ start, end: source.length });
-  }
-  return protectedRanges.some((protectedRange) => (
-    range.start < protectedRange.end && range.end > protectedRange.start
-  ));
-}
-
 function commitAuthoring(state: AuthoringState, context: ToolContext): void {
   // Creation uses the immutable ConstructionPreview overlay. Any source
   // preview belongs to the drag-only lane and must never leak into a commit.
@@ -767,22 +804,22 @@ function commitAuthoring(state: AuthoringState, context: ToolContext): void {
     ...context.scene.points.keys(),
     ...finalAnchors.map((anchor) => anchor.name),
   ];
-  const allocators = constructionAllocators(pointNames, {
-    constructionIds: state.managedConstructionIds,
-    referenceMarkers: state.managedReferenceMarkers,
-  });
+  const allocators = constructionAllocators(
+    pointNames,
+    state.baseCode,
+    false,
+    state.identitySnapshot,
+  );
   const nextName = allocators.nextName;
-  const managedBlocks = parseManagedConstructionBlocks(state.baseCode);
   const nextConstructionId = allocators.nextConstructionId;
   let custom: {
-    lines: readonly string[];
     selection: readonly string[];
     status: string;
   } | undefined;
+  let batchPlans: readonly ConstructionPlan[] = [];
   let outputSelection: readonly string[] = [];
   let constructionId: string | null = null;
-  const adoptionPatches: TextPatch[] = [];
-  const adoptionIds: string[] = [];
+  const adoptionIntents: CanvasCircleAdoptionIntent[] = [];
   try {
     const adoptedCircles = new Map<string, string>();
     finalAnchors = state.anchors.map((anchor) => {
@@ -810,46 +847,20 @@ function commitAuthoring(state: AuthoringState, context: ToolContext): void {
           message: 'raw circle cannot be adopted without its current source range',
         }]);
       }
-      const owningManagedBlock = managedBlocks.find((block) => (
-        range.start < block.range.end && range.end > block.range.start
-      ));
-      if (owningManagedBlock) {
-        throw new ConstructionPlanValidationError([{
-          path: 'circle.sourceRange',
-          message: `circle source is already inside managed block ${owningManagedBlock.id}; repair or recompile that block before reuse`,
-        }]);
-      }
-      if (sourceRangeOverlapsManagedDirectiveRegion(state.baseCode, range)) {
-        throw new ConstructionPlanValidationError([{
-          path: 'circle.sourceRange',
-          message: 'circle source is inside a malformed managed directive region; repair the source before reuse',
-        }]);
-      }
       const adoptionId = nextConstructionId('source-circle');
-      adoptionIds.push(adoptionId);
       const entityId = 'circle';
       const adoptedReference = qualifiedManagedEntityReference(
         adoptionId,
         entityId,
       );
-      const compiledAdoption = compileSourceCircleAdoption({
-        id: adoptionId,
-        entityId,
-        source: state.baseCode.slice(range.start, range.end),
-        circle: circle.definition.kind === 'center-through'
-          ? {
-            center: circle.definition.centerName,
-            through: circle.definition.throughName,
-          }
-          : {
-            center: circle.definition.centerName,
-            radius: circle.definition.radius,
-          },
-      });
-      adoptionPatches.push({
-        from: range.start,
-        to: range.end,
-        insert: compiledAdoption.lines.join('\n'),
+      adoptionIntents.push({
+        constructionId: adoptionId,
+        sourceEntityId: circle.semanticEntityId,
+        sourceBindingId: circle.sourceBindingId,
+        managedEntityId: entityId,
+        sourceStableId: circle.stableId,
+        range: { ...range },
+        definition: { ...circle.definition },
       });
       adoptedCircles.set(circle.stableId, adoptedReference);
       return {
@@ -863,14 +874,7 @@ function commitAuthoring(state: AuthoringState, context: ToolContext): void {
       nextName,
       nextConstructionId,
     };
-    const plan = state.spec.plan?.(planContext)
-      ?? (
-        state.spec.category === 'primitive'
-        && state.spec.kind
-        && isPrimitiveConstructionKind(state.spec.kind)
-          ? createPrimitiveConstructionPlan(state.spec.kind, planContext)
-          : undefined
-      );
+    const plan = createCatalogConstructionPlan(state.spec, planContext);
     outputSelection = plan?.outputs.map((output) => output.ref) ?? [];
     if (plan) {
       constructionId = plan.id;
@@ -883,16 +887,10 @@ function commitAuthoring(state: AuthoringState, context: ToolContext): void {
             nextName,
             nextConstructionId,
           }));
-      const compiledInputs = ownedInputPlans.map((inputPlan) => (
-        compileConstructionPlan(inputPlan)
-      ));
-      const compiled = compileConstructionPlan(plan);
+      batchPlans = [...ownedInputPlans, plan];
       custom = {
-        ...compiled,
-        lines: [
-          ...compiledInputs.flatMap((input) => input.lines),
-          ...compiled.lines,
-        ],
+        selection: [...plan.selection],
+        status: plan.status,
       };
     }
   } catch (error) {
@@ -911,61 +909,18 @@ function commitAuthoring(state: AuthoringState, context: ToolContext): void {
     cancelActiveToolInteraction(context.session, context);
     return;
   }
-  if (
-    custom.lines.length < 2
-    || custom.lines[custom.lines.length - 1] !== '% @mathgeo end'
-  ) {
-    context.setSolverStatus?.(
-      '构造编译器返回了不完整的 managed block，事务已拒绝',
-    );
+  if (!constructionId || batchPlans.length === 0 || !context.commitCanvasConstructionBatch) {
+    context.setSolverStatus?.('当前画板缺少语义构造事务能力，本次构造已拒绝写入');
     cancelActiveToolInteraction(context.session, context);
     return;
   }
-  const patch = insertBeforeTikzEndPatch(state.baseCode, custom.lines);
-  const sourcePatches = [...adoptionPatches, patch];
-  const prospectiveSource = applyTextPatches(state.baseCode, sourcePatches);
-  const prospectiveBlocks = parseManagedConstructionBlocks(prospectiveSource);
-  const prospectiveBlock = constructionId
-    ? prospectiveBlocks.find((block) => block.id === constructionId)
-    : null;
-  const prospectiveAdoptionsAreValid = adoptionIds.every((adoptionId) => {
-    const matches = prospectiveBlocks.filter((block) => block.id === adoptionId);
-    return (
-      matches.length === 1
-      && matches[0].metadataStatus === 'valid'
-      && matches[0].integrityStatus === 'valid'
-    );
-  });
-  if (
-    !prospectiveBlock
-    || prospectiveBlock.metadataStatus !== 'valid'
-    || prospectiveBlock.integrityStatus !== 'valid'
-    || !prospectiveAdoptionsAreValid
-  ) {
-    context.setSolverStatus?.(
-      '构造事务无法形成完整且指纹有效的 managed block，已拒绝写入',
-    );
-    cancelActiveToolInteraction(context.session, context);
-    return;
-  }
-  // CodeMirror and the source broker both accept multi-change transactions,
-  // but an adoption replacement may end exactly where the dependent block is
-  // inserted. Collapse that boundary-touching set to one minimal source patch
-  // so neither editor change ordering nor UTF-16 range association can split
-  // the managed block.
-  const transactionPatches = adoptionPatches.length === 0
-    ? [patch]
-    : [
-      minimalTextPatch(
-        state.baseCode,
-        prospectiveSource,
-      ),
-    ].filter((value): value is TextPatch => value !== null);
-  const committed = context.applySourcePatches(
-    transactionPatches,
-    'canvas',
+  const result = context.commitCanvasConstructionBatch(
+    batchPlans,
+    constructionId,
+    adoptionIntents,
     state.baseRevision,
   );
+  const committed = result.committed;
   if (committed) {
     const displayRefs = custom.selection.length > 0
       ? [...custom.selection]
@@ -974,23 +929,11 @@ function commitAuthoring(state: AuthoringState, context: ToolContext): void {
         : state.resultName
           ? [state.resultName]
           : finalAnchors.map((anchor) => anchor.name);
-    if (context.setSelectionTargets) {
-      const mappedPatchStart = patch.from + adoptionPatches.reduce(
-        (delta, adoptionPatch) => (
-          adoptionPatch.from <= patch.from
-            ? delta + adoptionPatch.insert.length
-              - (adoptionPatch.to - adoptionPatch.from)
-            : delta
-        ),
-        0,
-      );
+    if (context.setSelectionTargets && result.insertedRange) {
       context.setSelectionTargets([{
         kind: 'source-block',
         sourceRevision: state.baseRevision + 1,
-        range: {
-          start: mappedPatchStart,
-          end: mappedPatchStart + patch.insert.length,
-        },
+        range: result.insertedRange,
         refs: displayRefs,
       }]);
     } else {
@@ -1006,7 +949,8 @@ function commitAuthoring(state: AuthoringState, context: ToolContext): void {
     );
   } else {
     context.setSolverStatus?.(
-      '画板在构造期间已更新，本次构造未提交；请基于最新图形重试',
+      result.message
+        ?? '画板在构造期间已更新，本次构造未提交；请基于最新图形重试',
     );
   }
   context.session.authoring = null;
@@ -1067,7 +1011,7 @@ function creationTool(spec: ConstructionToolSpec): Tool {
         || context.session.authoring.toolId !== spec.id
         || context.session.authoring.baseRevision !== context.revision
       ) {
-        const identityCache = managedIdentityCache(context.code);
+        const identitySnapshot = createConstructionIdentitySnapshot(context.code);
         context.session.authoring = {
           toolId: spec.id,
           spec,
@@ -1081,8 +1025,7 @@ function creationTool(spec: ConstructionToolSpec): Tool {
               spec.resultPrefix,
             )
             : null,
-          managedConstructionIds: identityCache.constructionIds,
-          managedReferenceMarkers: identityCache.referenceMarkers,
+          identitySnapshot,
         };
       }
       const state = context.session.authoring;
@@ -1208,37 +1151,75 @@ export const selectTool: Tool = {
   shortcut: shortcutForTool('select'),
   cursor: 'default',
   onPointerDown(event, context) {
+    const multiple = event.shiftKey || event.ctrlKey || event.metaKey;
+    const selectTarget = (target: SelectionTarget) => {
+      if (!context.setSelectionTargets) return false;
+      if (!multiple) {
+        context.setSelectionTargets([target]);
+        return true;
+      }
+      const current = context.selectionTargets ?? [];
+      const identityKey = (candidate: SelectionTarget) => candidate.kind === 'source-block'
+        ? `source:${candidate.range.start}:${candidate.range.end}`
+        : candidate.kind === 'pending-ref'
+          ? `pending:${candidate.ref}`
+          : candidate.kind === 'entity'
+            ? `entity:${candidate.semanticEntityId ?? candidate.stableId}`
+            : `statement:${candidate.semanticEntityId ?? candidate.stmtIndex}`;
+      const key = target.kind === 'source-block'
+        ? `source:${target.range.start}:${target.range.end}`
+        : target.kind === 'pending-ref'
+          ? `pending:${target.ref}`
+          : identityKey(target);
+      context.setSelectionTargets(
+        current.some((candidate) => identityKey(candidate) === key)
+          ? current.filter((candidate) => identityKey(candidate) !== key)
+          : [...current, target],
+      );
+      return true;
+    };
     const screen = localScreen(event, context);
     const elementHit = hitTestToolElement(screen, context, 8);
     if (elementHit?.kind === 'label') {
       if (context.setSelectionTargets) {
-        context.setSelectionTargets([
-          selectionTargetForElementHit(elementHit),
-        ]);
+        selectTarget(selectionTargetForElementHit(elementHit, context.scene.sourceRevision));
       } else {
         context.setSelection([...elementHit.refs], elementHit.stmtIndex);
       }
       return;
     }
 
-    const pointName = hitTestPointHandle(screen, context.scene, context.viewport, 12);
+    const pointName = elementHit?.kind === 'point' && elementHit.pointName
+      ? elementHit.pointName
+      : hitTestPointHandle(screen, context.scene, context.viewport, 12);
     if (
       pointName
       && !preferAngleMarkOverPoint(elementHit, pointName, screen, context)
     ) {
       const point = context.scene.points.get(pointName);
       if (point && context.setSelectionTargets) {
-        context.setSelectionTargets([{
-          kind: 'entity',
-          stableId: point.stableId,
-          stmtIndex: point.stmtIndex,
-          entityKind: 'point',
-          refs: [point.name],
-        }]);
+        const pointTarget = elementHit?.kind === 'point'
+          ? selectionTargetForElementHit({
+            ...elementHit,
+            refs: elementHit.refs.length > 0
+              ? elementHit.refs
+              : [point.name],
+          }, context.scene.sourceRevision)
+          : {
+            kind: 'entity' as const,
+            sourceRevision: context.scene.sourceRevision,
+            stableId: `point:${point.name}`,
+            stmtIndex: point.stmtIndex,
+            entityKind: 'point' as const,
+            refs: [point.name],
+            semanticEntityId: `point:${point.name}`,
+            sourceBindingIds: [`binding:point:${point.name}`],
+          };
+        selectTarget(pointTarget);
       } else {
         context.setSelection([pointName], point?.stmtIndex ?? null);
       }
-      if (context.readOnly) return;
+      if (context.readOnly || multiple) return;
       const range = context.freePointRanges.get(pointName);
       if (
         range
@@ -1246,11 +1227,17 @@ export const selectTool: Tool = {
         || (point && !point.free && context.solveDerivedDrag)
       ) {
         context.session.drag = {
+          pointerId: event.pointerId,
           mode: range
             ? 'free'
             : point?.constraint
               ? 'path'
               : 'derived',
+          sourceStableId: elementHit?.kind === 'point'
+            ? elementHit.sourceStableId ?? elementHit.semanticEntityId
+            // A free-point range can be present without a resolved scene point,
+            // so key off the hit-tested name rather than point.name.
+            : `point:${pointName}`,
           pointName,
           baseCode: context.code,
           baseRevision: context.revision,
@@ -1264,11 +1251,13 @@ export const selectTool: Tool = {
             }
             : undefined,
           pendingPatches: [],
+          latestTarget: null,
           solving: false,
           queuedTarget: null,
           requestSequence: 0,
           activeRequestSequence: 0,
           released: false,
+          abortController: new AbortController(),
         };
         event.currentTarget?.setPointerCapture?.(event.pointerId);
         event.preventDefault();
@@ -1277,9 +1266,7 @@ export const selectTool: Tool = {
     }
 
     if (elementHit && context.setSelectionTargets) {
-      context.setSelectionTargets([
-        selectionTargetForElementHit(elementHit),
-      ]);
+      selectTarget(selectionTargetForElementHit(elementHit, context.scene.sourceRevision));
     } else if (elementHit) {
       context.setSelection([...elementHit.refs], elementHit.stmtIndex);
     } else {
@@ -1311,11 +1298,20 @@ export const selectTool: Tool = {
         '画板在拖动期间已更新，已取消过期预览',
       );
       clearDrag(context);
+      context.cancelInteraction?.(drag.pointerId, 'stale-revision');
       return;
     }
     const next = context.toScenePoint(event.clientX, event.clientY);
+    drag.latestTarget = next;
     if (drag.mode === 'free' && drag.range) {
-      const patch = coordinateLiteralPatch(drag.baseCode, drag.range, next);
+      const patch = coordinateLiteralPatch(
+        drag.baseCode,
+        drag.range,
+        sourceCoordinateForWorldPoint(
+          context.freePointTransforms?.get(drag.pointName),
+          next,
+        ),
+      );
       drag.pendingPatches = [patch];
       context.previewPatch?.(applyTextPatch(drag.baseCode, patch));
     } else if (
@@ -1364,6 +1360,7 @@ export const selectTool: Tool = {
       commitDrag(state, context);
     } else {
       state.released = true;
+      context.promoteInteraction?.(state.pointerId, 'committing');
       requestDerivedSolve(
         state,
         context,

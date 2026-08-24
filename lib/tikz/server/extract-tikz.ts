@@ -17,10 +17,25 @@ const PREVIEW_ONLY_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
   { label: 'controls', pattern: /\.\.\s*controls\b/ },
 ];
 
+const TIKZ_TEX_COMMAND_PATTERN = /\\(?:draw|path|fill(?:draw)?|shade(?:draw)?|clip|node|coordinate|foreach|matrix|graph|tikzset|usetikzlibrary|useasboundingbox|pgf(?:keys|math)\w*|newcommand|renewcommand|documentclass|usepackage|frac|sqrt|text|mathrm|mathbf|begin|end)\b/iu;
+
+function containsTikzOrTexCommand(value: string): boolean {
+  return TIKZ_TEX_COMMAND_PATTERN.test(value)
+    || /\\begin\s*\{\s*tikzpicture\s*\}/iu.test(value)
+    || /\\end\s*\{\s*tikzpicture\s*\}/iu.test(value);
+}
+
 export function extractTikzBlock(text: string): string | null {
   const fenced = /```(?:tikz|latex|tex)\s*\r?\n([\s\S]*?)```/i.exec(text);
   if (fenced) return fenced[1].trim();
-  const bare = /\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\}/.exec(text);
+  // A provider occasionally omits the language label. Treat only a fenced
+  // block containing an actual TikZ/TeX command as a code artifact; ordinary
+  // Markdown fences remain prose and are never promoted to source.
+  const plainFence = /```[ \t]*\r?\n([\s\S]*?)```/g;
+  for (const match of text.matchAll(plainFence)) {
+    if (containsTikzOrTexCommand(match[1] ?? '')) return (match[1] ?? '').trim();
+  }
+  const bare = /\\begin\s*\{\s*tikzpicture\s*\}[\s\S]*?\\end\s*\{\s*tikzpicture\s*\}/iu.exec(text);
   return bare ? bare[0] : null;
 }
 

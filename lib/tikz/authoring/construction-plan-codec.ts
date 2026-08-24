@@ -1,5 +1,6 @@
 import {
   compileConstructionPlan,
+  compileConstructionWriterArtifact,
   validateConstructionPlan,
   type CircleConstructionReference,
   type ConstructionConstraint,
@@ -14,16 +15,38 @@ import {
   type PrimitiveKind,
 } from './construction-ir';
 import {
-  MANAGED_CONSTRUCTION_SCHEMA_VERSION,
+  MANAGED_CONSTRUCTION_SCHEMA_V2,
+  MANAGED_CONSTRUCTION_SCHEMA_V3,
   parseManagedConstructionBlocks,
   type ManagedConstructionBlock,
 } from '../semantics/managed-construction';
+import {
+  hydrateManagedPresentation,
+  managedPresentationEnvelopeMatches,
+  type ManagedPresentationIR,
+} from './managed-presentation';
+import { compileConstructionPlanV3 } from './construction-ir-v3';
+import {
+  managedConstructionV3OutsideSlotsMatches,
+  readManagedConstructionV3Envelope,
+  validateManagedConstructionV3Artifact,
+} from '../semantics/managed-construction-v3';
+import { validateConstructionPlanSemanticFootprint } from './construction-plan-footprint';
+
+/**
+ * Compatibility identity for the managed construction decoder/recovery ABI.
+ * Include this in semantic projection digests so an old CDN client cannot
+ * present a proposal created under different writer-slot rules as current.
+ */
+export const CONSTRUCTION_PLAN_CODEC_ABI_VERSION =
+  'construction-plan-codec/v3' as const;
 
 /**
  * Schema-v2 stores the source-relevant semantic graph, but intentionally does
- * not persist ephemeral authoring feedback (`status` and `selection`).  A
- * recovered plan therefore normalizes those two fields while proving every
- * source-relevant byte by recompiling the complete managed block.
+ * not persist ephemeral authoring feedback (`status` and `selection`). A
+ * recovered plan therefore normalizes those fields and proves either complete
+ * canonical writer output or a lossless, writer-slot-owned presentation
+ * projection for the currently supported primitive vertical slice.
  */
 export type CompactCanonicalConstructionPlan = ConstructionPlan extends infer Plan
   ? Plan extends ConstructionPlan
@@ -45,6 +68,7 @@ export type ConstructionPlanCodecIssueCode =
   | 'insufficient-plan-data'
   | 'invalid-recovered-plan'
   | 'unsafe-writer-surface'
+  | 'invalid-writer-envelope'
   | 'non-canonical-source';
 
 export type ConstructionPlanWriterSafetyIssueCode =
@@ -75,6 +99,8 @@ export interface DecodedManagedConstructionPlan {
   readonly plan: ConstructionPlan;
   /** Source-relevant plan projection suitable for a compact AI context. */
   readonly compactPlan: CompactCanonicalConstructionPlan;
+  /** Proven revision-local presentation for supported writer slots. */
+  readonly presentation?: ManagedPresentationIR;
 }
 
 export interface RejectedManagedConstructionPlan {
@@ -87,10 +113,20 @@ export type ManagedConstructionPlanDecodeResult =
   | DecodedManagedConstructionPlan
   | RejectedManagedConstructionPlan;
 
+/**
+ * Selects the union members that can carry `kind`. Plain `Extract` collapses to
+ * `never` for members declared with a grouped discriminant such as
+ * `kind: 'segment' | 'vector' | 'line' | 'ray'`, because that member is not
+ * assignable to `{ kind: 'line' }`.
+ */
+type RecordWithKind<T, K> = T extends { kind: infer Discriminant }
+  ? K extends Discriminant ? T : never
+  : never;
+
 type ConstraintKind = ConstructionConstraint['kind'];
-type ConstraintOf<K extends ConstraintKind> = Extract<ConstructionConstraint, { kind: K }>;
+type ConstraintOf<K extends ConstraintKind> = RecordWithKind<ConstructionConstraint, K>;
 type EntityKind = ConstructionEntity['kind'];
-type EntityOf<K extends EntityKind> = Extract<ConstructionEntity, { kind: K }>;
+type EntityOf<K extends EntityKind> = RecordWithKind<ConstructionEntity, K>;
 
 const PLAN_KINDS = new Set<ConstructionPlanKind>([
   'primitive',
@@ -103,6 +139,9 @@ const PLAN_KINDS = new Set<ConstructionPlanKind>([
   'perpendicular-bisector',
   'angle-bisector',
   'circumcircle',
+  'nine-point-circle',
+  'simson-line',
+  'fermat-point',
   'tangent-at-point',
   'reflect-point',
   'reflect-line',
@@ -364,6 +403,7 @@ function safeWriterConstraint(
         return [constraint.point, constraint.line, constraint.circle, constraint.excludePoint];
       case 'cyclic':
       case 'complete-quadrilateral':
+      case 'collinear':
         return constraint.points;
     }
   })();
@@ -552,6 +592,40 @@ export function validateConstructionPlanWriterSafety(
       break;
     case 'circumcircle':
       names([['a', plan.a], ['b', plan.b], ['c', plan.c], ['center', plan.center], ['circle', plan.circle]]);
+      break;
+    case 'nine-point-circle':
+      names([
+        ['a', plan.a], ['b', plan.b], ['c', plan.c],
+        ['midpointBC', plan.midpointBC], ['midpointCA', plan.midpointCA], ['midpointAB', plan.midpointAB],
+        ['footA', plan.footA], ['footB', plan.footB], ['footC', plan.footC],
+        ['orthocenter', plan.orthocenter],
+        ['vertexMidpointA', plan.vertexMidpointA],
+        ['vertexMidpointB', plan.vertexMidpointB],
+        ['vertexMidpointC', plan.vertexMidpointC],
+        ['center', plan.center], ['circle', plan.circle],
+      ]);
+      break;
+    case 'simson-line':
+      names([
+        ['a', plan.a], ['b', plan.b], ['c', plan.c],
+        ['center', plan.center], ['circle', plan.circle], ['point', plan.point],
+        ['footAB', plan.footAB], ['footBC', plan.footBC], ['footCA', plan.footCA],
+        ['line', plan.line],
+      ]);
+      safeWriterScalar(plan.angleDegrees, 'angleDegrees', issues);
+      break;
+    case 'fermat-point':
+      names([
+        ['a', plan.a], ['b', plan.b], ['c', plan.c],
+        ['equilateralAB', plan.equilateralAB], ['equilateralAC', plan.equilateralAC],
+        ['torricelli', plan.torricelli], ['result', plan.result],
+        ['line1', plan.line1], ['line2', plan.line2],
+        ['triangleAB', plan.triangleAB], ['triangleAC', plan.triangleAC],
+        ['rayA', plan.rayA], ['rayB', plan.rayB], ['rayC', plan.rayC],
+        ['resultSource', plan.resultSource],
+      ]);
+      safeWriterScalar(plan.rotationABDegrees, 'rotationABDegrees', issues);
+      safeWriterScalar(plan.rotationACDegrees, 'rotationACDegrees', issues);
       break;
     case 'tangent-at-point':
       safeWriterCircleReference(plan.circle, 'circle', issues);
@@ -1068,6 +1142,158 @@ function rectanglePlan(context: DecodeContext): Record<string, unknown> | undefi
   };
 }
 
+function ninePointCirclePlan(context: DecodeContext): Record<string, unknown> | undefined {
+  const headerInputs = headerValues(context, 'inputs', 3);
+  const headerOutputs = headerValues(context, 'outputs', 12);
+  if (!headerInputs || !headerOutputs) return undefined;
+  const [
+    midpointBC, midpointCA, midpointAB,
+    footA, footB, footC,
+    orthocenter,
+    vertexMidpointA, vertexMidpointB, vertexMidpointC,
+    center, circle,
+  ] = headerOutputs;
+  const circleRecord = constraint(context, 'circle-through-three-points');
+  if (!circleRecord) return undefined;
+  semanticMismatch(
+    context,
+    'constraints.circle-through-three-points',
+    [...circleRecord.points, circleRecord.center, circleRecord.circle],
+    [midpointBC, midpointCA, midpointAB, center, circle],
+  );
+  return {
+    a: headerInputs[0], b: headerInputs[1], c: headerInputs[2],
+    midpointBC, midpointCA, midpointAB,
+    footA, footB, footC, orthocenter,
+    vertexMidpointA, vertexMidpointB, vertexMidpointC,
+    center, circle,
+  };
+}
+
+function fermatPointPlan(context: DecodeContext): Record<string, unknown> | undefined {
+  const headerInputs = headerValues(context, 'inputs', 3);
+  const headerOutputs = headerValues(context, 'outputs', 8);
+  if (!headerInputs || !headerOutputs) return undefined;
+  const [a, b, c] = headerInputs;
+  const [equilateralAB, equilateralAC, result, triangleAB, triangleAC, rayA, rayB, rayC] = headerOutputs;
+  const rotations = context.constraints.filter(
+    (candidate): candidate is ConstraintOf<'rotation'> => candidate.kind === 'rotation',
+  );
+  const rotationAB = uniqueMatch(
+    context,
+    rotations.filter((candidate) => candidate.center === a && candidate.source === b && candidate.result === equilateralAB),
+    'constraints.rotationAB',
+    'AB equilateral rotation constraint',
+  );
+  const rotationAC = uniqueMatch(
+    context,
+    rotations.filter((candidate) => candidate.center === a && candidate.source === c && candidate.result === equilateralAC),
+    'constraints.rotationAC',
+    'AC equilateral rotation constraint',
+  );
+  const intersection = constraint(context, 'line-intersection');
+  const branch = uniqueMatch(
+    context,
+    context.constraints.filter((candidate): candidate is ConstraintOf<'midpoint'> => (
+      candidate.kind === 'midpoint' && candidate.point === result && candidate.a === candidate.b
+    )),
+    'constraints.branch',
+    'Fermat branch alias constraint',
+  );
+  if (!rotationAB || !rotationAC || !intersection || !branch) return undefined;
+  const line1 = entity(context, 'line', (candidate) => candidate.name === intersection.line1, 'entities.line1', 'first Fermat construction line');
+  const line2 = entity(context, 'line', (candidate) => candidate.name === intersection.line2, 'entities.line2', 'second Fermat construction line');
+  if (!line1 || !line2) return undefined;
+  semanticMismatch(context, 'entities.line1', [line1.from, line1.to], [c, equilateralAB]);
+  semanticMismatch(context, 'entities.line2', [line2.from, line2.to], [b, equilateralAC]);
+  return {
+    a, b, c,
+    equilateralAB, equilateralAC,
+    torricelli: intersection.point,
+    result,
+    line1: line1.name,
+    line2: line2.name,
+    triangleAB,
+    triangleAC,
+    rayA,
+    rayB,
+    rayC,
+    rotationABDegrees: rotationAB.angleDegrees,
+    rotationACDegrees: rotationAC.angleDegrees,
+    resultSource: branch.a,
+  };
+}
+
+function simsonLinePlan(context: DecodeContext): Record<string, unknown> | undefined {
+  const headerInputs = headerValues(context, 'inputs', 3);
+  const headerOutputs = headerValues(context, 'outputs', 7);
+  if (!headerInputs || !headerOutputs) return undefined;
+  const [a, b, c] = headerInputs;
+  const [center, circle, point, footAB, footBC, footCA, line] = headerOutputs;
+  const circleRecord = constraint(context, 'circle-through-three-points');
+  const rotation = uniqueMatch(
+    context,
+    context.constraints.filter((candidate): candidate is ConstraintOf<'rotation'> => (
+      candidate.kind === 'rotation'
+      && candidate.source === a
+      && candidate.center === center
+      && candidate.result === point
+    )),
+    'constraints.rotation',
+    'Simson circle-point rotation constraint',
+  );
+  const collinear = constraint(context, 'collinear');
+  const onCircle = uniqueMatch(
+    context,
+    context.constraints.filter((candidate): candidate is ConstraintOf<'on-circle'> => (
+      candidate.kind === 'on-circle'
+      && candidate.point === point
+      && candidate.circle === circle
+    )),
+    'constraints.on-circle',
+    'Simson source point circle constraint',
+  );
+  const footConstraint = (
+    result: string,
+    lineStart: string,
+    lineEnd: string,
+    path: string,
+  ): ConstraintOf<'perpendicular-foot'> | undefined => uniqueMatch(
+    context,
+    context.constraints.filter((candidate): candidate is ConstraintOf<'perpendicular-foot'> => (
+      candidate.kind === 'perpendicular-foot'
+      && candidate.point === point
+      && candidate.result === result
+      && candidate.lineStart === lineStart
+      && candidate.lineEnd === lineEnd
+    )),
+    path,
+    `Simson perpendicular foot ${result}`,
+  );
+  const perpendicularAB = footConstraint(footAB, a, b, 'constraints.footAB');
+  const perpendicularBC = footConstraint(footBC, b, c, 'constraints.footBC');
+  const perpendicularCA = footConstraint(footCA, c, a, 'constraints.footCA');
+  const lineEntity = entity(
+    context,
+    'line',
+    (candidate) => candidate.name === line,
+    'entities.line',
+    'Simson line entity',
+  );
+  if (
+    !circleRecord || !rotation || !onCircle || !collinear
+    || !perpendicularAB || !perpendicularBC || !perpendicularCA || !lineEntity
+  ) return undefined;
+  semanticMismatch(context, 'constraints.circle.points', circleRecord.points, [a, b, c]);
+  semanticMismatch(context, 'constraints.circle.outputs', [circleRecord.center, circleRecord.circle], [center, circle]);
+  semanticMismatch(context, 'constraints.collinear.points', collinear.points, [footAB, footBC, footCA]);
+  semanticMismatch(context, 'entities.line.endpoints', [lineEntity.from, lineEntity.to], [footAB, footCA]);
+  return {
+    a, b, c, center, circle, point, footAB, footBC, footCA, line,
+    angleDegrees: rotation.angleDegrees,
+  };
+}
+
 function cyclicPlan(context: DecodeContext): Record<string, unknown> | undefined {
   const headerInputs = headerValues(context, 'inputs', 4);
   if (!headerInputs) return undefined;
@@ -1221,6 +1447,12 @@ function recoverDefinition(
     case 'homothety-2':
     case 'inversion-point':
       return directConstraintPlan(context, kind);
+    case 'nine-point-circle':
+      return ninePointCirclePlan(context);
+    case 'simson-line':
+      return simsonLinePlan(context);
+    case 'fermat-point':
+      return fermatPointPlan(context);
     case 'parallel-line':
     case 'perpendicular-line':
       return parallelPlan(context, kind);
@@ -1279,11 +1511,40 @@ function currentBlock(
   return matches.length === 1 ? matches[0] : undefined;
 }
 
-function compiledBlockText(plan: ConstructionPlan, currentText: string): string {
-  const lineEnding = currentText.includes('\r\n') ? '\r\n' : '\n';
+/**
+ * The envelope's own line ending, read from the header and record lines.
+ *
+ * Inferring it from the whole block would let a CRLF inside the writer-slot
+ * body — a legitimate presentation detail, e.g. a comment inside an option
+ * list — rewrite the canonical header and record lines as CRLF. The envelope
+ * comparison would then reject bytes that never changed.
+ */
+function envelopeLineEnding(envelopeText: string): '\n' | '\r\n' {
+  return envelopeText.includes('\r\n') ? '\r\n' : '\n';
+}
+
+function compiledBlockText(
+  plan: ConstructionPlan,
+  currentText: string,
+  envelopeText: string,
+): string {
+  const lineEnding = envelopeLineEnding(envelopeText);
   const hasTrailingLineEnding = currentText.endsWith('\r\n') || currentText.endsWith('\n');
   return compileConstructionPlan(plan).lines.join(lineEnding)
     + (hasTrailingLineEnding ? lineEnding : '');
+}
+
+function compiledV3BlockText(
+  plan: ConstructionPlan,
+  currentText: string,
+  envelopeText: string,
+): string {
+  const lineEnding = envelopeLineEnding(envelopeText);
+  const hasTrailingLineEnding = currentText.endsWith('\r\n') || currentText.endsWith('\n');
+  const compiled = compileConstructionPlanV3(plan, lineEnding).source;
+  return hasTrailingLineEnding
+    ? compiled
+    : compiled.slice(0, -lineEnding.length);
 }
 
 export function compactCanonicalConstructionPlan(
@@ -1299,12 +1560,13 @@ export function compactCanonicalConstructionPlan(
 }
 
 /**
- * Recover a canonical ConstructionPlan from one current schema-v2 block.
+ * Recover a canonical ConstructionPlan from one current schema-v2/v3 block.
  *
  * This is a proof-producing decoder rather than a best-effort parser:
  * metadata and integrity must be valid, plan-specific fields must have one
  * semantic derivation, the reconstructed plan must validate, and its complete
- * canonical block must be byte-identical to the current source slice. Any
+ * canonical block must be byte-identical to the current source slice, unless
+ * a writer-slot presentation hydrator proves the difference is lossless. Any
  * source-adopted, styled, hand-diverged, ambiguous, or under-specified block
  * fails closed with typed issues.
  */
@@ -1325,12 +1587,15 @@ export function decodeManagedConstructionPlan(
     };
   }
   const context = recordsContext(block);
-  if (block.schemaVersion !== MANAGED_CONSTRUCTION_SCHEMA_VERSION) {
+  if (
+    block.schemaVersion !== MANAGED_CONSTRUCTION_SCHEMA_V2
+    && block.schemaVersion !== MANAGED_CONSTRUCTION_SCHEMA_V3
+  ) {
     issue(
       context,
       'unsupported-schema',
       'schemaVersion',
-      `Expected schema-v2, found ${String(block.schemaVersion)}.`,
+      `Expected schema-v2 or schema-v3, found ${String(block.schemaVersion)}.`,
     );
   }
   if (block.metadataStatus !== 'valid') {
@@ -1402,6 +1667,18 @@ export function decodeManagedConstructionPlan(
     };
   }
   const plan = candidate as unknown as ConstructionPlan;
+  const footprintIssues = validateConstructionPlanSemanticFootprint(plan);
+  if (footprintIssues.length > 0) {
+    return {
+      ok: false,
+      block,
+      issues: footprintIssues.map((footprintIssue) => ({
+        code: 'invalid-recovered-plan' as const,
+        path: footprintIssue.path,
+        message: footprintIssue.message,
+      })),
+    };
+  }
   const writerSafetyIssues = validateConstructionPlanWriterSafety(plan);
   if (writerSafetyIssues.length > 0) {
     return {
@@ -1415,9 +1692,15 @@ export function decodeManagedConstructionPlan(
     };
   }
   const currentText = source.slice(block.range.start, block.range.end);
+  // Header, records and end marker — the block minus its TikZ body. The body is
+  // writer-slot/presentation territory and must not dictate envelope layout.
+  const envelopeText = source.slice(block.range.start, block.tikzBodyRange.start)
+    + source.slice(block.tikzBodyRange.end, block.range.end);
   let compiled: string;
   try {
-    compiled = compiledBlockText(plan, currentText);
+    compiled = block.schemaVersion === MANAGED_CONSTRUCTION_SCHEMA_V3
+      ? compiledV3BlockText(plan, currentText, envelopeText)
+      : compiledBlockText(plan, currentText, envelopeText);
   } catch (error) {
     return {
       ok: false,
@@ -1429,14 +1712,97 @@ export function decodeManagedConstructionPlan(
       }],
     };
   }
-  if (compiled !== currentText) {
+  let presentationSource = source.slice(
+    block.tikzBodyRange.start,
+    block.tikzBodyRange.end,
+  );
+  let v3EnvelopeMatches = true;
+  if (block.schemaVersion === MANAGED_CONSTRUCTION_SCHEMA_V3) {
+    const currentLocalBlock = parseManagedConstructionBlocks(currentText)[0];
+    const canonicalBlock = parseManagedConstructionBlocks(compiled)[0];
+    if (!currentLocalBlock || !canonicalBlock) {
+      return {
+        ok: false,
+        block,
+        issues: [{
+          code: 'invalid-writer-envelope',
+          path: 'range',
+          message: 'Schema-v3 block could not be reparsed as a standalone writer envelope.',
+        }],
+      };
+    }
+    const currentEnvelope = readManagedConstructionV3Envelope(
+      currentText,
+      currentLocalBlock,
+    );
+    const canonicalEnvelope = readManagedConstructionV3Envelope(
+      compiled,
+      canonicalBlock,
+    );
+    const artifact = compileConstructionWriterArtifact(plan);
+    const currentArtifact = validateManagedConstructionV3Artifact(
+      currentEnvelope,
+      artifact,
+    );
+    const canonicalArtifact = validateManagedConstructionV3Artifact(
+      canonicalEnvelope,
+      artifact,
+    );
+    if (
+      !currentEnvelope.syntacticallyValid
+      || currentEnvelope.opaqueRanges.length !== 0
+      || !currentArtifact.artifactMatched
+      || !canonicalEnvelope.syntacticallyValid
+      || canonicalEnvelope.opaqueRanges.length !== 0
+      || !canonicalArtifact.artifactMatched
+      || currentEnvelope.slots.length !== 1
+    ) {
+      const firstIssue = [
+        ...currentEnvelope.issues,
+        ...currentArtifact.issues,
+        ...canonicalEnvelope.issues,
+        ...canonicalArtifact.issues,
+      ][0];
+      return {
+        ok: false,
+        block,
+        issues: [{
+          code: 'invalid-writer-envelope',
+          path: 'writerEnvelope',
+          message: firstIssue?.message
+            ?? 'Schema-v3 block is not owned by the trusted one-slot writer artifact.',
+        }],
+      };
+    }
+    presentationSource = currentText.slice(
+      currentEnvelope.slots[0]!.sourceRange.start,
+      currentEnvelope.slots[0]!.sourceRange.end,
+    );
+    v3EnvelopeMatches = managedConstructionV3OutsideSlotsMatches(
+      currentText,
+      currentEnvelope,
+      compiled,
+      canonicalEnvelope,
+    );
+  }
+  const presentation = hydrateManagedPresentation(plan, presentationSource);
+  const sourceDiverged = compiled !== currentText;
+  if (
+    sourceDiverged
+    && (
+      !(block.schemaVersion === MANAGED_CONSTRUCTION_SCHEMA_V3
+        ? v3EnvelopeMatches
+        : managedPresentationEnvelopeMatches(currentText, compiled))
+      || !presentation.ok
+    )
+  ) {
     return {
       ok: false,
       block,
       issues: [{
         code: 'non-canonical-source',
         path: 'range',
-        message: 'Recovered plan does not reproduce the complete managed block byte-for-byte; source may be styled, diverged, or non-canonical.',
+        message: `Recovered plan does not reproduce the complete managed block byte-for-byte and presentation hydration rejected it: ${presentation.ok ? 'managed envelope differs outside the owned writer slot' : presentation.issues[0]?.message ?? 'unknown presentation conflict'}`,
       }],
     };
   }
@@ -1445,6 +1811,9 @@ export function decodeManagedConstructionPlan(
     block,
     plan,
     compactPlan: compactCanonicalConstructionPlan(plan),
+    ...(sourceDiverged && presentation.ok
+      ? { presentation: presentation.presentation }
+      : {}),
   };
 }
 

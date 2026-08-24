@@ -1,0 +1,332 @@
+/* ============================================================
+   SCENE 1 — Atmospheric opening.
+   Monochromatic cobalt only. No cards, no gradients, no shadows.
+   ============================================================ */
+
+.scene-1 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ---------- Living geometry object ---------- */
+
+.scene-1__geometry {
+  position: absolute;
+  top: 15%;
+  right: calc(var(--margin-x) * 0.9);
+  width: clamp(280px, 44vmin, 520px);
+  aspect-ratio: 1 / 1;
+  z-index: 1;
+  will-change: transform, opacity;
+}
+
+.scene-1__geometry-drift,
+.scene-1__geometry-rot {
+  position: absolute;
+  inset: 0;
+}
+
+/* Music breathing wrapper — direct DOM scale writes on the shared ticker;
+   composes with the progress transform on .scene-1__geometry and the
+   drift/rotation wrappers inside. */
+.scene-1__geometry-breathe {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+/* Veiled field: clicking a mode blurs the living circumcircle behind the
+   overlay. filter: blur is allowed HERE ONLY (small area). */
+.scene-1__geometry-field {
+  position: absolute;
+  inset: 0;
+  transition:
+    filter 450ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    opacity 450ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    transform 450ms cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+.scene-1__geometry-field.is-veiled {
+  filter: blur(8px);
+  opacity: 0.25;
+  transform: scale(0.985);
+}
+
+.scene-1__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* Coincident draw-on overlay (same viewBox, same aspect handling). */
+.scene-1__construction {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.scene-1__glabel {
+  font-size: 0.34px; /* viewBox units — matches GeometryCanvas labels */
+  fill: var(--mist);
+  font-family: var(--font-sans);
+  user-select: none;
+}
+
+.scene-1__fig {
+  position: absolute;
+  left: 0;
+  bottom: -26px;
+  white-space: nowrap;
+}
+
+/* ---------- Typographic anchor ---------- */
+
+.scene-1__type {
+  position: absolute;
+  left: var(--margin-x);
+  bottom: 11vh;
+  max-width: 62%;
+  z-index: 2;
+  will-change: transform, opacity;
+}
+
+.scene-1__title {
+  font-family: var(--font-display);
+  font-size: var(--text-hero);
+  line-height: 0.84;
+  letter-spacing: var(--tracking-wordmark);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--paper);
+}
+
+.scene-1__title-line {
+  display: block;
+  will-change: transform, opacity;
+}
+
+.scene-1__standfirst {
+  margin-top: 22px;
+  font-size: 12.5px;
+  color: var(--mist);
+}
+
+/* zh: the CJK standfirst breathes with wider tracking under the
+   stacked MATH/HUB anchor (class applied via useLang() on the root). */
+.scene-1--zh .scene-1__standfirst {
+  letter-spacing: 0.3em;
+}
+
+.scene-1__cta {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--paper);
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--line-strong);
+  border-radius: 0;
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+
+.scene-1__cta:hover {
+  color: var(--mist);
+}
+
+/* ---------- Edge fragments ---------- */
+
+.scene-1__frag-coord {
+  max-width: 30ch;
+}
+
+.scene-1__modes {
+  position: absolute;
+  right: var(--margin-x);
+  bottom: calc(var(--gutter) * 1.5); /* 36px — ≥24px edge margin */
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end; /* never reach the bottom-left credit */
+  row-gap: 6px;
+  column-gap: 10px;
+  max-width: 62%;
+  z-index: 4; /* stays clickable above the mode dismiss backdrop */
+}
+
+.scene-1__modes-sep {
+  width: 14px;
+  height: 1px;
+  background: var(--line-faint);
+}
+
+/* Clickable mode console — real buttons, same hairline-separated
+   editorial look: 10.5px uppercase, wide tracking. */
+.scene-1__mode-btn {
+  appearance: none;
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 2px 0;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  letter-spacing: var(--tracking-meta);
+  text-transform: uppercase;
+  color: var(--mist);
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: color 200ms ease;
+}
+
+.scene-1__mode-btn:hover {
+  color: var(--paper);
+}
+
+.scene-1__mode-btn:focus-visible {
+  outline: 1px solid var(--paper);
+  outline-offset: 3px;
+}
+
+.scene-1__mode-btn.is-active {
+  color: var(--paper);
+}
+
+/* zh: CJK category labels are full-width glyphs — drop the wide Latin
+   meta tracking (0.22em) to a tighter CJK measure; uppercase is a no-op. */
+.scene-1--zh .scene-1__mode-btn {
+  letter-spacing: 0.14em;
+}
+
+/* Demo caption — names the real capability being replayed; sits where
+   the fig label rests, inside the overlay so it enters with it. */
+.scene-1__mode-caption {
+  position: absolute;
+  left: 0;
+  bottom: -26px;
+  white-space: nowrap;
+}
+
+/* ---------- Mode overlay (code replay + drawing geometry) ---------- */
+
+/* Transparent dismiss surface — covers the stage while a mode is open;
+   sits below the mode console so the buttons stay clickable. */
+.scene-1__mode-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  appearance: none;
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 0;
+  cursor: default;
+}
+
+.scene-1__mode-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 420ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    transform 420ms cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+.scene-1__mode-overlay.is-open {
+  opacity: 1;
+  transform: none;
+}
+
+.scene-1__mode-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Typed source replay — floats over the blurred field, hairline rule
+   above, no background. */
+.scene-1__mode-code {
+  position: absolute;
+  left: 0;
+  bottom: 9%;
+  display: block;
+  max-width: 94%;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--paper);
+  white-space: pre;
+  user-select: none;
+}
+
+/* ---------- Author credit ---------- */
+
+.scene-1__credit {
+  position: absolute;
+  left: var(--margin-x);
+  bottom: calc(var(--gutter) * 1.5);
+  z-index: 2;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--mist);
+  user-select: none;
+}
+
+/* Reduced motion: the veil keeps its opacity dim but drops the blur;
+   the overlay fades without rising. */
+@media (prefers-reduced-motion: reduce) {
+  .scene-1__geometry-field {
+    transition: opacity 450ms ease;
+  }
+
+  .scene-1__geometry-field.is-veiled {
+    filter: none;
+    transform: none;
+  }
+
+  .scene-1__mode-overlay {
+    transform: none;
+    transition: opacity 300ms ease;
+  }
+}
+
+/* ---------- Narrow stages: keep the air, shrink the object ---------- */
+
+/* Tablet: retain asymmetry, drop only the decorative edge fragment. */
+@media (max-width: 1024px) {
+  .scene-1__frag-coord {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .scene-1__geometry {
+    top: 9%;
+    right: 6%;
+    width: clamp(220px, 58vmin, 340px);
+  }
+
+  .scene-1__type {
+    bottom: 9vh;
+    max-width: 78%;
+  }
+
+  /* Headline: reduced, but still large — mood before density. */
+  .scene-1__title {
+    font-size: clamp(52px, 15vw, 96px);
+  }
+
+  .scene-1__modes {
+    display: none; /* atmosphere first on small stages */
+  }
+}

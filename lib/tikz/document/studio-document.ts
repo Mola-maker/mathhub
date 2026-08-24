@@ -1,7 +1,6 @@
 import { Annotation, type TransactionSpec } from '@codemirror/state';
 import type { Tree } from '@lezer/common';
 import {
-  applyTextPatch,
   applyTextPatches,
   assertTextPatch,
   minimalTextPatch,
@@ -71,6 +70,32 @@ export interface StudioDocumentSnapshot {
   lastTransaction: StudioTransactionRecord | null;
 }
 
+export const STUDIO_DOCUMENT_CHANGE_SCHEMA_VERSION =
+  'tikz-studio-document-change/v1' as const;
+export const MAX_STUDIO_TRANSACTION_RECORDS = 128;
+export const MAX_STUDIO_TRANSACTION_BYTES = 2 * 1024 * 1024;
+export const MAX_STUDIO_IDEMPOTENCY_TOMBSTONES = 4096;
+
+export interface StudioDocumentChangeEvent {
+  readonly schemaVersion: typeof STUDIO_DOCUMENT_CHANGE_SCHEMA_VERSION;
+  readonly documentId: string;
+  readonly epoch: string;
+  readonly transactionId: string;
+  readonly idempotencyKey: string;
+  readonly fromRevision: number;
+  readonly toRevision: number;
+  readonly origin: SourceEditOrigin;
+  readonly motionHint: StudioTransactionRecord['motionHint'];
+  readonly sourceLengthBefore: number;
+  readonly sourceLengthAfter: number;
+  readonly patches: readonly {
+    readonly from: number;
+    readonly to: number;
+    readonly insertLength: number;
+  }[];
+  readonly changedRangesAfter: StudioTransactionRecord['changedRangesAfter'];
+}
+
 type EditorDispatch = (spec: TransactionSpec) => void;
 
 export const studioEditOrigin = Annotation.define<SourceEditOrigin>();
@@ -78,6 +103,26 @@ export const studioTransactionMetadata =
   Annotation.define<StudioTransactionMetadata>();
 
 let documentSequence = 0;
+
+function retainedTransactionBytes(transaction: StudioTransactionRecord): number {
+  const textBytes = (value: string | undefined) => (value?.length ?? 0) * 2;
+  const accessBytes = (access: readonly StudioSourceAccess[]) => access.reduce(
+    (total, item) => total
+      + textBytes(item.sourceId)
+      + textBytes(item.expectedText)
+      + 32,
+    0,
+  );
+  return 256
+    + textBytes(transaction.transactionId)
+    + textBytes(transaction.idempotencyKey)
+    + textBytes(transaction.requestFingerprint)
+    + accessBytes(transaction.readSet)
+    + accessBytes(transaction.writeSet)
+    + transaction.patches.reduce((total, patch) => total + textBytes(patch.insert) + 32, 0)
+    + transaction.changedRangesAfter.length * 24
+    + (transaction.changeDesc?.length ?? 0) * 8;
+}
 
 function createDocumentIdentity(prefix: string): string {
   documentSequence += 1;
@@ -88,9 +133,15 @@ function createDocumentIdentity(prefix: string): string {
 export class StudioDocument {
   private snapshot: StudioDocumentSnapshot;
   private readonly listeners = new Set<() => void>();
+  private readonly changeListeners = new Set<(event: StudioDocumentChangeEvent) => void>();
   private editorDispatch: EditorDispatch | null = null;
   private readonly transactions: StudioTransactionRecord[] = [];
   private readonly idempotencyIndex = new Map<string, StudioTransactionRecord>();
+  private readonly idempotencyTombstones = new Map<string, {
+    readonly transactionId: string;
+    readonly requestFingerprint?: string;
+  }>();
+  private retainedTransactionBytes = 0;
   private transactionSequence = 0;
 
   constructor(
@@ -114,12 +165,24 @@ export class StudioDocument {
     return () => this.listeners.delete(listener);
   };
 
+  /**
+   * Subscribe to committed source truth. Unlike `subscribe`, this does not fire
+   * for CST refreshes and never duplicates source or inserted text bytes.
+   */
+  subscribeChanges = (
+    listener: (event: StudioDocumentChangeEvent) => void,
+  ): (() => void) => {
+    this.changeListeners.add(listener);
+    return () => this.changeListeners.delete(listener);
+  };
+
   getTransactionsSince(revision: number): readonly StudioTransactionRecord[] {
     return this.transactions.filter((transaction) => transaction.fromRevision >= revision);
   }
 
   hasAppliedIdempotencyKey(idempotencyKey: string): boolean {
-    return this.idempotencyIndex.has(idempotencyKey);
+    return this.idempotencyIndex.has(idempotencyKey)
+      || this.idempotencyTombstones.has(idempotencyKey);
   }
 
   getTransactionByIdempotencyKey(
@@ -202,11 +265,13 @@ export class StudioDocument {
     ) return false;
     if (
       metadata?.idempotencyKey
-      && this.idempotencyIndex.has(metadata.idempotencyKey)
+      && this.hasAppliedIdempotencyKey(metadata.idempotencyKey)
     ) {
       const existing = this.idempotencyIndex.get(metadata.idempotencyKey);
+      const tombstone = this.idempotencyTombstones.get(metadata.idempotencyKey);
       return metadata.requestFingerprint !== undefined
-        && existing?.requestFingerprint === metadata.requestFingerprint;
+        && (existing?.requestFingerprint ?? tombstone?.requestFingerprint)
+          === metadata.requestFingerprint;
     }
     if (expectedRevision !== undefined && expectedRevision !== before.revision) return false;
     for (const patch of patches) assertTextPatch(before.source, patch);
@@ -291,16 +356,59 @@ export class StudioDocument {
       lastTransaction: transaction,
     };
     this.transactions.push(transaction);
+    this.retainedTransactionBytes += retainedTransactionBytes(transaction);
     this.idempotencyIndex.set(idempotencyKey, transaction);
-    if (this.transactions.length > 256) {
+    while (
+      this.transactions.length > 1
+      && (
+        this.transactions.length > MAX_STUDIO_TRANSACTION_RECORDS
+        || this.retainedTransactionBytes > MAX_STUDIO_TRANSACTION_BYTES
+      )
+    ) {
       const evicted = this.transactions.shift();
       if (
         evicted
         && this.idempotencyIndex.get(evicted.idempotencyKey) === evicted
       ) {
+        this.retainedTransactionBytes = Math.max(
+          0,
+          this.retainedTransactionBytes - retainedTransactionBytes(evicted),
+        );
         this.idempotencyIndex.delete(evicted.idempotencyKey);
+        this.idempotencyTombstones.delete(evicted.idempotencyKey);
+        this.idempotencyTombstones.set(evicted.idempotencyKey, {
+          transactionId: evicted.transactionId,
+          ...(evicted.requestFingerprint
+            ? { requestFingerprint: evicted.requestFingerprint }
+            : {}),
+        });
+        while (this.idempotencyTombstones.size > MAX_STUDIO_IDEMPOTENCY_TOMBSTONES) {
+          const oldest = this.idempotencyTombstones.keys().next().value as string | undefined;
+          if (oldest === undefined) break;
+          this.idempotencyTombstones.delete(oldest);
+        }
       }
     }
+    const changeEvent: StudioDocumentChangeEvent = {
+      schemaVersion: STUDIO_DOCUMENT_CHANGE_SCHEMA_VERSION,
+      documentId: before.documentId,
+      epoch: before.epoch,
+      transactionId,
+      idempotencyKey,
+      fromRevision: before.revision,
+      toRevision: revision,
+      origin,
+      motionHint,
+      sourceLengthBefore: before.source.length,
+      sourceLengthAfter: source.length,
+      patches: sortedPatches.map((patch) => ({
+        from: patch.from,
+        to: patch.to,
+        insertLength: patch.insert.length,
+      })),
+      changedRangesAfter,
+    };
+    for (const listener of this.changeListeners) listener(changeEvent);
     for (const listener of this.listeners) listener();
   }
 }

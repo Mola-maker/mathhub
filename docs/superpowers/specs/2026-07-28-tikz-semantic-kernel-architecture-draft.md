@@ -987,6 +987,35 @@ revision/hash、重新 analyze 后才能提交。
   还必须保留源码中任何仍被 `managed:<id>:` 引用的孤儿 ID；直接删除上游块不能使身份重新可用。
   raw circle source range 若与任一 valid/detached/invalid managed block 重叠，则禁止再次收编，
   必须先修复或显式重编译原块，禁止嵌套 `@mathgeo begin/end`；
+- Canvas 创建统一通过 `canvas-construction-batch-proposal/v1`：owned input point plans、最终
+  construction plan 与 raw-circle adoption intents 使用起始文档 UTF-16 坐标组成一个原子
+  multi-patch transaction。GeometryDoc 的 `binding:document:tikzpicture-body-end` 必须显式暴露
+  `create-managed-construction-batch` capability 及 revision/plugin-bound fingerprint；Broker 从当前
+  source 重建 GeometryDoc，校验 compact canonical plan、writer safety 与 writer artifact 后重新调用
+  trusted writer，要求 canonical patches/proof 完全相等。可逆类型还必须从生成块反解回同一 compact
+  plan；当前记录无法无猜测恢复圆参数的 point-on-circle、tangent-at-point、radical-axis 必须通过严格
+  catalog semantic footprint 后再由 trusted writer 重放；其中每个 managed circle ID 必须从当前 valid
+  managed record 或同批 adoption capability 重新解析定义，并与 GeometryDoc 的圆心、过点、半径及
+  evaluated snapshot 一致。任何无 batch proof 的 Canvas managed-block
+  新建一律拒绝，不能退回 generic source patch；style 只是提交展示来源，不能改变 Canvas 授权身份；
+- 所有 ConstructionPlan 类型统一服从 `construction-plan-footprint/v1`。该 ABI 对当前 19 类构造
+  （含可变参数的 polyline/polygon primitive）精确规定有序 inputs、entities、constraints、relations
+  与 outputs。Catalog 的预览/提交、Canvas proposal、AI proposal 与 Broker canonical replay 必须
+  调用同一个 validator；任何额外记录、重复角色、未消费依赖或数组重排都 fail closed。Canvas
+  外部 input ref 还必须解析到当前 GeometryDoc、同批更早的 owned point 或同批 adoption capability；
+  仅通过一般 ConstructionPlan grammar 但不符合具体工具足迹的计划不得进入 writer；
+- AI 新建构造已经收敛为 closed、create-only 的 `construction-intent/v1`，不再要求模型合成完整
+  record arrays。intent 携带完整 document/epoch/revision/source/kernel/projection/plugin/catalog basis、
+  revision-bound insertion capability fingerprint、toolId、有序 binding IDs、声明式命名请求与显式参数；
+  可信 Catalog compiler 在当前 GeometryDoc 上分配 ID、构建 canonical ConstructionPlan、验证 footprint
+  并产出 writer artifact，Broker 在最终提交点重新投影当前 source、重解 binding、重编 intent、比较
+  canonical plan 并重生 patch。完整 ConstructionPlan 只保留为内部 proof/replay ABI，以及现阶段对
+  已有 canonical managed block 的受控 replacement compatibility lane；AI 直接用 plan 新建必须拒绝。
+  Broker 的 authorized binding IDs、create capability fingerprint 与 scope fingerprint 必须由宿主作为
+  独立 commit evidence 传入，不能从 intent 或 transaction metadata 反推，否则 scope 校验只是同义反复。
+  raw source circle adoption 已进入 intent/v1：模型只提交授权 binding，Catalog/Broker 从当前
+  GeometryDoc、source range、verbatim fingerprint 与 typed definition 原子生成 adoption + dependent plan；
+  计算型、歧义、退化、opaque 或 stale 圆仍显式 fail closed，不能猜测 circle snapshot；
 - `radical-axis` 的输入已从四个近似点升级为两个 typed circle references。writer 使用
   `t=(d^2+r1^2-r2^2)/(2d^2)` 生成等幂点，再以圆心连线的垂线方向生成完整直线；center-through
   与 positive literal radius 两种圆定义共享该语义。schema-v2 同时登记 line entity、
@@ -1002,7 +1031,8 @@ revision/hash、重新 analyze 后才能提交。
 - `perpendicular-bisector` 同时记录 midpoint 与 perpendicular-bisector predicate，并把
   输出线登记为 typed output；`angle-bisector` 记录 line + armA/vertex/armB 的等角语义，
   不再让 AI 从画线公式猜测构造意图；
-- Construction Plan runtime validator、managed schema shape validator、TikZ adapter 1.11.0 与
+- Construction Plan runtime validator、managed schema shape validator、TikZ adapter 1.17.0、
+  `construction-plan-footprint/v1` 与
   structural constraint diagnostics 已同时登记上述新 predicate。新增语义种类不得只改
   catalog 或 writer，否则必须视为 schema/AI/canvas 闭环失败；
 - 交点不再定义为匿名坐标或数组下标。`line-intersection` 已携带两条 typed line entity；

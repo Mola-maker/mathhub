@@ -98,7 +98,7 @@ export interface GeometryInvalidationResult {
   fallbackReasons: readonly GeometryFullReprojectReason[];
 }
 
-interface DependencyGraph {
+export interface DependencyGraph {
   dependencies: Map<string, Set<string>>;
   dependents: Map<string, Set<string>>;
 }
@@ -290,7 +290,7 @@ function stringArray(value: unknown): string[] {
     : [];
 }
 
-function dependencyPairs(
+export function dependencyPairs(
   relation: GeometryRelation,
 ): Array<{ dependent: string; dependency: string }> {
   const participants = relation.participants.flatMap((participant) => (
@@ -307,6 +307,20 @@ function dependencyPairs(
   if (explicitDependencies.length > 0 && explicitDependents.length > 0) {
     return explicitDependents.flatMap((dependent) =>
       explicitDependencies.map((dependency) => ({ dependent, dependency })));
+  }
+
+  if (relation.kind === 'depends-on') {
+    const from = participants
+      .filter((participant) => participant.role === 'from')
+      .map((participant) => participant.entityId);
+    const to = participants
+      .filter((participant) => participant.role === 'to')
+      .map((participant) => participant.entityId);
+    if (from.length > 0 && to.length > 0) {
+      return from.flatMap((dependent) => (
+        to.map((dependency) => ({ dependent, dependency }))
+      ));
+    }
   }
 
   const propertyDependencies = stringArray(relation.properties?.dependencies);
@@ -332,7 +346,7 @@ function dependencyPairs(
   return [];
 }
 
-function buildDependencyGraph(relations: readonly GeometryRelation[]): DependencyGraph {
+export function buildDependencyGraph(relations: readonly GeometryRelation[]): DependencyGraph {
   const graph: DependencyGraph = {
     dependencies: new Map(),
     dependents: new Map(),

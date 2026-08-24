@@ -7,6 +7,7 @@ import {
   TIKZ_SYNTAX_CAPABILITIES,
   TIKZ_CATALOG_SOURCE,
   queryTikzSyntaxCapabilities,
+  type TikzCapabilityLaneTruth,
   type TikzLayer,
   type TikzSyntaxCapability,
 } from '@/lib/tikz/syntax';
@@ -35,12 +36,14 @@ function insertableExample(entry: TikzSyntaxCapability): string | null {
   return example ?? null;
 }
 
-function capabilityLabel(
-  enabled: boolean,
-  enabledLabel: string,
-  disabledLabel: string,
-): string {
-  return enabled ? enabledLabel : disabledLabel;
+function capabilityLabel(lane: TikzCapabilityLaneTruth, label: string): string {
+  const status = {
+    verified: '已验证',
+    partial: '部分支持',
+    conditional: '条件支持',
+    blocked: '当前阻止',
+  }[lane.status];
+  return `${label} · ${status}`;
 }
 
 export function TikzSyntaxPanel({
@@ -146,18 +149,20 @@ export function TikzSyntaxPanel({
             </div>
             <h3>{selected.title}</h3>
             <div className="tz-syntax-panel__capabilities" aria-label="能力等级">
-              <span className="is-on">保真</span>
-              <span className={selected.capabilities.syntax ? 'is-on' : ''}>
-                {capabilityLabel(selected.capabilities.syntax, '语法识别', '仅 opaque')}
+              <span className={`is-${selected.truth.preserve.status}`} title={selected.truth.preserve.reason}>
+                {capabilityLabel(selected.truth.preserve, '源码保真')}
               </span>
-              <span className={selected.capabilities.semantic ? 'is-on' : ''}>
-                {capabilityLabel(selected.capabilities.semantic, '语义理解', '未语义化')}
+              <span className={`is-${selected.truth.syntax.status}`} title={selected.truth.syntax.reason}>
+                {capabilityLabel(selected.truth.syntax, '语法识别')}
               </span>
-              <span className={selected.capabilities.interactive ? 'is-on' : ''}>
-                {capabilityLabel(selected.capabilities.interactive, '画板可编辑', '画板只读')}
+              <span className={`is-${selected.truth.semantic.status}`} title={selected.truth.semantic.reason}>
+                {capabilityLabel(selected.truth.semantic, '语义理解')}
               </span>
-              <span className={selected.capabilities.exact ? 'is-on' : ''}>
-                {capabilityLabel(selected.capabilities.exact, '精确编译', '策略阻止')}
+              <span className={`is-${selected.truth.interactive.status}`} title={selected.truth.interactive.reason}>
+                {capabilityLabel(selected.truth.interactive, '画板编辑')}
+              </span>
+              <span className={`is-${selected.truth.exact.status}`} title={selected.truth.exact.reason}>
+                {capabilityLabel(selected.truth.exact, '精准编译')}
               </span>
             </div>
             <p>{selected.officialRef.section}</p>

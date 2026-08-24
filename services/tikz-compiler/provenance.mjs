@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
-import { CompilerError } from './compiler-core.mjs';
+import {
+  CompilerError,
+  TIKZ_COMPILER_PROFILE,
+} from './compiler-core.mjs';
 
 const PRODUCTION_IMAGE_DIGEST = /^sha256:[a-f0-9]{64}$/;
 const IMMUTABLE_IMAGE_REFERENCE = /^(?<repository>[^@\s]+)@(?<digest>sha256:[a-f0-9]{64})$/;
@@ -14,7 +17,11 @@ export function workerImageDigestFromReference(reference, production = false) {
       'COMPILER_WORKER_IMAGE_REF must be a repository@sha256 reference in production',
     );
   }
-  if (!configured) return 'dev-tectonic-0.17.0-dvisvgm';
+  if (!configured) {
+    return TIKZ_COMPILER_PROFILE === 'tikz-luatex-graphdrawing-v1'
+      ? 'dev-texlive-luatex-graphdrawing-dvisvgm'
+      : 'dev-tectonic-0.17.0-dvisvgm';
+  }
   if (
     !PRODUCTION_IMAGE_DIGEST.test(configured)
     && !DEVELOPMENT_IMAGE_ID.test(configured)
@@ -76,6 +83,7 @@ export function assertWorkerProvenance(job, result, workerImageDigest) {
     'wrapperId',
     'wrapperDigest',
     'bundleIdentity',
+    'profileManifestDigest',
   ];
   const hasExplicitInputIdentity = identityFields.some(
     (field) => job[field] !== undefined || result[field] !== undefined,

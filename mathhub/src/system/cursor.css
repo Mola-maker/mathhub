@@ -1,0 +1,87 @@
+/* ============================================================
+   Custom cursor — dot + lerped hairline ring.
+   Fine pointers only. Under reduced motion the native cursor
+   stays: the `cursor: none` overrides below are gated behind
+   (prefers-reduced-motion: no-preference), and cursor.tsx
+   renders nothing there.
+   ============================================================ */
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  body,
+  a,
+  button,
+  [role="button"],
+  input,
+  summary,
+  [data-cursor] {
+    /* !important: beats class-level cursor declarations
+       (e.g. .top__lang-half { cursor: pointer }). */
+    cursor: none !important;
+  }
+}
+
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100; /* above the fixed header (z-index: 50) */
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform;
+  /* difference inverts --paper over the ivory chapters — the
+     elegant answer to the cobalt → ivory → cobalt flip. */
+  mix-blend-mode: difference;
+}
+
+/* ---- Dot: 6px off-white, instant follow (JS writes transform) ---- */
+
+.cursor-dot {
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px; /* center on the pointer point */
+  border-radius: 50%;
+  background: var(--paper);
+  transition: opacity 150ms cubic-bezier(0.33, 1, 0.68, 1); /* easeOut3 */
+}
+
+/* ---- Ring: 24px hairline, lerped follow (JS writes translate) ----
+   The visible circle lives on ::before so the ticker owns the
+   element's transform while CSS owns the hover scale — the two
+   never fight over the same property. */
+.cursor-ring {
+  transition: opacity 150ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.cursor-ring::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px; /* center on the pointer point */
+  border: 1px solid var(--paper);
+  border-radius: 50%;
+  transform: scale(1);
+  transition:
+    transform 150ms cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 150ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* ---- States (toggled as classes from cursor.tsx) ---- */
+
+.cursor-dot.is-visible,
+.cursor-ring.is-visible {
+  opacity: 1;
+}
+
+/* Hover over a / button / [role='button'] / [data-cursor]:
+   ring scales to 1.8, dot disappears. */
+.cursor-ring.is-hover::before {
+  transform: scale(1.8);
+}
+
+.cursor-dot.is-hover {
+  opacity: 0;
+}

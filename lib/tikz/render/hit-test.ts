@@ -1,11 +1,15 @@
 import type { Pt } from '../semantics/calc-eval';
+import { flattenCubicBezier } from '../geometry/cubic-bezier';
+import { flattenCircularArc } from '../geometry/circular-arc';
+import { flattenEllipticalArc } from '../geometry/elliptical-arc';
+import { flattenEllipse } from '../geometry/ellipse';
 import type { Scene, SceneElement } from '../semantics/scene';
 import { labelScreenBounds, type ScreenBounds } from './label-layout';
 import {
   angleMarkGeometry,
   DEFAULT_ANGLE_MARK_RADIUS,
 } from './svg-decoration-primitives';
-import { sceneToScreen, type Viewport } from './viewport';
+import { sceneToScreen, tikzPresentationScale, type Viewport } from './viewport';
 
 const distance = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -77,14 +81,54 @@ export function hitTestElement(
       for (const [start, end] of segments) {
         currentDistance = Math.min(currentDistance, distanceToSegment(screen, start, end));
       }
+    } else if (element.kind === 'cubic-bezier') {
+      const curve = {
+        start: sceneToScreen(element.start, viewport),
+        control1: sceneToScreen(element.control1, viewport),
+        control2: sceneToScreen(element.control2, viewport),
+        end: sceneToScreen(element.end, viewport),
+      };
+      const points = flattenCubicBezier(curve, 0.75);
+      for (let index = 1; index < points.length; index += 1) {
+        currentDistance = Math.min(currentDistance, distanceToSegment(screen, points[index - 1]!, points[index]!));
+      }
+    } else if (element.kind === 'circular-arc') {
+      const points = flattenCircularArc(element, 3)
+        .map((point) => sceneToScreen(point, viewport));
+      for (let index = 1; index < points.length; index += 1) {
+        currentDistance = Math.min(currentDistance, distanceToSegment(screen, points[index - 1]!, points[index]!));
+      }
+    } else if (element.kind === 'elliptical-arc') {
+      const points = flattenEllipticalArc(element, 3)
+        .map((point) => sceneToScreen(point, viewport));
+      for (let index = 1; index < points.length; index += 1) {
+        currentDistance = Math.min(currentDistance, distanceToSegment(screen, points[index - 1]!, points[index]!));
+      }
     } else if (element.kind === 'circle') {
       const center = sceneToScreen(element.center, viewport);
       currentDistance = Math.abs(distance(screen, center) - element.radius * viewport.scale);
+    } else if (element.kind === 'graph-node') {
+      const center = sceneToScreen(element.center, viewport);
+      currentDistance = Math.max(0, distance(screen, center) - element.radius * viewport.scale);
+    } else if (element.kind === 'ellipse') {
+      const points = flattenEllipse(element, 96)
+        .map((point) => sceneToScreen(point, viewport));
+      for (let index = 1; index < points.length; index += 1) {
+        currentDistance = Math.min(
+          currentDistance,
+          distanceToSegment(screen, points[index - 1]!, points[index]!),
+        );
+      }
     } else if (element.kind === 'label') {
       const at = sceneToScreen(element.at, viewport);
       currentDistance = distanceToBounds(
         screen,
-        labelScreenBounds(at, element.text, element.anchor),
+        labelScreenBounds(
+          at,
+          element.text,
+          element.anchor,
+          tikzPresentationScale(viewport),
+        ),
       );
     } else {
       const geometry = angleMarkGeometry({
@@ -92,7 +136,7 @@ export function hitTestElement(
         from: sceneToScreen(element.from, viewport),
         to: sceneToScreen(element.to, viewport),
         right: element.right,
-        radius: DEFAULT_ANGLE_MARK_RADIUS,
+        radius: DEFAULT_ANGLE_MARK_RADIUS * tikzPresentationScale(viewport),
       });
       if (geometry) {
         for (let index = 1; index < geometry.points.length; index += 1) {

@@ -10,7 +10,9 @@ dist
 node_modules
 output
 services/tikz-compiler/node_modules
-Herodeisgn/shots
+mathhub/node_modules
+mathhub/dist
+public/mathhub
 *.log
 *.tsbuildinfo
 .env

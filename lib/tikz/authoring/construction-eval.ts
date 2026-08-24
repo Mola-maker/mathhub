@@ -7,9 +7,11 @@ import type {
   ConstructionPlan,
   ConstructionPlanKind,
   CyclicQuadrilateralConstructionPlan,
+  FermatPointConstructionPlan,
   Homothety2ConstructionPlan,
   InversionPointConstructionPlan,
   MidpointConstructionPlan,
+  NinePointCircleConstructionPlan,
   ParallelLineConstructionPlan,
   PerpendicularBisectorConstructionPlan,
   PerpendicularFootConstructionPlan,
@@ -18,6 +20,7 @@ import type {
   ReflectPointConstructionPlan,
   RadicalAxisConstructionPlan,
   Rotate90ConstructionPlan,
+  SimsonLineConstructionPlan,
   TangentAtPointConstructionPlan,
 } from './construction-ir';
 import type { Pt } from '../semantics/calc-eval';
@@ -211,6 +214,16 @@ function scale(point: Pt, factor: number): Pt {
 
 function rotate90(point: Pt): Pt {
   return { x: -point.y, y: point.x };
+}
+
+function rotateByDegrees(point: Pt, degrees: number): Pt {
+  const radians = degrees * Math.PI / 180;
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  return {
+    x: point.x * cosine - point.y * sine,
+    y: point.x * sine + point.y * cosine,
+  };
 }
 
 function finitePositive(value: number): boolean {
@@ -792,6 +805,164 @@ function evaluateCircumcircle(
   registerCircle(state, plan, plan.circle, value.center, value.radius);
 }
 
+function evaluateNinePointCircle(
+  plan: NinePointCircleConstructionPlan,
+  source: ReadonlyMap<string, Pt>,
+  state: MutableEvaluationState,
+): void {
+  const a = pointAt(state, source, plan.a, 'a');
+  const b = pointAt(state, source, plan.b, 'b');
+  const c = pointAt(state, source, plan.c, 'c');
+  if (!a || !b || !c) return;
+  const seed = circumcenter(a, b, c);
+  if (!seed) {
+    diagnostic(state, 'collinear-points', 'a/b/c', 'Three collinear points do not define a nine-point circle.');
+    return;
+  }
+  const midpointBC = scale(add(b, c), 0.5);
+  const midpointCA = scale(add(c, a), 0.5);
+  const midpointAB = scale(add(a, b), 0.5);
+  const footA = projectPointOnLine(a, b, c);
+  const footB = projectPointOnLine(b, c, a);
+  const footC = projectPointOnLine(c, a, b);
+  // Euler's vector identity H=A+B+C-2O remains defined for every
+  // non-collinear triangle, including a right triangle where one altitude
+  // segment can degenerate to a vertex and cannot safely drive a line-line
+  // intersection.
+  const orthocenter = subtract(add(add(a, b), c), scale(seed.center, 2));
+  const vertexMidpointA = scale(add(a, orthocenter), 0.5);
+  const vertexMidpointB = scale(add(b, orthocenter), 0.5);
+  const vertexMidpointC = scale(add(c, orthocenter), 0.5);
+  const ninePoint = circumcenter(midpointBC, midpointCA, midpointAB);
+  if (!ninePoint) {
+    diagnostic(state, 'invalid-geometry', 'center', 'Side midpoints do not define a finite nine-point circle.');
+    return;
+  }
+  const points = [
+    [plan.midpointBC, midpointBC], [plan.midpointCA, midpointCA], [plan.midpointAB, midpointAB],
+    [plan.footA, footA], [plan.footB, footB], [plan.footC, footC],
+    [plan.orthocenter, orthocenter],
+    [plan.vertexMidpointA, vertexMidpointA],
+    [plan.vertexMidpointB, vertexMidpointB],
+    [plan.vertexMidpointC, vertexMidpointC],
+    [plan.center, ninePoint.center],
+  ] as const;
+  for (const [name, point] of points) registerPoint(state, plan, name, point);
+  registerCircle(state, plan, plan.circle, ninePoint.center, ninePoint.radius);
+}
+
+function evaluateSimsonLine(
+  plan: SimsonLineConstructionPlan,
+  source: ReadonlyMap<string, Pt>,
+  state: MutableEvaluationState,
+): void {
+  const a = pointAt(state, source, plan.a, 'a');
+  const b = pointAt(state, source, plan.b, 'b');
+  const c = pointAt(state, source, plan.c, 'c');
+  if (!a || !b || !c) return;
+  const seed = circumcenter(a, b, c);
+  if (!seed) {
+    diagnostic(state, 'collinear-points', 'a/b/c', 'Three collinear points do not define a Simson construction.');
+    return;
+  }
+  const point = add(seed.center, rotateByDegrees(subtract(a, seed.center), plan.angleDegrees));
+  const radiusError = Math.abs(distance(seed.center, point) - seed.radius);
+  if (radiusError > CONSTRUCTION_EPSILON * Math.max(1, seed.radius)) {
+    diagnostic(state, 'point-not-on-circle', 'point', 'The Simson source point is not on the triangle circumcircle.');
+    return;
+  }
+  const footAB = projectPointOnLine(point, a, b);
+  const footBC = projectPointOnLine(point, b, c);
+  const footCA = projectPointOnLine(point, c, a);
+  const baseline = subtract(footCA, footAB);
+  const offset = subtract(footBC, footAB);
+  const cross = baseline.x * offset.y - baseline.y * offset.x;
+  const scaleFactor = Math.max(
+    1,
+    Math.hypot(baseline.x, baseline.y) * Math.hypot(offset.x, offset.y),
+  );
+  if (Math.abs(cross) > 1e-7 * scaleFactor) {
+    diagnostic(state, 'invalid-geometry', 'footAB/footBC/footCA', 'The three pedal points failed the Simson collinearity invariant.');
+    return;
+  }
+  if (isZeroDirection(footAB, footCA)) {
+    diagnostic(state, 'invalid-geometry', 'footAB/footCA', 'The Simson line is degenerate because its defining pedal points coincide.');
+    return;
+  }
+  registerPoint(state, plan, plan.center, seed.center);
+  registerCircle(state, plan, plan.circle, seed.center, seed.radius);
+  registerPoint(state, plan, plan.point, point);
+  registerPoint(state, plan, plan.footAB, footAB);
+  registerPoint(state, plan, plan.footBC, footBC);
+  registerPoint(state, plan, plan.footCA, footCA);
+  registerLine(state, plan, plan.line, footAB, footCA);
+}
+
+function fermatBranch(a: Pt, b: Pt, c: Pt): 'a' | 'b' | 'c' | null {
+  const cosineAt = (vertex: Pt, first: Pt, second: Pt): number => {
+    const firstVector = subtract(first, vertex);
+    const secondVector = subtract(second, vertex);
+    return (
+      firstVector.x * secondVector.x + firstVector.y * secondVector.y
+    ) / Math.max(
+      CONSTRUCTION_EPSILON,
+      Math.hypot(firstVector.x, firstVector.y) * Math.hypot(secondVector.x, secondVector.y),
+    );
+  };
+  const threshold = -0.5 + CONSTRUCTION_EPSILON;
+  if (cosineAt(a, b, c) <= threshold) return 'a';
+  if (cosineAt(b, a, c) <= threshold) return 'b';
+  if (cosineAt(c, a, b) <= threshold) return 'c';
+  return null;
+}
+
+function evaluateFermatPoint(
+  plan: FermatPointConstructionPlan,
+  source: ReadonlyMap<string, Pt>,
+  state: MutableEvaluationState,
+): void {
+  const a = pointAt(state, source, plan.a, 'a');
+  const b = pointAt(state, source, plan.b, 'b');
+  const c = pointAt(state, source, plan.c, 'c');
+  if (!a || !b || !c) return;
+  if (collinearPoints(a, b, c)) {
+    diagnostic(state, 'collinear-points', 'a/b/c', 'Three collinear points do not define a Fermat point construction.');
+    return;
+  }
+
+  const equilateralAB = add(a, rotateByDegrees(subtract(b, a), plan.rotationABDegrees));
+  const equilateralAC = add(a, rotateByDegrees(subtract(c, a), plan.rotationACDegrees));
+  const torricelli = intersectInfiniteLines(c, equilateralAB, b, equilateralAC);
+  if (!torricelli) {
+    diagnostic(state, 'parallel-lines', 'line1/line2', 'Fermat construction lines do not have a finite intersection.');
+    return;
+  }
+  const branch = fermatBranch(a, b, c);
+  const expectedSource = branch === 'a' ? plan.a : branch === 'b' ? plan.b : branch === 'c' ? plan.c : plan.torricelli;
+  if (expectedSource !== plan.resultSource) {
+    diagnostic(
+      state,
+      'invalid-geometry',
+      'resultSource',
+      'The triangle crossed the 120-degree Fermat branch boundary; recompile the managed construction.',
+    );
+    return;
+  }
+  const result = branch === 'a' ? a : branch === 'b' ? b : branch === 'c' ? c : torricelli;
+
+  registerPoint(state, plan, plan.equilateralAB, equilateralAB);
+  registerPoint(state, plan, plan.equilateralAC, equilateralAC);
+  registerPoint(state, plan, plan.torricelli, torricelli);
+  registerPoint(state, plan, plan.result, result);
+  registerLine(state, plan, plan.line1, c, equilateralAB);
+  registerLine(state, plan, plan.line2, b, equilateralAC);
+  registerPolygon(state, plan, plan.triangleAB, [a, b, equilateralAB]);
+  registerPolygon(state, plan, plan.triangleAC, [a, c, equilateralAC]);
+  registerSegment(state, plan, plan.rayA, result, a);
+  registerSegment(state, plan, plan.rayB, result, b);
+  registerSegment(state, plan, plan.rayC, result, c);
+}
+
 function evaluateTangent(
   plan: TangentAtPointConstructionPlan,
   source: ReadonlyMap<string, Pt>,
@@ -893,6 +1064,12 @@ function visibleNames(plan: ConstructionPlan): readonly string[] {
       return [plan.result, plan.line];
     case 'circumcircle':
       return [plan.center, plan.circle];
+    case 'nine-point-circle':
+      return plan.outputs.map((output) => output.ref);
+    case 'simson-line':
+      return plan.outputs.map((output) => output.ref);
+    case 'fermat-point':
+      return plan.outputs.map((output) => output.ref);
     case 'tangent-at-point':
       return [plan.touch, plan.result, plan.line];
     case 'reflect-point':
@@ -999,6 +1176,15 @@ export function evaluateConstructionPlan(
       break;
     case 'circumcircle':
       evaluateCircumcircle(plan, source, state);
+      break;
+    case 'nine-point-circle':
+      evaluateNinePointCircle(plan, source, state);
+      break;
+    case 'simson-line':
+      evaluateSimsonLine(plan, source, state);
+      break;
+    case 'fermat-point':
+      evaluateFermatPoint(plan, source, state);
       break;
     case 'tangent-at-point':
       evaluateTangent(plan, source, state);

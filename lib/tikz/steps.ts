@@ -57,6 +57,13 @@ function statementSteps(statement: Statement, stmtIndex: number): Omit<Construct
       refs: [...statement.points],
     }];
   }
+  if (statement.kind === 'graph') {
+    return [{
+      title: `作图：静态图（${statement.nodes.length} 个节点，${statement.edges.length} 条关系）`,
+      stmtIndex,
+      refs: statement.nodes.map((node) => node.name),
+    }];
+  }
 
   const steps: Omit<ConstructionStep, 'index'>[] = [];
   if (statement.namePath) {
@@ -75,6 +82,14 @@ function statementSteps(statement: Statement, stmtIndex: number): Omit<Construct
     for (const spec of statement.specs) {
       const refs = spec.type === 'polyline'
         ? spec.points.flatMap(collectCoordRefs)
+        : spec.type === 'rectangle'
+          ? [spec.first, spec.opposite].flatMap(collectCoordRefs)
+        : spec.type === 'cubic-bezier'
+          ? [spec.start, spec.control1, spec.control2, spec.end].flatMap(collectCoordRefs)
+        : spec.type === 'circular-arc'
+          ? collectCoordRefs(spec.start)
+        : spec.type === 'ellipse'
+          ? collectCoordRefs(spec.center)
         : [
             ...collectCoordRefs(spec.center),
             ...(spec.radius.kind === 'through' ? collectCoordRefs(spec.radius.point) : []),
@@ -82,6 +97,14 @@ function statementSteps(statement: Statement, stmtIndex: number): Omit<Construct
       steps.push({
         title: spec.type === 'circle'
           ? `作图：圆${statement.command.startsWith('fill') ? '（填充）' : ''}`
+          : spec.type === 'cubic-bezier'
+            ? '作图：三次 Bézier 曲线'
+          : spec.type === 'rectangle'
+            ? '作图：矩形'
+          : spec.type === 'circular-arc'
+            ? '作图：圆弧'
+          : spec.type === 'ellipse'
+            ? '作图：椭圆'
           : `作图：${spec.cycle ? '多边形' : '折线'}`,
         stmtIndex,
         refs,

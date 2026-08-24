@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLIENT_PROVIDER, getEffectiveProvider, PROVIDER_NAMES, relayBaseUrl } from './settings';
 
-const ENV_KEYS = ['LLM_RELAY_API_KEY', 'LLM_RELAY_MODEL'];
+const ENV_KEYS = [
+  'LLM_RELAY_API_KEY',
+  'LLM_RELAY_MODEL',
+  'LLM_RELAY_VISION_MODEL',
+];
 
 beforeEach(() => {
   for (const key of ENV_KEYS) vi.stubEnv(key, '');
@@ -26,11 +30,13 @@ describe('api.molamaker.cn relay settings', () => {
   it('只读取 relay key 和可选默认模型', async () => {
     vi.stubEnv('LLM_RELAY_API_KEY', 'relay-key');
     vi.stubEnv('LLM_RELAY_MODEL', 'model-a');
+    vi.stubEnv('LLM_RELAY_VISION_MODEL', 'vision-a');
     const provider = await getEffectiveProvider('relay');
     expect(provider).toMatchObject({
       apiKey: 'relay-key',
       baseUrl: 'https://api.molamaker.cn',
       model: 'model-a',
+      visionModel: 'vision-a',
       configured: true,
     });
   });

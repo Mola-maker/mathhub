@@ -1,0 +1,10 @@
+\documentclass[border=2pt]{standalone}
+\def\pgfsysdriver{pgfsys-dvisvgm.def}
+\usepackage{tikz}
+\usetikzlibrary{graphs,graphdrawing}
+\usegdlibrary{force}
+\begin{document}
+\begin{tikzpicture}
+  \graph [spring layout] { a -- b -- c -- a };
+\end{tikzpicture}
+\end{document}

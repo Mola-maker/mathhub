@@ -4,6 +4,7 @@ import type { Tree } from '@lezer/common';
 import { ParseError, type SourceRange, type Statement } from './subset/ast';
 import { parseTikz } from './subset/parser';
 import { staticCheck } from './subset/static-check';
+import type { TikzCoordinateTransform } from './subset/coordinate-transform';
 
 export interface AnalysisIssue {
   severity: 'error' | 'preview-only';
@@ -19,16 +20,25 @@ export interface Analysis {
   scene: Scene | null;
   issues: AnalysisIssue[];
   freePointRanges: Map<string, SourceRange>;
+  /** World-to-source writeback uses the inverse of this per-point CTM. */
+  freePointTransforms: Map<string, TikzCoordinateTransform>;
 }
 
-function freeRanges(stmts: Statement[]): Map<string, SourceRange> {
+function freePointProjection(stmts: Statement[]): {
+  ranges: Map<string, SourceRange>;
+  transforms: Map<string, TikzCoordinateTransform>;
+} {
   const ranges = new Map<string, SourceRange>();
+  const transforms = new Map<string, TikzCoordinateTransform>();
   for (const statement of stmts) {
     if (statement.kind === 'coordinate' && statement.at.kind === 'literal') {
       ranges.set(statement.name, statement.at.range);
+      if (statement.coordinateTransform) {
+        transforms.set(statement.name, statement.coordinateTransform);
+      }
     }
   }
-  return ranges;
+  return { ranges, transforms };
 }
 
 const STATEMENT_WRAPPER_PREFIX = '\\begin{tikzpicture}\n';
@@ -58,7 +68,11 @@ function shiftSourceRanges<T>(value: T, delta: number): T {
 }
 
 function parseSemanticProjection(code: string, cst: TikzCst): Statement[] {
-  if (cst.opaqueNodes.length === 0) {
+  if (
+    cst.opaqueNodes.length === 0
+    && !/\\begin\s*\{scope\}/u.test(code)
+    && cst.statements.every((node) => !node.coordinateTransform)
+  ) {
     return parseTikz(code).statements;
   }
 
@@ -71,10 +85,15 @@ function parseSemanticProjection(code: string, cst: TikzCst): Statement[] {
     );
     const statement = parseTikz(wrapped).statements[0];
     if (!statement) continue;
-    statements.push(shiftSourceRanges(
+    const shifted = shiftSourceRanges(
       statement,
       node.range.start - STATEMENT_WRAPPER_PREFIX.length,
-    ));
+    );
+    statements.push({
+      ...shifted,
+      ...(node.coordinateTransform ? { coordinateTransform: node.coordinateTransform } : {}),
+      ...(node.inheritedStyleRaw ? { inheritedStyleRaw: node.inheritedStyleRaw } : {}),
+    });
   }
   return statements;
 }
@@ -91,6 +110,7 @@ export function analyze(code: string, sourceRevision = 0, cstTree?: Tree): Analy
       scene: evaluateScene(stmts, sourceRevision),
       issues: [],
       freePointRanges: new Map(),
+      freePointTransforms: new Map(),
     };
   }
   if (cst.errorRanges.length > 0) {
@@ -106,6 +126,7 @@ export function analyze(code: string, sourceRevision = 0, cstTree?: Tree): Analy
         range,
       })),
       freePointRanges: new Map(),
+      freePointTransforms: new Map(),
     };
   }
   let stmts: Statement[];
@@ -125,9 +146,25 @@ export function analyze(code: string, sourceRevision = 0, cstTree?: Tree): Analy
           range: { start: error.start, end: error.end },
         }],
         freePointRanges: new Map(),
+        freePointTransforms: new Map(),
       };
     }
-    throw error;
+    return {
+      sourceRevision,
+      status: 'invalid',
+      cst,
+      stmts: null,
+      scene: null,
+      issues: [{
+        severity: 'error',
+        message: error instanceof Error
+          ? error.message
+          : '交互语义投影失败',
+        range: null,
+      }],
+      freePointRanges: new Map(),
+      freePointTransforms: new Map(),
+    };
   }
 
   const picture = {
@@ -145,7 +182,7 @@ export function analyze(code: string, sourceRevision = 0, cstTree?: Tree): Analy
     message: `${node.command || '未知 TikZ 语句'} 超出交互子集；源码已原样保留并交给精确编译器`,
     range: node.range,
   })));
-  const ranges = freeRanges(stmts);
+  const freePoints = freePointProjection(stmts);
 
   if (staticIssues.some((issue) => issue.severity === 'error')) {
     return {
@@ -155,7 +192,8 @@ export function analyze(code: string, sourceRevision = 0, cstTree?: Tree): Analy
       stmts,
       scene: null,
       issues: staticIssues,
-      freePointRanges: ranges,
+      freePointRanges: freePoints.ranges,
+      freePointTransforms: freePoints.transforms,
     };
   }
 
@@ -176,6 +214,7 @@ export function analyze(code: string, sourceRevision = 0, cstTree?: Tree): Analy
     stmts,
     scene,
     issues: [...staticIssues, ...evaluationIssues],
-    freePointRanges: ranges,
+    freePointRanges: freePoints.ranges,
+    freePointTransforms: freePoints.transforms,
   };
 }

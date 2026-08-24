@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import exactProfile from '@/lib/tikz/syntax/exact-profile.json';
 import {
   compileTikzToSvg,
   createTikzCompileJob,
@@ -9,6 +10,9 @@ import {
   type CompilerArtifactAttestation,
 } from './compile-tikz';
 
+// Digests are taken over SOURCE exactly as submitted. The exact entry point may
+// reject source but may not trim, canonicalize or rewrite it, so a fixture that
+// hashed a trimmed variant would assert a normalization the contract forbids.
 const SOURCE = String.raw`
   \begin{tikzpicture}
   \draw (0,0) -- (1,1);
@@ -23,20 +27,52 @@ function digest(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+// The cache key binds the full execution identity, not just the source: compiler
+// image, source policy, wrapper and bundle identity all participate, so a
+// different sandbox or wrapper can never serve a cached artifact.
+const CACHE_KEY_VERSION = 'tikz-cache-key/v3' as const;
+const SOURCE_POLICY = 'tikz-untrusted-no-io/v1' as const;
+const WRAPPER_ID = 'tikz-standalone-dvisvgm/v1' as const;
+const WRAPPER_DIGEST = digest('tikz-standalone-dvisvgm-wrapper');
+const BUNDLE_IDENTITY = `tectonic-only-cached@${COMPILER_IMAGE_DIGEST}`;
+const PROFILE_MANIFEST_DIGEST = digest(JSON.stringify(exactProfile));
+
+function cacheKeyFor(submittedSourceDigest: string): string {
+  return digest([
+    CACHE_KEY_VERSION,
+    COMPILER_IMAGE_DIGEST,
+    PROFILE,
+    VISIBILITY,
+    submittedSourceDigest,
+    SOURCE_POLICY,
+    WRAPPER_ID,
+    WRAPPER_DIGEST,
+    BUNDLE_IDENTITY,
+    PROFILE_MANIFEST_DIGEST,
+  ].join('\0'));
+}
+
 function attestationFor(
   sourceDigest: string,
   artifact = ARTIFACT,
 ): CompilerArtifactAttestation {
-  const cacheKeyDigest = digest(
-    `${COMPILER_IMAGE_DIGEST}\0${PROFILE}\0${VISIBILITY}\0${sourceDigest}`,
-  );
+  const cacheKeyDigest = cacheKeyFor(sourceDigest);
   return {
     schemaVersion: 'tikz-artifact-attestation/v1',
     jobId: `j_${cacheKeyDigest}`,
+    cacheKeyVersion: CACHE_KEY_VERSION,
     sourceDigest,
+    submittedSourceDigest: sourceDigest,
+    executedSourceDigest: sourceDigest,
+    executedDocumentDigest: digest(`document:${sourceDigest}`),
     cacheKeyDigest,
     artifactDigest: digest(artifact),
     profile: PROFILE,
+    sourcePolicy: SOURCE_POLICY,
+    wrapperId: WRAPPER_ID,
+    wrapperDigest: WRAPPER_DIGEST,
+    bundleIdentity: BUNDLE_IDENTITY,
+    profileManifestDigest: PROFILE_MANIFEST_DIGEST,
     visibility: VISIBILITY,
     renderer: 'tectonic-dvisvgm',
     compilerImageDigest: COMPILER_IMAGE_DIGEST,
@@ -46,16 +82,85 @@ function attestationFor(
   };
 }
 
+// A job must advertise the same execution identity as its attestation; the
+// client recomputes the cache key from these fields before trusting an artifact.
+function jobFor(attestation: CompilerArtifactAttestation) {
+  return {
+    id: attestation.jobId,
+    cacheKeyVersion: attestation.cacheKeyVersion,
+    cacheKeyDigest: attestation.cacheKeyDigest,
+    sourceDigest: attestation.sourceDigest,
+    submittedSourceDigest: attestation.submittedSourceDigest,
+    executedSourceDigest: attestation.executedSourceDigest,
+    executedDocumentDigest: attestation.executedDocumentDigest,
+    profile: attestation.profile,
+    sourcePolicy: attestation.sourcePolicy,
+    wrapperId: attestation.wrapperId,
+    wrapperDigest: attestation.wrapperDigest,
+    bundleIdentity: attestation.bundleIdentity,
+    profileManifestDigest: attestation.profileManifestDigest,
+    visibility: attestation.visibility,
+    renderer: attestation.renderer,
+    compilerImageDigest: attestation.compilerImageDigest,
+  };
+}
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
 describe('compileTikzToSvg', () => {
+  it('does not send Lua graph drawing source to the standard compiler', async () => {
+    vi.stubEnv('TIKZ_COMPILER_URL', 'http://compiler.internal');
+    vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
+    vi.stubEnv('TIKZ_GRAPHDRAWING_COMPILER_URL', '');
+    vi.stubEnv('TIKZ_GRAPHDRAWING_COMPILER_TOKEN', '');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(createTikzCompileJob(String.raw`
+      \begin{tikzpicture}
+      \graph [spring layout] { a -- b -- c -- a };
+      \end{tikzpicture}
+    `)).rejects.toMatchObject({
+      status: 503,
+      code: 'GRAPHDRAWING_COMPILER_NOT_CONFIGURED',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('submits Lua layout source only to the configured companion profile', async () => {
+    vi.stubEnv(
+      'TIKZ_GRAPHDRAWING_COMPILER_URL',
+      'http://graph-compiler.internal/',
+    );
+    vi.stubEnv('TIKZ_GRAPHDRAWING_COMPILER_TOKEN', 'graph-token');
+    const fetchMock = vi.fn(async () => Response.json(
+      { error: 'fixture stop', code: 'FIXTURE_STOP' },
+      { status: 422 },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(createTikzCompileJob(String.raw`
+      \begin{tikzpicture}
+      \graph [layered layout] { a -> b };
+      \end{tikzpicture}
+    `)).rejects.toMatchObject({ code: 'FIXTURE_STOP' });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://graph-compiler.internal/v1/jobs');
+    expect(init?.headers).toMatchObject({
+      Authorization: 'Bearer graph-token',
+    });
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      profile: 'tikz-luatex-graphdrawing-v1',
+    });
+  });
+
   it('通过内部 job API 创建任务并读取隔离 artifact', async () => {
     vi.stubEnv('TIKZ_COMPILER_URL', 'http://compiler.internal/');
     vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
-    const sourceDigest = digest(SOURCE.trim());
+    const sourceDigest = digest(SOURCE);
     const attestation = attestationFor(sourceDigest);
     const { jobId, artifactDigest } = attestation;
     const fetchMock = vi.fn(async (
@@ -71,10 +176,8 @@ describe('compileTikzToSvg', () => {
           },
         })
         : new Response(JSON.stringify({
-          id: jobId,
+          ...jobFor(attestation),
           status: 'succeeded',
-          sourceDigest,
-          renderer: 'tectonic-dvisvgm',
           attestation,
         }), {
           status: 200,
@@ -92,7 +195,7 @@ describe('compileTikzToSvg', () => {
       'Content-Type': 'application/json',
     });
     expect(JSON.parse(String(init?.body))).toEqual({
-      source: SOURCE.trim(),
+      source: SOURCE,
       profile: 'tikz-standard-v1',
       visibility: 'private',
     });
@@ -117,7 +220,7 @@ describe('compileTikzToSvg', () => {
   it('拒绝与请求源码不一致的任务响应', async () => {
     vi.stubEnv('TIKZ_COMPILER_URL', 'http://compiler.internal');
     vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
-    const attestation = attestationFor(digest(SOURCE.trim()));
+    const attestation = attestationFor(digest(SOURCE));
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       id: attestation.jobId,
       status: 'queued',
@@ -128,7 +231,8 @@ describe('compileTikzToSvg', () => {
     })));
 
     await expect(createTikzCompileJob(SOURCE)).rejects.toMatchObject({
-      code: 'COMPILER_REJECTED',
+      status: 502,
+      code: 'INVALID_JOB_IDENTITY',
     });
   });
 
@@ -139,14 +243,15 @@ describe('compileTikzToSvg', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       id: `j_${'2'.repeat(64)}`,
       status: 'running',
-      sourceDigest: digest(SOURCE.trim()),
+      sourceDigest: digest(SOURCE),
     }), {
       status: 202,
       headers: { 'Content-Type': 'application/json' },
     })));
 
     await expect(getTikzCompileJob(requested)).rejects.toMatchObject({
-      code: 'COMPILER_REJECTED',
+      status: 502,
+      code: 'INVALID_JOB_IDENTITY',
     });
   });
 
@@ -183,7 +288,7 @@ describe('compileTikzToSvg', () => {
   }) => {
     vi.stubEnv('TIKZ_COMPILER_URL', 'http://compiler.internal');
     vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
-    const original = attestationFor(digest(SOURCE.trim()));
+    const original = attestationFor(digest(SOURCE));
     const attestation = mutate(original);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(body, {
       status: 200,
@@ -203,7 +308,7 @@ describe('compileTikzToSvg', () => {
     vi.stubEnv('TIKZ_COMPILER_URL', 'http://compiler.internal');
     vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
     const unsafe = '<svg onload="bad()"><path /></svg>';
-    const attestation = attestationFor(digest(SOURCE.trim()), unsafe);
+    const attestation = attestationFor(digest(SOURCE), unsafe);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(unsafe, {
       status: 200,
       headers: {
@@ -221,7 +326,7 @@ describe('compileTikzToSvg', () => {
   it('拒绝输入字段改变但 cache key 未重算的证明', async () => {
     vi.stubEnv('TIKZ_COMPILER_URL', 'http://compiler.internal');
     vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
-    const original = attestationFor(digest(SOURCE.trim()));
+    const original = attestationFor(digest(SOURCE));
     const stale = {
       ...original,
       visibility: 'public' as const,
@@ -234,6 +339,58 @@ describe('compileTikzToSvg', () => {
       stale,
     )).rejects.toMatchObject({ code: 'INVALID_ARTIFACT_ATTESTATION' });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('rejects an oversized compiler JSON response before parsing it', async () => {
+    vi.stubEnv('TIKZ_COMPILER_URL', 'http://compiler.internal');
+    vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('x'.repeat(300 * 1024), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+
+    await expect(createTikzCompileJob(SOURCE)).rejects.toMatchObject({
+      code: 'COMPILER_RESPONSE_TOO_LARGE',
+    });
+  });
+
+  it('rejects an oversized artifact before buffering its body', async () => {
+    vi.stubEnv('TIKZ_COMPILER_URL', 'http://compiler.internal');
+    vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
+    const attestation = attestationFor(digest(SOURCE));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(ARTIFACT, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/svg+xml',
+        'Content-Length': String(4 * 1024 * 1024 + 1),
+        'X-Artifact-SHA256': attestation.artifactDigest,
+      },
+    })));
+
+    await expect(fetchTikzCompileArtifact(
+      attestation.jobId,
+      attestation,
+    )).rejects.toMatchObject({ code: 'ARTIFACT_TOO_LARGE' });
+  });
+
+  it('propagates caller cancellation to the compiler request', async () => {
+    vi.stubEnv('TIKZ_COMPILER_URL', 'http://compiler.internal');
+    vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
+    vi.stubGlobal('fetch', vi.fn(async (
+      _url: string | URL | Request,
+      init?: RequestInit,
+    ) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(new DOMException('Aborted', 'AbortError'));
+      }, { once: true });
+    })));
+    const controller = new AbortController();
+    const request = createTikzCompileJob(SOURCE, controller.signal);
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({
+      code: 'COMPILER_REQUEST_ABORTED',
+      status: 499,
+    });
   });
 });
 

@@ -1,9 +1,11 @@
 import {
-  compileConstructionPlan,
+  compileConstructionWriterArtifact,
   validateConstructionPlan,
   type ConstructionPoint,
   type ConstructionPlan,
 } from '../authoring/construction-ir';
+import { compileNewManagedConstructionPlan } from '../authoring/construction-ir-v3';
+import { validateConstructionPlanSemanticFootprint } from '../authoring/construction-plan-footprint';
 import {
   constructionPlanSyntaxKind,
   validateConstructionPlanWriterSafety,
@@ -28,8 +30,6 @@ import type {
   GeometryTransactionRequest,
 } from './transactions';
 import {
-  compileAiPatchProposal,
-  type AiPatchCompilationResult,
   type AiPatchBindingContext,
   type AiPatchCompileOptions,
   type AiPatchProposalBasis,
@@ -56,6 +56,12 @@ export type AiConstructionPlanOperation =
     readonly expectedPlanKind: string;
     readonly expectedSyntaxKind: string;
     readonly expectedContentFingerprint: string;
+    readonly expectedPresentationFingerprint?: string;
+    readonly expectedWriterId: string;
+    readonly expectedWriterRevision: number;
+    readonly expectedWriterSlotIds: readonly string[];
+    readonly expectedWriterSlotSemanticFingerprints: readonly string[];
+    readonly expectedAttachmentsFingerprint?: string;
     readonly expectedRange: { readonly start: number; readonly end: number };
     readonly previousPlan: ConstructionPlan;
     readonly plan: ConstructionPlan;
@@ -80,6 +86,7 @@ export interface AiConstructionPlanProposalError {
     | 'write-capability'
     | 'plan-invalid'
     | 'precondition-failed'
+    | 'presentation-conflict'
     | 'compile-failed';
   readonly message: string;
 }
@@ -121,13 +128,11 @@ function sameBasis(left: AiPatchProposalBasis, right: AiPatchProposalBasis): boo
     && left.sourceId === right.sourceId
     && left.hashAlgorithm === right.hashAlgorithm
     && left.kernelHash === right.kernelHash
+    && left.projectionHash === right.projectionHash
     && left.pluginSetDigest === right.pluginSetDigest;
 }
 
-type ConstructionPlanBindingContext = AiPatchBindingContext & {
-  /** Concrete managed syntax discriminator emitted by the semantic kernel. */
-  readonly managedSyntaxKind?: string;
-};
+type ConstructionPlanBindingContext = AiPatchBindingContext;
 
 function isBindingContextMap(
   value: AiPatchValidationContext['bindings'],
@@ -184,11 +189,26 @@ function operationShapeError(value: unknown): string | null {
   if (value.kind !== 'replace-managed-construction') {
     return 'Unsupported typed construction operation kind.';
   }
+  const hasCompleteWriterProof = nonEmpty(value.expectedWriterId)
+    && integer(value.expectedWriterRevision)
+    && Array.isArray(value.expectedWriterSlotIds)
+    && value.expectedWriterSlotIds.length > 0
+    && value.expectedWriterSlotIds.every(nonEmpty)
+    && Array.isArray(value.expectedWriterSlotSemanticFingerprints)
+    && value.expectedWriterSlotSemanticFingerprints.length
+      === value.expectedWriterSlotIds.length
+    && value.expectedWriterSlotSemanticFingerprints.every(nonEmpty);
+  const hasAnyPresentationProofField = value.expectedPresentationFingerprint !== undefined
+    || value.expectedAttachmentsFingerprint !== undefined;
+  const hasCompletePresentationProof = nonEmpty(value.expectedPresentationFingerprint)
+    && nonEmpty(value.expectedAttachmentsFingerprint);
   if (
     !nonEmpty(value.constructionId)
     || !nonEmpty(value.expectedPlanKind)
     || !nonEmpty(value.expectedSyntaxKind)
     || !nonEmpty(value.expectedContentFingerprint)
+    || !hasCompleteWriterProof
+    || (hasAnyPresentationProofField && !hasCompletePresentationProof)
     || !isRecord(value.expectedRange)
     || !integer(value.expectedRange.start)
     || !integer(value.expectedRange.end)
@@ -256,7 +276,7 @@ function planNamespaceConflictError(
   try {
     compiledSource = [
       '\\begin{tikzpicture}',
-      ...compileConstructionPlan(plan).lines,
+      ...compileNewManagedConstructionPlan(plan).lines,
       '\\end{tikzpicture}',
     ].join('\n');
   } catch (error) {
@@ -297,12 +317,24 @@ function planNamespaceConflictError(
       .map((entity) => entity.name),
   );
   const compilerPrivateCoordinates = new Set(
-    plan.kind === 'circumcircle' || plan.kind === 'cyclic-quadrilateral'
+    plan.kind === 'circumcircle'
+    || plan.kind === 'nine-point-circle'
+    || plan.kind === 'cyclic-quadrilateral'
+    || plan.kind === 'simson-line'
       ? [
         `mg-${plan.id}-m1`,
         `mg-${plan.id}-m2`,
         `mg-${plan.id}-q1`,
         `mg-${plan.id}-q2`,
+        ...(plan.kind === 'nine-point-circle'
+          ? [
+            `mg-${plan.id}-orthocenter-o`,
+            `mg-${plan.id}-orthocenter-m1`,
+            `mg-${plan.id}-orthocenter-m2`,
+            `mg-${plan.id}-orthocenter-q1`,
+            `mg-${plan.id}-orthocenter-q2`,
+          ]
+          : []),
       ]
       : [],
   );
@@ -379,6 +411,9 @@ const EVALUATED_PLAN_KINDS = new Set<ConstructionPlan['kind']>([
   'perpendicular-bisector',
   'angle-bisector',
   'circumcircle',
+  'nine-point-circle',
+  'simson-line',
+  'fermat-point',
   'tangent-at-point',
   'reflect-point',
   'reflect-line',
@@ -497,6 +532,18 @@ export function compileAiConstructionPlanProposal(
         message: writerIssues
           .slice(0, 8)
           .map((issue) => `${issue.path}: ${issue.message}`)
+        .join('; '),
+      });
+    }
+    const footprintIssues = validateConstructionPlanSemanticFootprint(
+      proposal.operation.plan,
+    );
+    if (footprintIssues.length > 0) {
+      errors.push({
+        code: 'plan-invalid',
+        message: footprintIssues
+          .slice(0, 8)
+          .map((issue) => `${issue.path}: ${issue.message}`)
           .join('; '),
       });
     }
@@ -516,6 +563,18 @@ export function compileAiConstructionPlanProposal(
       errors.push({
         code: 'plan-invalid',
         message: `previousPlan: ${writerIssues
+          .slice(0, 8)
+          .map((issue) => `${issue.path}: ${issue.message}`)
+          .join('; ')}`,
+      });
+    }
+    const footprintIssues = validateConstructionPlanSemanticFootprint(
+      proposal.operation.previousPlan,
+    );
+    if (footprintIssues.length > 0) {
+      errors.push({
+        code: 'plan-invalid',
+        message: `previousPlan: ${footprintIssues
           .slice(0, 8)
           .map((issue) => `${issue.path}: ${issue.message}`)
           .join('; ')}`,
@@ -630,7 +689,7 @@ export function compileAiConstructionPlanProposal(
       }
       patch = insertBeforeTikzEndPatch(
         context.source,
-        compileConstructionPlan(operation.plan).lines,
+        compileNewManagedConstructionPlan(operation.plan).lines,
       );
     } else {
       if (!binding.writeCapabilities?.includes('replace-managed-construction')) {
@@ -641,6 +700,17 @@ export function compileAiConstructionPlanProposal(
         || binding.managedPlanKind !== operation.expectedPlanKind
         || binding.managedSyntaxKind !== operation.expectedSyntaxKind
         || binding.managedContentFingerprint !== operation.expectedContentFingerprint
+        || binding.managedPresentationFingerprint
+          !== operation.expectedPresentationFingerprint
+        || binding.managedWriterId !== operation.expectedWriterId
+        || binding.managedWriterRevision
+          !== operation.expectedWriterRevision
+        || JSON.stringify(binding.managedWriterSlotIds)
+          !== JSON.stringify(operation.expectedWriterSlotIds)
+        || JSON.stringify(binding.managedWriterSlotSemanticFingerprints)
+          !== JSON.stringify(operation.expectedWriterSlotSemanticFingerprints)
+        || binding.managedAttachmentsFingerprint
+          !== operation.expectedAttachmentsFingerprint
         || binding.range.start !== operation.expectedRange.start
         || binding.range.end !== operation.expectedRange.end
       ) {
@@ -669,6 +739,19 @@ export function compileAiConstructionPlanProposal(
           expectedRange: operation.expectedRange,
           expectedPlanKind: operation.expectedPlanKind,
           expectedCanonicalPlan: operation.previousPlan,
+          expectedWriterId: operation.expectedWriterId,
+          expectedWriterRevision: operation.expectedWriterRevision,
+          expectedWriterSlotIds: operation.expectedWriterSlotIds,
+          expectedWriterSlotSemanticFingerprints:
+            operation.expectedWriterSlotSemanticFingerprints,
+          ...(operation.expectedPresentationFingerprint
+            ? {
+              expectedPresentationFingerprint:
+                operation.expectedPresentationFingerprint,
+              expectedAttachmentsFingerprint:
+                operation.expectedAttachmentsFingerprint!,
+            }
+            : {}),
         },
       );
       const replacement = replacementPatches[0];
@@ -692,10 +775,14 @@ export function compileAiConstructionPlanProposal(
       patch = replacement;
     }
   } catch (error) {
+    const code = error instanceof ManagedConstructionRecompileError
+      && error.code === 'presentation-conflict'
+      ? 'presentation-conflict' as const
+      : 'compile-failed' as const;
     return {
       ok: false,
       errors: [{
-        code: 'compile-failed',
+        code,
         message: error instanceof Error ? error.message : 'Construction plan compilation failed.',
       }],
     };
@@ -713,6 +800,7 @@ export function compileAiConstructionPlanProposal(
   }
 
   const range = { start: patch.from, end: patch.to };
+  const operationWriterArtifact = compileConstructionWriterArtifact(operation.plan);
   const precondition = sourcePrecondition(context.basis.sourceId, patch, context.source);
   const resource = sourceRange(context.basis.sourceId, range);
   const transaction: GeometryTransactionRequest = {
@@ -727,6 +815,9 @@ export function compileAiConstructionPlanProposal(
     sourceHash: proposal.basis.sourceHash,
     ...(options.expectedKernelHash ?? proposal.basis.kernelHash
       ? { expectedKernelHash: options.expectedKernelHash ?? proposal.basis.kernelHash }
+      : {}),
+    ...(proposal.basis.projectionHash
+      ? { expectedProjectionHash: proposal.basis.projectionHash }
       : {}),
     ...(options.pluginSetDigest ?? proposal.basis.pluginSetDigest
       ? { pluginSetDigest: options.pluginSetDigest ?? proposal.basis.pluginSetDigest }
@@ -757,7 +848,46 @@ export function compileAiConstructionPlanProposal(
       constructionPlanKind: operation.plan.kind,
       constructionSyntaxKind: constructionPlanSyntaxKind(operation.plan),
       constructionPlanId: operation.plan.id,
+      managedConstructionOperationKind: operation.kind,
       semanticWrite: true,
+      ...(operation.kind === 'replace-managed-construction'
+        ? {
+          managedConstructionRecompileProof: {
+            schemaVersion: 'managed-construction-recompile-proof/v1',
+            mode: operation.expectedPresentationFingerprint
+              ? 'lossless-presentation'
+              : 'canonical',
+            constructionId: operation.constructionId,
+            previousContentFingerprint:
+              operation.expectedContentFingerprint,
+            writerId: operation.expectedWriterId,
+            writerRevision: operation.expectedWriterRevision,
+            slotIds: operation.expectedWriterSlotIds,
+            slotSemanticFingerprints:
+              operation.expectedWriterSlotSemanticFingerprints,
+            ...(operation.expectedPresentationFingerprint
+              ? {
+                presentationFingerprint:
+                  operation.expectedPresentationFingerprint,
+                attachmentsFingerprint:
+                  operation.expectedAttachmentsFingerprint!,
+              }
+              : {}),
+          },
+        }
+        : {
+          managedConstructionCreateProof: {
+            schemaVersion: 'managed-construction-create-proof/v1',
+            constructionId: operation.plan.id,
+            planKind: operation.plan.kind,
+            syntaxKind: constructionPlanSyntaxKind(operation.plan),
+            writerId: operationWriterArtifact.writerId,
+            writerRevision: operationWriterArtifact.writerRevision,
+            slotIds: operationWriterArtifact.slots.map((slot) => slot.id),
+            slotSemanticFingerprints:
+              operationWriterArtifact.slots.map((slot) => slot.semanticFingerprint),
+          },
+        }),
     },
   };
   return { ok: true, proposal, transaction };
@@ -768,19 +898,4 @@ export function isAiConstructionPlanProposal(
 ): value is AiConstructionPlanProposal {
   return isRecord(value)
     && value.schemaVersion === AI_CONSTRUCTION_PLAN_PROPOSAL_SCHEMA_VERSION;
-}
-
-export type AiWriteProposalCompilation =
-  | AiConstructionPlanProposalCompilation
-  | AiPatchCompilationResult;
-
-/** Dispatch raw writable bindings and typed managed bindings without merging their trust policies. */
-export function compileAiWriteProposal(
-  value: unknown,
-  context: AiPatchValidationContext,
-  options: AiPatchCompileOptions = {},
-): AiWriteProposalCompilation {
-  return isAiConstructionPlanProposal(value)
-    ? compileAiConstructionPlanProposal(value, context, options)
-    : compileAiPatchProposal(value, context, options);
 }

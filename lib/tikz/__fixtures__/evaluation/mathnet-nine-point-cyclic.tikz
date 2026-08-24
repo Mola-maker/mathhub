@@ -1,0 +1,28 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (6,0);
+\coordinate (C) at (1.5,4);
+\coordinate (D) at ($(B)!(A)!(C)$);
+\coordinate (E) at ($(C)!(B)!(A)$);
+\coordinate (F) at ($(A)!(C)!(B)$);
+\coordinate (Mab) at ($(A)!0.5!(B)$);
+\coordinate (Mbc) at ($(B)!0.5!(C)$);
+\coordinate (Mca) at ($(C)!0.5!(A)$);
+\coordinate (O) at (3,1.15625);
+\coordinate (H) at (1.5,1.6875);
+\coordinate (N) at ($(O)!0.5!(H)$);
+\draw[thick] (A) -- (B) -- (C) -- cycle;
+\draw[dashed] (A) -- (D) (B) -- (E) (C) -- (F);
+\node[draw,circle through=(Mab)] at (N) {};
+\pic[draw] {right angle = A--D--B};
+\pic[draw] {right angle = B--E--C};
+\pic[draw] {right angle = C--F--A};
+\node[below left] at (A) {$A$};
+\node[below right] at (B) {$B$};
+\node[above] at (C) {$C$};
+\node[right] at (D) {$D$};
+\node[left] at (E) {$E$};
+\node[below] at (F) {$F$};
+\node[above right] at (H) {$H$};
+\node[above] at (N) {$N$};
+\end{tikzpicture}

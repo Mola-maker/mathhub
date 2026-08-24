@@ -10,6 +10,7 @@ export interface DefaultCommandContext extends Record<string, unknown> {
   finishConstruction?: () => unknown;
   backConstruction?: () => unknown;
   deleteSelection?: () => unknown;
+  selectAllGeometry?: () => unknown;
   activeConstruction?: boolean;
   hasSelection?: boolean;
 }
@@ -58,6 +59,8 @@ export const DEFAULT_TOOL_SHORTCUTS: readonly ToolShortcut[] = [
   { id: 'perpendicular-bisector', label: '中垂线', shortcut: 'B' },
   { id: 'angle-bisector', label: '角平分线', shortcut: 'Shift+B' },
   { id: 'circumcircle', label: '三点圆', shortcut: 'O' },
+  { id: 'nine-point-circle', label: '九点圆', shortcut: 'Shift+O' },
+  { id: 'fermat-point', label: '费马点', shortcut: 'Shift+F' },
   { id: 'tangent-at-point', label: '切线', shortcut: 'J' },
   { id: 'reflect-point', label: '点反射', shortcut: 'X' },
   { id: 'reflect-line', label: '轴反射', shortcut: 'Shift+X' },
@@ -67,6 +70,7 @@ export const DEFAULT_TOOL_SHORTCUTS: readonly ToolShortcut[] = [
   { id: 'radical-axis', label: '根轴', shortcut: 'Y' },
   { id: 'cyclic-quadrilateral', label: '圆内接四边形', shortcut: 'U' },
   { id: 'complete-quadrilateral', label: '完全四边形', shortcut: 'Shift+U' },
+  { id: 'simson-line', label: '西姆松线', shortcut: 'Shift+S' },
 ];
 
 export function shortcutForTool(toolId: string): string | undefined {
@@ -120,6 +124,15 @@ export const DEFAULT_COMMANDS: readonly CommandDefinition<DefaultCommandContext>
     when: activeConstruction,
     shortcuts: ['Escape'],
     execute: (context) => context.backConstruction?.(),
+  },
+  {
+    id: 'selection.select-all',
+    title: '全选画板图元',
+    scope: 'canvas',
+    priority: 100,
+    allowInEditable: false,
+    shortcuts: ['Mod+A'],
+    execute: (context) => context.selectAllGeometry?.(),
   },
   {
     id: 'selection.delete',

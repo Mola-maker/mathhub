@@ -29,6 +29,8 @@ export interface AuthoringAnchor {
   existing: boolean;
   circle?: {
     stableId: string;
+    semanticEntityId: string;
+    sourceBindingId: string;
     stmtIndex: number;
     sourceRange?: { start: number; end: number };
     centerName: string;

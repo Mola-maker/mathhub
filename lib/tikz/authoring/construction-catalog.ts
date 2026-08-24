@@ -6,6 +6,10 @@ import {
   type ConstructionPlan,
   type PrimitiveKind,
 } from './construction-ir';
+import { assertConstructionPlanSemanticFootprint } from './construction-plan-footprint';
+import { hashSource } from '../document/source-hash';
+
+export const CONSTRUCTION_CATALOG_ABI_VERSION = 'construction-catalog/v1' as const;
 
 export type ConstructionCategory =
   | 'navigate'
@@ -23,6 +27,8 @@ export interface ConstructionInputSlot {
 
 export interface ConstructionBuildContext {
   anchors: readonly AuthoringAnchor[];
+  /** Closed, writer-safe label text supplied only by the trusted intent compiler. */
+  labelText?: string;
   nextName(prefix: string): string;
   /**
    * Allocates a document-unique managed construction identity. Geometry names
@@ -33,6 +39,8 @@ export interface ConstructionBuildContext {
 
 export interface ConstructionToolSpec {
   id: string;
+  /** Bump when this tool's plan factory changes semantic output or allocation. */
+  semanticRevision: string;
   label: string;
   symbol: string;
   description: string;
@@ -46,6 +54,163 @@ export interface ConstructionToolSpec {
   validate?: (anchors: readonly AuthoringAnchor[]) => string | null;
   plan?: (context: ConstructionBuildContext) => ConstructionPlan;
 }
+
+export interface ConstructionIntentContract {
+  readonly minInputs: number;
+  readonly maxInputs: number;
+  readonly repeatedInputKind?: ConstructionInputSlot['accepts'];
+  readonly inputKinds: readonly ConstructionInputSlot['accepts'][];
+  readonly requestedNameKeys: readonly string[];
+  readonly parameterSchema: 'none' | 'point-position' | 'circle-angle' | 'label-text';
+  /** Stable model-facing outputs which may feed a later Catalog step. */
+  readonly outputSlots: readonly ConstructionOutputSlotContract[];
+}
+
+export interface ConstructionOutputSlotContract {
+  /** Stable DAG key. It is deliberately independent from allocated TikZ names. */
+  readonly key: string;
+  readonly produces: 'point' | 'circle';
+  /** One logical output may have branch-specific managed output roles. */
+  readonly roles: readonly string[];
+}
+
+const pointOutput = (
+  key: string,
+  ...roles: string[]
+): ConstructionOutputSlotContract => ({ key, produces: 'point', roles });
+const circleOutput = (
+  key: string,
+  ...roles: string[]
+): ConstructionOutputSlotContract => ({ key, produces: 'circle', roles });
+
+/**
+ * Public output ABI for atomic construction DAGs.
+ *
+ * Line/polygon outputs remain visible GeometryDoc entities but are omitted
+ * here because the current Catalog input ABI accepts only points and circles.
+ * Adding line/conic input slots later extends this table without teaching the
+ * model writer internals or allocated entity names.
+ */
+const CONSTRUCTION_OUTPUT_SLOTS: Readonly<Record<
+  string,
+  readonly ConstructionOutputSlotContract[]
+>> = {
+  point: [pointOutput('point', 'point')],
+  circle: [circleOutput('circle', 'circle')],
+  midpoint: [pointOutput('midpoint', 'midpoint')],
+  'perpendicular-foot': [pointOutput('foot', 'foot')],
+  'point-on-circle': [pointOutput('point', 'point')],
+  'parallel-line': [pointOutput('direction-point', 'direction-point')],
+  'perpendicular-line': [pointOutput('direction-point', 'direction-point')],
+  'perpendicular-bisector': [
+    pointOutput('midpoint', 'midpoint'),
+    pointOutput('direction-point', 'direction-point'),
+  ],
+  'angle-bisector': [pointOutput('direction-point', 'bisector-direction')],
+  circumcircle: [
+    pointOutput('center', 'circumcenter'),
+    circleOutput('circle', 'circumcircle'),
+  ],
+  'nine-point-circle': [
+    pointOutput('midpoint-bc', 'side-midpoint-bc'),
+    pointOutput('midpoint-ca', 'side-midpoint-ca'),
+    pointOutput('midpoint-ab', 'side-midpoint-ab'),
+    pointOutput('foot-a', 'altitude-foot-a'),
+    pointOutput('foot-b', 'altitude-foot-b'),
+    pointOutput('foot-c', 'altitude-foot-c'),
+    pointOutput('orthocenter', 'orthocenter'),
+    pointOutput('vertex-midpoint-a', 'vertex-orthocenter-midpoint-a'),
+    pointOutput('vertex-midpoint-b', 'vertex-orthocenter-midpoint-b'),
+    pointOutput('vertex-midpoint-c', 'vertex-orthocenter-midpoint-c'),
+    pointOutput('center', 'nine-point-center'),
+    circleOutput('circle', 'nine-point-circle'),
+  ],
+  'simson-line': [
+    pointOutput('center', 'circumcenter'),
+    circleOutput('circle', 'circumcircle'),
+    pointOutput('circle-point', 'circumcircle-point'),
+    pointOutput('foot-ab', 'pedal-foot-ab'),
+    pointOutput('foot-bc', 'pedal-foot-bc'),
+    pointOutput('foot-ca', 'pedal-foot-ca'),
+  ],
+  'fermat-point': [
+    pointOutput('equilateral-vertex-ab', 'equilateral-vertex-ab'),
+    pointOutput('equilateral-vertex-ac', 'equilateral-vertex-ac'),
+    pointOutput(
+      'result',
+      'fermat-point',
+      'fermat-vertex-a',
+      'fermat-vertex-b',
+      'fermat-vertex-c',
+    ),
+  ],
+  'tangent-at-point': [
+    pointOutput('touch-point', 'tangent-touch-point'),
+    pointOutput('direction-point', 'tangent-direction'),
+  ],
+  'reflect-point': [pointOutput('result', 'reflected-point')],
+  'reflect-line': [
+    pointOutput('foot', 'projection-foot'),
+    pointOutput('result', 'reflected-point'),
+  ],
+  'rotate-90': [pointOutput('result', 'rotated-point')],
+  'homothety-2': [pointOutput('result', 'homothetic-point')],
+  'inversion-point': [pointOutput('result', 'inverted-point')],
+  'radical-axis': [
+    pointOutput('point', 'radical-axis-point'),
+    pointOutput('direction-point', 'radical-axis-direction'),
+  ],
+  'cyclic-quadrilateral': [
+    pointOutput('center', 'circumcenter'),
+    pointOutput('fourth-vertex', 'fourth-vertex'),
+    circleOutput('circle', 'circumcircle'),
+  ],
+  'complete-quadrilateral': [
+    pointOutput('intersection-1', 'opposite-intersection-1'),
+    pointOutput('intersection-2', 'opposite-intersection-2'),
+  ],
+};
+
+/**
+ * Optional caller-facing names in the exact order each trusted plan factory
+ * allocates semantic points. Internal line/polygon identities stay host-owned.
+ */
+const CONSTRUCTION_REQUESTED_NAME_KEYS: Readonly<Record<string, readonly string[]>> = {
+  point: ['point'],
+  rectangle: ['secondCorner', 'fourthCorner'],
+  midpoint: ['midpoint'],
+  'perpendicular-foot': ['foot'],
+  'point-on-circle': ['point'],
+  'parallel-line': ['directionPoint'],
+  'perpendicular-line': ['directionPoint'],
+  'perpendicular-bisector': ['midpoint', 'directionPoint'],
+  'angle-bisector': ['directionPoint'],
+  circumcircle: ['center'],
+  'nine-point-circle': [
+    'midpointBC',
+    'midpointCA',
+    'midpointAB',
+    'footA',
+    'footB',
+    'footC',
+    'orthocenter',
+    'vertexMidpointA',
+    'vertexMidpointB',
+    'vertexMidpointC',
+    'center',
+  ],
+  'simson-line': ['center', 'circlePoint', 'footAB', 'footBC', 'footCA'],
+  'fermat-point': ['equilateralVertexAB', 'equilateralVertexAC', 'torricelli', 'result'],
+  'tangent-at-point': ['touchPoint', 'directionPoint'],
+  'reflect-point': ['result'],
+  'reflect-line': ['foot', 'result'],
+  'rotate-90': ['result'],
+  'homothety-2': ['result'],
+  'inversion-point': ['result'],
+  'radical-axis': ['point', 'directionPoint'],
+  'cyclic-quadrilateral': ['center', 'fourthVertex'],
+  'complete-quadrilateral': ['intersection1', 'intersection2'],
+};
 
 const pointSlot = (
   id: string,
@@ -183,6 +348,7 @@ function validateLine(anchors: readonly AuthoringAnchor[], aIndex: number, bInde
 const BASE_SPECS: ConstructionToolSpec[] = [
   {
     id: 'point',
+    semanticRevision: '1',
     label: '点',
     symbol: '•',
     description: '点击空白处创建自由点',
@@ -194,6 +360,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'segment',
+    semanticRevision: '1',
     label: '线段',
     symbol: '╱',
     description: '依次选择两个点创建线段',
@@ -208,6 +375,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'vector',
+    semanticRevision: '1',
     label: '向量',
     symbol: '↗',
     description: '依次选择起点和终点创建向量',
@@ -221,6 +389,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'line',
+    semanticRevision: '1',
     label: '直线',
     symbol: '↔',
     description: '依次选择两个点创建延长直线',
@@ -234,6 +403,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'ray',
+    semanticRevision: '1',
     label: '射线',
     symbol: '→',
     description: '依次选择起点和方向点',
@@ -247,6 +417,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'polyline',
+    semanticRevision: '1',
     label: '折线',
     symbol: '⌁',
     description: '逐点点击，双击或 Enter 完成',
@@ -261,6 +432,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'polygon',
+    semanticRevision: '1',
     label: '多边形',
     symbol: '△',
     description: '逐点点击，双击、点击首点或 Enter 闭合',
@@ -276,6 +448,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'rectangle',
+    semanticRevision: '1',
     label: '矩形',
     symbol: '□',
     description: '选择两个对角点创建矩形',
@@ -294,6 +467,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'circle',
+    semanticRevision: '1',
     label: '圆',
     symbol: '○',
     description: '依次选择圆心和圆上一点',
@@ -308,6 +482,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'label',
+    semanticRevision: '2',
     label: '标注',
     symbol: 'A',
     description: '选择点并创建可编辑标签',
@@ -318,6 +493,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'angle',
+    semanticRevision: '1',
     label: '角',
     symbol: '∠',
     description: '依次选择边点、顶点、边点',
@@ -332,6 +508,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'right-angle',
+    semanticRevision: '1',
     label: '直角',
     symbol: '⌞',
     description: '依次选择边点、顶点、边点',
@@ -346,6 +523,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'midpoint',
+    semanticRevision: '1',
     label: '中点',
     symbol: '◉',
     description: '选择两个已有点创建保持约束的中点',
@@ -362,6 +540,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'perpendicular-foot',
+    semanticRevision: '1',
     label: '垂足',
     symbol: '⊥',
     description: '依次选择待投影点和直线上的两个点',
@@ -379,6 +558,7 @@ const BASE_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'point-on-circle',
+    semanticRevision: '2',
     label: '圆上点',
     symbol: '⊙',
     description: '点击具有可逆圆定义语义的圆周创建绑定点',
@@ -560,6 +740,7 @@ function primitiveInputRoles(kind: PrimitiveKind): readonly string[] {
 function primitiveDefinition(
   kind: PrimitiveKind,
   anchors: readonly AuthoringAnchor[],
+  labelText?: string,
 ): Extract<ConstructionPlan, { kind: 'primitive' }>['primitive'] {
   const names = anchors.map((anchor) => anchor.name);
   switch (kind) {
@@ -582,7 +763,7 @@ function primitiveDefinition(
     case 'circle':
       return { kind, center: names[0], through: names[1] };
     case 'label':
-      return { kind, at: names[0], text: `$${names[0]}$` };
+      return { kind, at: names[0], text: labelText ?? `$${names[0]}$` };
     case 'angle':
     case 'right-angle':
       return { kind, points: [names[0], names[1], names[2]] };
@@ -594,6 +775,7 @@ function primitiveEntity(
   entityId: string,
   entityName: string,
   anchors: readonly AuthoringAnchor[],
+  labelText?: string,
 ): ConstructionPlan['entities'][number] {
   const names = anchors.map((anchor) => anchor.name);
   const base = {
@@ -623,7 +805,7 @@ function primitiveEntity(
     case 'circle':
       return { ...base, kind, center: names[0], through: names[1] };
     case 'label':
-      return { ...base, kind, at: names[0], text: `$${names[0]}$` };
+      return { ...base, kind, at: names[0], text: labelText ?? `$${names[0]}$` };
     case 'angle':
     case 'right-angle':
       return { ...base, kind, points: [names[0], names[1], names[2]] };
@@ -661,11 +843,11 @@ export function createPrimitiveConstructionPlan(
         ? [{ id: `input-${index + 1}`, role, ref: anchor.name }]
         : [];
     });
-  return {
+  const plan: ConstructionPlan = {
     id: constructionId,
     kind: 'primitive',
     inputs,
-    entities: [primitiveEntity(kind, entityId, entityName, anchors)],
+    entities: [primitiveEntity(kind, entityId, entityName, anchors, context.labelText)],
     constraints: [],
     relations: kind === 'point'
       ? []
@@ -677,12 +859,14 @@ export function createPrimitiveConstructionPlan(
       ref: entityReference,
       kind,
     }],
-    primitive: primitiveDefinition(kind, anchors),
+    primitive: primitiveDefinition(kind, anchors, context.labelText),
     selection: anchors.map((anchor) => anchor.name),
     status: kind === 'point'
       ? `已创建自由点 ${entityName}`
       : `已创建 ${kind} 图元`,
   };
+  assertConstructionPlanSemanticFootprint(plan);
+  return plan;
 }
 
 function rectangleByOppositeCornersPlan(
@@ -1019,6 +1203,317 @@ function circumcirclePlan({ anchors, nextName }: ConstructionBuildContext): Cons
   };
 }
 
+function ninePointCirclePlan({
+  anchors,
+  nextName,
+  nextConstructionId,
+}: ConstructionBuildContext): ConstructionPlan {
+  const [a, b, c] = anchors.map((anchor) => anchor.name);
+  const midpointBC = nextName('Mbc');
+  const midpointCA = nextName('Mca');
+  const midpointAB = nextName('Mab');
+  const footA = nextName('Ha');
+  const footB = nextName('Hb');
+  const footC = nextName('Hc');
+  const orthocenter = nextName('H');
+  const vertexMidpointA = nextName('Ja');
+  const vertexMidpointB = nextName('Jb');
+  const vertexMidpointC = nextName('Jc');
+  const center = nextName('N');
+  const circle = `circle-${center}`;
+  const constructionId = nextConstructionId?.(`nine-point-circle-${a}-${b}-${c}`)
+    ?? `nine-point-circle-${center}`;
+  const points = [
+    pointEntity(midpointBC, ['derived', 'nine-point-circle', 'side-midpoint']),
+    pointEntity(midpointCA, ['derived', 'nine-point-circle', 'side-midpoint']),
+    pointEntity(midpointAB, ['derived', 'nine-point-circle', 'side-midpoint']),
+    pointEntity(footA, ['derived', 'nine-point-circle', 'altitude-foot']),
+    pointEntity(footB, ['derived', 'nine-point-circle', 'altitude-foot']),
+    pointEntity(footC, ['derived', 'nine-point-circle', 'altitude-foot']),
+    pointEntity(orthocenter, ['derived', 'nine-point-circle', 'orthocenter']),
+    pointEntity(vertexMidpointA, ['derived', 'nine-point-circle', 'vertex-orthocenter-midpoint']),
+    pointEntity(vertexMidpointB, ['derived', 'nine-point-circle', 'vertex-orthocenter-midpoint']),
+    pointEntity(vertexMidpointC, ['derived', 'nine-point-circle', 'vertex-orthocenter-midpoint']),
+    pointEntity(center, ['derived', 'nine-point-circle', 'center']),
+  ];
+  const constraints: ConstructionPlan['constraints'] = [
+    { recordType: 'constraint', id: `midpoint-${midpointBC}`, kind: 'midpoint', point: midpointBC, a: b, b: c },
+    { recordType: 'constraint', id: `midpoint-${midpointCA}`, kind: 'midpoint', point: midpointCA, a: c, b: a },
+    { recordType: 'constraint', id: `midpoint-${midpointAB}`, kind: 'midpoint', point: midpointAB, a, b },
+    { recordType: 'constraint', id: `foot-${footA}`, kind: 'perpendicular-foot', point: a, lineStart: b, lineEnd: c, result: footA },
+    { recordType: 'constraint', id: `foot-${footB}`, kind: 'perpendicular-foot', point: b, lineStart: c, lineEnd: a, result: footB },
+    { recordType: 'constraint', id: `foot-${footC}`, kind: 'perpendicular-foot', point: c, lineStart: a, lineEnd: b, result: footC },
+    { recordType: 'constraint', id: `midpoint-${vertexMidpointA}`, kind: 'midpoint', point: vertexMidpointA, a, b: orthocenter },
+    { recordType: 'constraint', id: `midpoint-${vertexMidpointB}`, kind: 'midpoint', point: vertexMidpointB, a: b, b: orthocenter },
+    { recordType: 'constraint', id: `midpoint-${vertexMidpointC}`, kind: 'midpoint', point: vertexMidpointC, a: c, b: orthocenter },
+    {
+      recordType: 'constraint', id: `circle-through-${midpointBC}-${midpointCA}-${midpointAB}`,
+      kind: 'circle-through-three-points', circle, center,
+      points: [midpointBC, midpointCA, midpointAB],
+    },
+    ...[
+      midpointBC, midpointCA, midpointAB,
+      footA, footB, footC,
+      vertexMidpointA, vertexMidpointB, vertexMidpointC,
+    ].map((point) => ({
+      recordType: 'constraint' as const,
+      id: `on-circle-${point}-${circle}`,
+      kind: 'on-circle' as const,
+      point,
+      circle,
+    })),
+  ];
+  const dependencies = [
+    ...dependencyRelations(midpointBC, [b, c]),
+    ...dependencyRelations(midpointCA, [c, a]),
+    ...dependencyRelations(midpointAB, [a, b]),
+    ...dependencyRelations(footA, [a, b, c]),
+    ...dependencyRelations(footB, [a, b, c]),
+    ...dependencyRelations(footC, [a, b, c]),
+    ...dependencyRelations(orthocenter, [a, footA, b, footB]),
+    ...dependencyRelations(vertexMidpointA, [a, orthocenter]),
+    ...dependencyRelations(vertexMidpointB, [b, orthocenter]),
+    ...dependencyRelations(vertexMidpointC, [c, orthocenter]),
+    ...dependencyRelations(center, [midpointBC, midpointCA, midpointAB]),
+    ...dependencyRelations(circle, [center, midpointBC, midpointCA, midpointAB, footA, footB, footC, vertexMidpointA, vertexMidpointB, vertexMidpointC]),
+  ];
+  return {
+    id: constructionId,
+    kind: 'nine-point-circle',
+    inputs: [
+      { id: 'a', role: 'triangle-vertex', ref: a },
+      { id: 'b', role: 'triangle-vertex', ref: b },
+      { id: 'c', role: 'triangle-vertex', ref: c },
+    ],
+    entities: [
+      ...points,
+      {
+        recordType: 'entity', id: circle, name: circle, kind: 'circle',
+        center, through: midpointBC,
+        tags: ['derived', 'nine-point-circle', 'through-nine-points'],
+      },
+    ],
+    constraints,
+    relations: dependencies,
+    outputs: [
+      outputRecord(midpointBC, 'side-midpoint-bc'),
+      outputRecord(midpointCA, 'side-midpoint-ca'),
+      outputRecord(midpointAB, 'side-midpoint-ab'),
+      outputRecord(footA, 'altitude-foot-a'),
+      outputRecord(footB, 'altitude-foot-b'),
+      outputRecord(footC, 'altitude-foot-c'),
+      outputRecord(orthocenter, 'orthocenter'),
+      outputRecord(vertexMidpointA, 'vertex-orthocenter-midpoint-a'),
+      outputRecord(vertexMidpointB, 'vertex-orthocenter-midpoint-b'),
+      outputRecord(vertexMidpointC, 'vertex-orthocenter-midpoint-c'),
+      outputRecord(center, 'nine-point-center'),
+      { recordType: 'output', id: `output-${circle}`, role: 'nine-point-circle', ref: circle, kind: 'circle' },
+    ],
+    a, b, c,
+    midpointBC, midpointCA, midpointAB,
+    footA, footB, footC, orthocenter,
+    vertexMidpointA, vertexMidpointB, vertexMidpointC,
+    center, circle,
+    selection: [circle],
+    status: `已创建 △${a}${b}${c} 的九点圆`,
+  };
+}
+
+function simsonLinePlan({
+  anchors,
+  nextName,
+  nextConstructionId,
+}: ConstructionBuildContext): ConstructionPlan {
+  const [a, b, c] = anchors.map((anchor) => anchor.name);
+  const center = nextName('O');
+  const circle = `circle-${center}`;
+  const point = nextName('P');
+  const footAB = nextName('Sab');
+  const footBC = nextName('Sbc');
+  const footCA = nextName('Sca');
+  const line = `line-${footAB}-${footCA}`;
+  // A fixed irrational-looking branch avoids routinely colliding with a
+  // triangle vertex while keeping the managed writer deterministic. The
+  // point remains semantically on the circumcircle and can later be moved by
+  // its circle parameter rather than flattened to a free coordinate.
+  const angleDegrees = 137.5;
+  const constructionId = nextConstructionId?.(`simson-line-${a}-${b}-${c}`)
+    ?? `simson-line-${point}`;
+  return {
+    id: constructionId,
+    kind: 'simson-line',
+    inputs: [
+      { id: 'a', role: 'triangle-vertex', ref: a },
+      { id: 'b', role: 'triangle-vertex', ref: b },
+      { id: 'c', role: 'triangle-vertex', ref: c },
+    ],
+    entities: [
+      pointEntity(center, ['derived', 'simson-line', 'circumcenter']),
+      {
+        recordType: 'entity', id: circle, name: circle, kind: 'circle',
+        center, through: a,
+        tags: ['derived', 'simson-line', 'circumcircle'],
+      },
+      pointEntity(point, ['derived', 'simson-line', 'circle-point']),
+      pointEntity(footAB, ['derived', 'simson-line', 'pedal-foot']),
+      pointEntity(footBC, ['derived', 'simson-line', 'pedal-foot']),
+      pointEntity(footCA, ['derived', 'simson-line', 'pedal-foot']),
+      {
+        ...lineEntity(line, footAB, footCA),
+        tags: ['derived', 'simson-line', 'collinear-feet'],
+      },
+    ],
+    constraints: [
+      {
+        recordType: 'constraint',
+        id: `circle-through-${a}-${b}-${c}`,
+        kind: 'circle-through-three-points',
+        circle,
+        center,
+        points: [a, b, c],
+      },
+      { recordType: 'constraint', id: `on-circle-${point}`, kind: 'on-circle', point, circle },
+      { recordType: 'constraint', id: `rotation-${point}`, kind: 'rotation', source: a, center, result: point, angleDegrees },
+      { recordType: 'constraint', id: `foot-${footAB}`, kind: 'perpendicular-foot', point, lineStart: a, lineEnd: b, result: footAB },
+      { recordType: 'constraint', id: `foot-${footBC}`, kind: 'perpendicular-foot', point, lineStart: b, lineEnd: c, result: footBC },
+      { recordType: 'constraint', id: `foot-${footCA}`, kind: 'perpendicular-foot', point, lineStart: c, lineEnd: a, result: footCA },
+      { recordType: 'constraint', id: `collinear-${footAB}-${footBC}-${footCA}`, kind: 'collinear', points: [footAB, footBC, footCA] },
+    ],
+    relations: [
+      ...dependencyRelations(center, [a, b, c]),
+      ...dependencyRelations(circle, [center, a, b, c]),
+      ...dependencyRelations(point, [circle, center, a]),
+      ...dependencyRelations(footAB, [point, a, b]),
+      ...dependencyRelations(footBC, [point, b, c]),
+      ...dependencyRelations(footCA, [point, c, a]),
+      ...dependencyRelations(line, [footAB, footBC, footCA]),
+    ],
+    outputs: [
+      outputRecord(center, 'circumcenter'),
+      { recordType: 'output', id: `output-${circle}`, role: 'circumcircle', ref: circle, kind: 'circle' },
+      outputRecord(point, 'circumcircle-point'),
+      outputRecord(footAB, 'pedal-foot-ab'),
+      outputRecord(footBC, 'pedal-foot-bc'),
+      outputRecord(footCA, 'pedal-foot-ca'),
+      outputRecord(line, 'simson-line', 'derived-line'),
+    ],
+    a, b, c, center, circle, point, footAB, footBC, footCA, line, angleDegrees,
+    selection: [point, footAB, footBC, footCA, line],
+    status: `已创建 △${a}${b}${c} 的西姆松线`,
+  };
+}
+
+function fermatVertexBranch(
+  anchors: readonly AuthoringAnchor[],
+): 'a' | 'b' | 'c' | null {
+  const cosineAt = (vertex: AuthoringAnchor, first: AuthoringAnchor, second: AuthoringAnchor) => {
+    const ux = first.position.x - vertex.position.x;
+    const uy = first.position.y - vertex.position.y;
+    const vx = second.position.x - vertex.position.x;
+    const vy = second.position.y - vertex.position.y;
+    return (ux * vx + uy * vy) / Math.max(1e-15, Math.hypot(ux, uy) * Math.hypot(vx, vy));
+  };
+  const threshold = -0.5 + 1e-10;
+  if (cosineAt(anchors[0], anchors[1], anchors[2]) <= threshold) return 'a';
+  if (cosineAt(anchors[1], anchors[0], anchors[2]) <= threshold) return 'b';
+  if (cosineAt(anchors[2], anchors[0], anchors[1]) <= threshold) return 'c';
+  return null;
+}
+
+function fermatPointPlan({
+  anchors,
+  nextName,
+  nextConstructionId,
+}: ConstructionBuildContext): ConstructionPlan {
+  const [a, b, c] = anchors.map((anchor) => anchor.name);
+  const orientation = (
+    (anchors[1].position.x - anchors[0].position.x)
+    * (anchors[2].position.y - anchors[0].position.y)
+    - (anchors[1].position.y - anchors[0].position.y)
+    * (anchors[2].position.x - anchors[0].position.x)
+  ) >= 0 ? 1 : -1;
+  // Keep equivalent rotations in [0,360). The interactive subset accepts
+  // positive calc rotations losslessly; spelling clockwise 60° as 300° avoids
+  // turning an otherwise semantic managed block into an opaque statement.
+  const rotationABDegrees = (-60 * orientation + 360) % 360;
+  const rotationACDegrees = (60 * orientation + 360) % 360;
+  const equilateralAB = nextName('Eab');
+  const equilateralAC = nextName('Eac');
+  const torricelli = nextName('Ft');
+  const result = nextName('F');
+  const line1 = `line-${c}-${equilateralAB}`;
+  const line2 = `line-${b}-${equilateralAC}`;
+  const triangleAB = `triangle-${a}-${b}-${equilateralAB}`;
+  const triangleAC = `triangle-${a}-${c}-${equilateralAC}`;
+  const rayA = `segment-${result}-${a}`;
+  const rayB = `segment-${result}-${b}`;
+  const rayC = `segment-${result}-${c}`;
+  const branch = fermatVertexBranch(anchors);
+  const resultSource = branch === 'a' ? a : branch === 'b' ? b : branch === 'c' ? c : torricelli;
+  const constructionId = nextConstructionId?.(`fermat-point-${a}-${b}-${c}`)
+    ?? `fermat-point-${result}`;
+  const entities: ConstructionPlan['entities'] = [
+    pointEntity(equilateralAB, ['derived', 'fermat-point', 'equilateral-vertex']),
+    pointEntity(equilateralAC, ['derived', 'fermat-point', 'equilateral-vertex']),
+    pointEntity(torricelli, ['derived', 'fermat-point', 'torricelli-candidate']),
+    pointEntity(result, ['derived', 'fermat-point', branch ? 'vertex-branch' : 'interior-branch']),
+    lineEntity(line1, c, equilateralAB),
+    lineEntity(line2, b, equilateralAC),
+    { recordType: 'entity', id: triangleAB, name: triangleAB, kind: 'polygon', vertices: [a, b, equilateralAB], tags: ['fermat-point', 'equilateral-auxiliary'] },
+    { recordType: 'entity', id: triangleAC, name: triangleAC, kind: 'polygon', vertices: [a, c, equilateralAC], tags: ['fermat-point', 'equilateral-auxiliary'] },
+    { recordType: 'entity', id: rayA, name: rayA, kind: 'segment', from: result, to: a, tags: ['fermat-point', 'distance-ray'] },
+    { recordType: 'entity', id: rayB, name: rayB, kind: 'segment', from: result, to: b, tags: ['fermat-point', 'distance-ray'] },
+    { recordType: 'entity', id: rayC, name: rayC, kind: 'segment', from: result, to: c, tags: ['fermat-point', 'distance-ray'] },
+  ];
+  return {
+    id: constructionId,
+    kind: 'fermat-point',
+    inputs: [
+      { id: 'a', role: 'triangle-vertex', ref: a },
+      { id: 'b', role: 'triangle-vertex', ref: b },
+      { id: 'c', role: 'triangle-vertex', ref: c },
+    ],
+    entities,
+    constraints: [
+      { recordType: 'constraint', id: `rotation-${equilateralAB}`, kind: 'rotation', source: b, center: a, result: equilateralAB, angleDegrees: rotationABDegrees },
+      { recordType: 'constraint', id: `rotation-${equilateralAC}`, kind: 'rotation', source: c, center: a, result: equilateralAC, angleDegrees: rotationACDegrees },
+      { recordType: 'constraint', id: `intersection-${torricelli}`, kind: 'line-intersection', point: torricelli, line1, line2, domain: 'line' },
+      { recordType: 'constraint', id: `branch-${result}`, kind: 'midpoint', point: result, a: resultSource, b: resultSource },
+    ],
+    relations: [
+      ...dependencyRelations(equilateralAB, [a, b]),
+      ...dependencyRelations(equilateralAC, [a, c]),
+      ...dependencyRelations(line1, [c, equilateralAB]),
+      ...dependencyRelations(line2, [b, equilateralAC]),
+      ...dependencyRelations(torricelli, [line1, line2]),
+      ...dependencyRelations(result, [resultSource]),
+      ...dependencyRelations(triangleAB, [a, b, equilateralAB]),
+      ...dependencyRelations(triangleAC, [a, c, equilateralAC]),
+      ...dependencyRelations(rayA, [result, a]),
+      ...dependencyRelations(rayB, [result, b]),
+      ...dependencyRelations(rayC, [result, c]),
+    ],
+    outputs: [
+      outputRecord(equilateralAB, 'equilateral-vertex-ab'),
+      outputRecord(equilateralAC, 'equilateral-vertex-ac'),
+      outputRecord(result, branch ? `fermat-vertex-${branch}` : 'fermat-point'),
+      { recordType: 'output', id: `output-${triangleAB}`, role: 'equilateral-triangle-ab', ref: triangleAB, kind: 'polygon' },
+      { recordType: 'output', id: `output-${triangleAC}`, role: 'equilateral-triangle-ac', ref: triangleAC, kind: 'polygon' },
+      { recordType: 'output', id: `output-${rayA}`, role: 'fermat-ray-a', ref: rayA, kind: 'segment' },
+      { recordType: 'output', id: `output-${rayB}`, role: 'fermat-ray-b', ref: rayB, kind: 'segment' },
+      { recordType: 'output', id: `output-${rayC}`, role: 'fermat-ray-c', ref: rayC, kind: 'segment' },
+    ],
+    a, b, c,
+    equilateralAB, equilateralAC, torricelli, result,
+    line1, line2, triangleAB, triangleAC, rayA, rayB, rayC,
+    rotationABDegrees, rotationACDegrees, resultSource,
+    selection: [result, rayA, rayB, rayC],
+    status: branch
+      ? `△${a}${b}${c} 的一个角不小于 120°，Fermat 点为顶点 ${resultSource}`
+      : `已创建 △${a}${b}${c} 的 Fermat–Torricelli 点`,
+  };
+}
+
 function tangentAtPointPlan({ anchors, nextName }: ConstructionBuildContext): ConstructionPlan {
   const circle = anchors[0]?.circle;
   if (!circle) {
@@ -1279,6 +1774,7 @@ function radicalAxisPlan({ anchors, nextName }: ConstructionBuildContext): Const
 const ADVANCED_SPECS: ConstructionToolSpec[] = [
   {
     id: 'parallel-line',
+    semanticRevision: '1',
     label: '平行线',
     symbol: '∥',
     description: '选择过点，再选择参考直线的两个点',
@@ -1358,6 +1854,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'perpendicular-line',
+    semanticRevision: '1',
     label: '垂线',
     symbol: '⟂',
     description: '选择过点，再选择参考直线的两个点',
@@ -1437,6 +1934,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'perpendicular-bisector',
+    semanticRevision: '1',
     label: '中垂线',
     symbol: '⌖',
     description: '选择线段的两个端点',
@@ -1452,6 +1950,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'angle-bisector',
+    semanticRevision: '1',
     label: '角平分线',
     symbol: '⋔',
     description: '依次选择边点、顶点、边点',
@@ -1484,6 +1983,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'circumcircle',
+    semanticRevision: '1',
     label: '三点圆',
     symbol: '◯',
     description: '选择三个不共线点创建外接圆',
@@ -1501,7 +2001,65 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
     plan: circumcirclePlan,
   },
   {
+    id: 'nine-point-circle',
+    semanticRevision: '1',
+    label: '九点圆',
+    symbol: '⑨',
+    description: '选择三角形三个顶点，原子创建三边中点、三垂足、垂心与九点圆',
+    category: 'olympiad',
+    aliases: ['nine point circle', 'Euler circle', '九点圆', '欧拉圆'],
+    inputSlots: [
+      pointSlot('a', '选择三角形顶点 A'),
+      pointSlot('b', '选择三角形顶点 B'),
+      pointSlot('c', '选择三角形顶点 C'),
+    ],
+    resultPrefix: 'N',
+    validate: (anchors) => collinear(anchors[0], anchors[1], anchors[2])
+      ? '三个顶点共线，不能定义九点圆'
+      : null,
+    plan: ninePointCirclePlan,
+  },
+  {
+    id: 'fermat-point',
+    semanticRevision: '1',
+    label: '费马点',
+    symbol: '120°',
+    description: '选择三角形三个顶点；内部支满足三射线 120°，大角支返回对应顶点',
+    category: 'olympiad',
+    aliases: ['Fermat point', 'Torricelli point', '费马点', '托里拆利点', '几何中位点'],
+    inputSlots: [
+      pointSlot('a', '选择三角形顶点 A'),
+      pointSlot('b', '选择三角形顶点 B'),
+      pointSlot('c', '选择三角形顶点 C'),
+    ],
+    resultPrefix: 'F',
+    validate: (anchors) => collinear(anchors[0], anchors[1], anchors[2])
+      ? '三个顶点共线，不能定义 Fermat 点'
+      : null,
+    plan: fermatPointPlan,
+  },
+  {
+    id: 'simson-line',
+    semanticRevision: '1',
+    label: '西姆松线',
+    symbol: 'S',
+    description: '选择三角形三个顶点；在外接圆上创建点 P，并原子生成三个垂足与共线西姆松线',
+    category: 'olympiad',
+    aliases: ['Simson line', 'Simson theorem', '西姆松线', '辛普森线', '垂足共线'],
+    inputSlots: [
+      pointSlot('a', '选择三角形顶点 A'),
+      pointSlot('b', '选择三角形顶点 B'),
+      pointSlot('c', '选择三角形顶点 C'),
+    ],
+    resultPrefix: 'S',
+    validate: (anchors) => collinear(anchors[0], anchors[1], anchors[2])
+      ? '三个顶点共线，不能定义西姆松线'
+      : null,
+    plan: simsonLinePlan,
+  },
+  {
     id: 'tangent-at-point',
+    semanticRevision: '2',
     label: '切线',
     symbol: '⊙',
     description: '点击具有可逆圆定义语义的圆周，创建绑定切点和切线',
@@ -1515,6 +2073,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'reflect-point',
+    semanticRevision: '1',
     label: '点反射',
     symbol: '⇄',
     description: '选择待变换点和反射中心',
@@ -1529,6 +2088,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'reflect-line',
+    semanticRevision: '1',
     label: '轴反射',
     symbol: '⋈',
     description: '选择待变换点和反射轴上的两个点',
@@ -1545,6 +2105,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'rotate-90',
+    semanticRevision: '1',
     label: '旋转 90°',
     symbol: '↻',
     description: '选择待旋转点和旋转中心；方向为逆时针 90°',
@@ -1559,6 +2120,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'homothety-2',
+    semanticRevision: '1',
     label: '位似 ×2',
     symbol: '⤢',
     description: '选择待变换点和位似中心；默认比值为 2',
@@ -1573,6 +2135,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'inversion-point',
+    semanticRevision: '1',
     label: '反演点',
     symbol: '◌',
     description: '选择待反演点、反演中心和反演圆上一点',
@@ -1671,6 +2234,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'radical-axis',
+    semanticRevision: '2',
     label: '根轴',
     symbol: '⌁',
     description: '依次选择两个具有可逆定义语义的圆',
@@ -1702,6 +2266,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'cyclic-quadrilateral',
+    semanticRevision: '1',
     label: '圆内接四边形',
     symbol: '◇',
     description: '选择三点确定圆，再选择过首点的割线方向',
@@ -1924,6 +2489,7 @@ const ADVANCED_SPECS: ConstructionToolSpec[] = [
   },
   {
     id: 'complete-quadrilateral',
+    semanticRevision: '1',
     label: '完全四边形',
     symbol: '⌗',
     description: '选择四个连续交点，生成四条完整直线与两个对边交点',
@@ -2147,6 +2713,75 @@ export const CONSTRUCTION_TOOL_SPECS: readonly ConstructionToolSpec[] = [
 export const constructionSpecRegistry: ReadonlyMap<string, ConstructionToolSpec> = new Map(
   CONSTRUCTION_TOOL_SPECS.map((spec) => [spec.id, spec]),
 );
+
+/** Public, versioned AI/Canvas intent ABI derived from the trusted Catalog. */
+export function constructionIntentContract(
+  spec: ConstructionToolSpec,
+): ConstructionIntentContract {
+  if (spec.id === 'point') {
+    return {
+      minInputs: 0,
+      maxInputs: 0,
+      inputKinds: [],
+      requestedNameKeys: CONSTRUCTION_REQUESTED_NAME_KEYS.point!,
+      parameterSchema: 'point-position',
+      outputSlots: CONSTRUCTION_OUTPUT_SLOTS.point!,
+    };
+  }
+  return {
+    minInputs: spec.inputSlots.length,
+    maxInputs: spec.variableArity ? 64 : spec.inputSlots.length,
+    inputKinds: spec.inputSlots.map((slot) => slot.accepts),
+    ...(spec.variableArity
+      ? { repeatedInputKind: spec.inputSlots[spec.inputSlots.length - 1]!.accepts }
+      : {}),
+    requestedNameKeys: CONSTRUCTION_REQUESTED_NAME_KEYS[spec.id] ?? [],
+    parameterSchema: spec.id === 'point-on-circle' || spec.id === 'tangent-at-point'
+      ? 'circle-angle'
+      : spec.id === 'label'
+        ? 'label-text'
+        : 'none',
+    outputSlots: CONSTRUCTION_OUTPUT_SLOTS[spec.id] ?? [],
+  };
+}
+
+export const CONSTRUCTION_CATALOG_DIGEST = hashSource(JSON.stringify({
+  abi: CONSTRUCTION_CATALOG_ABI_VERSION,
+  tools: CONSTRUCTION_TOOL_SPECS.map((spec) => ({
+    id: spec.id,
+    semanticRevision: spec.semanticRevision,
+    category: spec.category,
+    kind: spec.kind ?? null,
+    inputSlots: spec.inputSlots.map((slot) => ({
+      id: slot.id,
+      accepts: slot.accepts,
+      createOnEmpty: slot.createOnEmpty === true,
+    })),
+    variableArity: spec.variableArity === true,
+    resultPrefix: spec.resultPrefix ?? null,
+    contract: constructionIntentContract(spec),
+  })),
+}));
+
+/** Single catalog boundary used by Canvas preview and commit. */
+export function createCatalogConstructionPlan(
+  spec: ConstructionToolSpec,
+  context: ConstructionBuildContext,
+): ConstructionPlan {
+  const plan = spec.plan?.(context)
+    ?? (
+      spec.category === 'primitive'
+      && spec.kind
+      && isPrimitiveConstructionKind(spec.kind)
+        ? createPrimitiveConstructionPlan(spec.kind, context)
+        : null
+    );
+  if (!plan) {
+    throw new TypeError(`Construction tool ${spec.id} has no semantic plan factory.`);
+  }
+  assertConstructionPlanSemanticFootprint(plan);
+  return plan;
+}
 
 export const CONSTRUCTION_CATEGORY_LABELS: Readonly<Record<ConstructionCategory, string>> = {
   navigate: '导航',

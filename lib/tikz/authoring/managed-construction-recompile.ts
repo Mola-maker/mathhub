@@ -1,5 +1,7 @@
 import type { TextPatch } from '../document/source-transaction';
 import {
+  MANAGED_CONSTRUCTION_SCHEMA_V2,
+  MANAGED_CONSTRUCTION_SCHEMA_V3,
   managedConstructionContentFingerprint,
   managedConstructionDocumentReferenceIssueKey,
   managedConstructionDocumentReferenceIssues,
@@ -8,13 +10,44 @@ import {
 } from '../semantics/managed-construction';
 import {
   compileConstructionPlan,
+  compileConstructionWriterArtifact,
   type ConstructionPlan,
 } from './construction-ir';
+import {
+  compileConstructionPlanV3,
+  compileConstructionPlanV3WithPresentation,
+} from './construction-ir-v3';
+import { decodeManagedConstructionPlan } from './construction-plan-codec';
+import {
+  hydrateManagedPresentation,
+  managedPresentationEnvelopeMatches,
+  mergeManagedPresentation,
+  type ManagedPresentationIR,
+} from './managed-presentation';
+import {
+  managedConstructionV3OutsideSlotsMatches,
+  readManagedConstructionV3Envelope,
+  validateManagedConstructionV3Artifact,
+} from '../semantics/managed-construction-v3';
+
+export type ManagedConstructionRecompileIssueCode =
+  | 'managed-recompile-failed'
+  | 'presentation-conflict'
+  | 'merged-block-invalid';
 
 export class ManagedConstructionRecompileError extends Error {
-  constructor(message: string) {
+  readonly code: ManagedConstructionRecompileIssueCode;
+  readonly stage: 'precondition' | 'hydrate' | 'merge' | 'validate';
+
+  constructor(
+    message: string,
+    code: ManagedConstructionRecompileIssueCode = 'managed-recompile-failed',
+    stage: 'precondition' | 'hydrate' | 'merge' | 'validate' = 'validate',
+  ) {
     super(message);
     this.name = 'ManagedConstructionRecompileError';
+    this.code = code;
+    this.stage = stage;
   }
 }
 
@@ -25,21 +58,71 @@ export interface ManagedConstructionRecompilePrecondition {
   readonly expectedRange: { readonly start: number; readonly end: number };
   /** Optional extra guard for callers that cache the construction kind. */
   readonly expectedPlanKind?: string;
+  /** CAS guard for a losslessly hydrated non-canonical presentation body. */
+  readonly expectedPresentationFingerprint?: string;
+  readonly expectedWriterId: string;
+  readonly expectedWriterRevision: number;
+  readonly expectedWriterSlotIds: readonly string[];
+  readonly expectedWriterSlotSemanticFingerprints: readonly string[];
+  readonly expectedAttachmentsFingerprint?: string;
   /**
-   * Schema-v2 presentation guard. Replacement is allowed only while the
-   * current block is still the canonical compilation of this prior plan.
-   * Styled/diverged bodies fail closed until Presentation IR/schema-v3 can
-   * round-trip them without loss.
+   * Canonical semantic plan used to prove writer-slot ownership. Exact blocks
+   * recompile directly; supported presentation divergence is hydrated and
+   * merged through ManagedPresentationIR, while all other divergence fails
+   * closed with `presentation-conflict`.
    */
   readonly expectedCanonicalPlan: ConstructionPlan;
 }
 
-function compiledBlockText(plan: ConstructionPlan, currentText: string): string {
+function compiledBlockText(
+  plan: ConstructionPlan,
+  currentText: string,
+  envelopeText = currentText,
+): string {
   const compilation = compileConstructionPlan(plan);
-  const lineEnding = currentText.includes('\r\n') ? '\r\n' : '\n';
+  const lineEnding = sourceLineEnding(envelopeText);
   const keepsTrailingLineEnding = currentText.endsWith('\r\n') || currentText.endsWith('\n');
   return compilation.lines.join(lineEnding)
     + (keepsTrailingLineEnding ? lineEnding : '');
+}
+
+function sourceLineEnding(value: string): '\n' | '\r\n' {
+  return value.includes('\r\n') ? '\r\n' : '\n';
+}
+
+function preserveTrailingLineEnding(
+  compiled: string,
+  currentText: string,
+  lineEnding: '\n' | '\r\n',
+): string {
+  const currentHasTrailing = currentText.endsWith('\r\n') || currentText.endsWith('\n');
+  if (currentHasTrailing) return compiled;
+  return compiled.endsWith(lineEnding)
+    ? compiled.slice(0, -lineEnding.length)
+    : compiled;
+}
+
+/**
+ * `envelopeText` is the block minus its TikZ body. Reading the line ending from
+ * the full block would let a CRLF inside the writer-owned presentation body
+ * rewrite the canonical header and record lines, so the envelope comparison
+ * would reject bytes that never changed.
+ */
+function compiledBlockTextForSchema(
+  plan: ConstructionPlan,
+  currentText: string,
+  schemaVersion: number | null,
+  envelopeText = currentText,
+): string {
+  if (schemaVersion === MANAGED_CONSTRUCTION_SCHEMA_V3) {
+    const lineEnding = sourceLineEnding(envelopeText);
+    return preserveTrailingLineEnding(
+      compileConstructionPlanV3(plan, lineEnding).source,
+      currentText,
+      lineEnding,
+    );
+  }
+  return compiledBlockText(plan, currentText, envelopeText);
 }
 
 function uniqueAttachedBlock(source: string, constructionId: string) {
@@ -88,7 +171,9 @@ function externallyReferencedEntities(
   source: string,
   target: ManagedConstructionBlock,
 ): ReadonlySet<string> {
-  const referenceToEntityId = new Map(target.records.flatMap((record) => (
+  // Declare a string key: the literal `managed:${string}:${string}` type would
+  // otherwise be inferred and reject the plain-string lookups below.
+  const referenceToEntityId = new Map<string, string>(target.records.flatMap((record) => (
     record.recordType === 'entity'
       ? [[`managed:${target.id}:${record.id}`, record.id] as const]
       : []
@@ -174,6 +259,14 @@ export function managedConstructionPlanRecompilePatches(
 ): readonly TextPatch[] {
   const block = uniqueAttachedBlock(source, constructionId);
   if (
+    block.schemaVersion !== MANAGED_CONSTRUCTION_SCHEMA_V2
+    && block.schemaVersion !== MANAGED_CONSTRUCTION_SCHEMA_V3
+  ) {
+    throw new ManagedConstructionRecompileError(
+      `Managed construction ${constructionId} uses unsupported schema ${String(block.schemaVersion)}.`,
+    );
+  }
+  if (
     block.range.start !== precondition.expectedRange.start
     || block.range.end !== precondition.expectedRange.end
   ) {
@@ -209,16 +302,214 @@ export function managedConstructionPlanRecompilePatches(
   }
   assertExternallyReferencedEntityIdentity(source, block, nextPlan);
   const currentText = source.slice(block.range.start, block.range.end);
+  // Header, records and end marker only: the TikZ body is presentation
+  // territory and must not dictate the canonical envelope's line ending.
+  const envelopeText = source.slice(block.range.start, block.tikzBodyRange.start)
+    + source.slice(block.tikzBodyRange.end, block.range.end);
   if (
     precondition.expectedCanonicalPlan.id !== constructionId
     || precondition.expectedCanonicalPlan.kind !== block.planKind
-    || compiledBlockText(precondition.expectedCanonicalPlan, currentText) !== currentText
   ) {
     throw new ManagedConstructionRecompileError(
-      `Managed construction ${constructionId} has presentation/source divergence; schema-v2 replacement would be lossy.`,
+      `Managed construction ${constructionId} does not match the expected canonical plan identity.`,
     );
   }
-  const replacement = compiledBlockText(nextPlan, currentText);
+  const priorCanonicalText = compiledBlockTextForSchema(
+    precondition.expectedCanonicalPlan,
+    currentText,
+    block.schemaVersion,
+    envelopeText,
+  );
+  const priorArtifact = compileConstructionWriterArtifact(
+    precondition.expectedCanonicalPlan,
+  );
+  if (
+    precondition.expectedWriterId !== priorArtifact.writerId
+    || precondition.expectedWriterRevision !== priorArtifact.writerRevision
+    || JSON.stringify(precondition.expectedWriterSlotIds)
+      !== JSON.stringify(priorArtifact.slots.map((slot) => slot.id))
+    || JSON.stringify(precondition.expectedWriterSlotSemanticFingerprints)
+      !== JSON.stringify(priorArtifact.slots.map((slot) => slot.semanticFingerprint))
+  ) {
+    throw new ManagedConstructionRecompileError(
+      `Managed construction ${constructionId} writer ABI changed since the semantic snapshot.`,
+      'presentation-conflict',
+      'precondition',
+    );
+  }
+  let replacement = compiledBlockTextForSchema(
+    nextPlan,
+    currentText,
+    block.schemaVersion,
+    envelopeText,
+  );
+  let priorPresentation: ManagedPresentationIR | null = null;
+  if (priorCanonicalText !== currentText) {
+    if (precondition.expectedPresentationFingerprint === undefined) {
+      throw new ManagedConstructionRecompileError(
+        'Non-canonical managed presentation requires an exact presentation fingerprint.',
+        'presentation-conflict',
+        'precondition',
+      );
+    }
+    let presentationBody = source.slice(
+      block.tikzBodyRange.start,
+      block.tikzBodyRange.end,
+    );
+    let envelopeMatches = managedPresentationEnvelopeMatches(
+      currentText,
+      priorCanonicalText,
+    );
+    if (block.schemaVersion === MANAGED_CONSTRUCTION_SCHEMA_V3) {
+      const currentLocalBlock = parseManagedConstructionBlocks(currentText)[0];
+      const canonicalBlock = parseManagedConstructionBlocks(priorCanonicalText)[0];
+      if (!currentLocalBlock || !canonicalBlock) {
+        throw new ManagedConstructionRecompileError(
+          'Schema-v3 presentation block could not be reparsed.',
+          'presentation-conflict',
+          'hydrate',
+        );
+      }
+      const currentEnvelope = readManagedConstructionV3Envelope(
+        currentText,
+        currentLocalBlock,
+      );
+      const canonicalEnvelope = readManagedConstructionV3Envelope(
+        priorCanonicalText,
+        canonicalBlock,
+      );
+      const artifactValidation = validateManagedConstructionV3Artifact(
+        currentEnvelope,
+        priorArtifact,
+      );
+      envelopeMatches = (
+        currentEnvelope.slots.length === 1
+        && artifactValidation.artifactMatched
+        && managedConstructionV3OutsideSlotsMatches(
+          currentText,
+          currentEnvelope,
+          priorCanonicalText,
+          canonicalEnvelope,
+        )
+      );
+      if (currentEnvelope.slots.length === 1) {
+        presentationBody = currentText.slice(
+          currentEnvelope.slots[0]!.sourceRange.start,
+          currentEnvelope.slots[0]!.sourceRange.end,
+        );
+      }
+    }
+    if (!envelopeMatches) {
+      throw new ManagedConstructionRecompileError(
+        'Managed block differs outside the writer-owned presentation slot.',
+        'presentation-conflict',
+        'hydrate',
+      );
+    }
+    const hydrated = hydrateManagedPresentation(
+      precondition.expectedCanonicalPlan,
+      presentationBody,
+    );
+    if (!hydrated.ok) {
+      throw new ManagedConstructionRecompileError(
+        hydrated.issues[0]?.message ?? 'Current presentation cannot be hydrated.',
+        'presentation-conflict',
+        'hydrate',
+      );
+    }
+    priorPresentation = hydrated.presentation;
+    if (
+      precondition.expectedPresentationFingerprint !== undefined
+      && hydrated.presentation.presentationFingerprint
+        !== precondition.expectedPresentationFingerprint
+    ) {
+      throw new ManagedConstructionRecompileError(
+        `Managed construction ${constructionId} presentation changed since the semantic snapshot.`,
+        'presentation-conflict',
+        'precondition',
+      );
+    }
+    if (
+      precondition.expectedPresentationFingerprint !== undefined
+      && (
+        precondition.expectedWriterId !== hydrated.presentation.writerId
+      || precondition.expectedWriterRevision
+        !== hydrated.presentation.writerRevision
+      || precondition.expectedAttachmentsFingerprint
+        !== hydrated.presentation.attachmentsFingerprint
+      )
+    ) {
+      throw new ManagedConstructionRecompileError(
+        `Managed construction ${constructionId} writer ABI or attachments changed since the semantic snapshot.`,
+        'presentation-conflict',
+        'precondition',
+      );
+    }
+    if (block.schemaVersion === MANAGED_CONSTRUCTION_SCHEMA_V3) {
+      // Envelope, not the whole block: a CRLF inside the writer-owned body is a
+      // presentation detail and must not rewrite the canonical header/records.
+      const lineEnding = sourceLineEnding(envelopeText);
+      try {
+        replacement = preserveTrailingLineEnding(
+          compileConstructionPlanV3WithPresentation(
+            nextPlan,
+            hydrated.presentation,
+            lineEnding,
+          ).source,
+          currentText,
+          lineEnding,
+        );
+      } catch (error) {
+        throw new ManagedConstructionRecompileError(
+          error instanceof Error ? error.message : 'Next v3 presentation cannot be merged.',
+          'presentation-conflict',
+          'merge',
+        );
+      }
+    } else {
+      const merged = mergeManagedPresentation(hydrated.presentation, nextPlan);
+      if (!merged.ok) {
+        throw new ManagedConstructionRecompileError(
+          merged.issues[0]?.message ?? 'Next presentation cannot be merged.',
+          'presentation-conflict',
+          'merge',
+        );
+      }
+      const replacementBlock = parseManagedConstructionBlocks(replacement)[0];
+      if (!replacementBlock) {
+        throw new ManagedConstructionRecompileError(
+          'Trusted recompile produced no managed block before presentation merge.',
+        );
+      }
+      const resealed = managedStyleRecompilePatches(
+        replacement,
+        constructionId,
+        {
+          from: replacementBlock.tikzBodyRange.start,
+          to: replacementBlock.tikzBodyRange.end,
+          insert: merged.tikzBody,
+        },
+      );
+      const wholeBlockPatch = resealed[0];
+      if (
+        resealed.length !== 1
+        || !wholeBlockPatch
+        || wholeBlockPatch.from !== 0
+        || wholeBlockPatch.to !== replacement.length
+      ) {
+        throw new ManagedConstructionRecompileError(
+          'Presentation merge did not produce one atomic managed-block replacement.',
+        );
+      }
+      replacement = wholeBlockPatch.insert;
+    }
+  } else if (precondition.expectedPresentationFingerprint !== undefined) {
+    throw new ManagedConstructionRecompileError(
+      `Managed construction ${constructionId} no longer has the expected presentation projection.`,
+      'presentation-conflict',
+      'precondition',
+    );
+  }
   const parsed = parseManagedConstructionBlocks(replacement);
   if (
     parsed.length !== 1
@@ -231,6 +522,38 @@ export function managedConstructionPlanRecompilePatches(
   ) {
     throw new ManagedConstructionRecompileError(
       'Typed recompile did not produce one complete, attached managed block.',
+    );
+  }
+  const decodedReplacement = decodeManagedConstructionPlan(
+    replacement,
+    parsed[0]!,
+  );
+  if (!decodedReplacement.ok) {
+    throw new ManagedConstructionRecompileError(
+      `Merged managed block failed writer/presentation self-validation: ${decodedReplacement.issues[0]?.message ?? 'unknown decode failure'}`,
+      'merged-block-invalid',
+      'validate',
+    );
+  }
+  if (
+    priorPresentation
+    && (
+      !decodedReplacement.presentation
+      || decodedReplacement.presentation.writerId !== priorPresentation.writerId
+      || decodedReplacement.presentation.writerRevision
+        !== priorPresentation.writerRevision
+      || decodedReplacement.presentation.attachmentsFingerprint
+        !== priorPresentation.attachmentsFingerprint
+      || JSON.stringify(decodedReplacement.presentation.slots.map((slot) => slot.slotId))
+        !== JSON.stringify(priorPresentation.slots.map((slot) => slot.slotId))
+      || JSON.stringify(decodedReplacement.presentation.opaqueSlots)
+        !== JSON.stringify(priorPresentation.opaqueSlots)
+    )
+  ) {
+    throw new ManagedConstructionRecompileError(
+      'Merged managed block did not preserve the hydrated presentation attachments and writer ABI.',
+      'merged-block-invalid',
+      'validate',
     );
   }
   const nextSource = source.slice(0, block.range.start)
@@ -266,6 +589,24 @@ export function managedStyleRecompilePatches(
     throw new ManagedConstructionRecompileError(
       'Style patch must stay inside the managed TikZ body.',
     );
+  }
+  if (block.schemaVersion === MANAGED_CONSTRUCTION_SCHEMA_V3) {
+    const envelope = readManagedConstructionV3Envelope(source, block);
+    const owningSlots = envelope.slots.filter((slot) => (
+      bodyPatch.from >= slot.sourceRange.start
+      && bodyPatch.to <= slot.sourceRange.end
+    ));
+    if (
+      !envelope.syntacticallyValid
+      || envelope.opaqueRanges.length !== 0
+      || owningSlots.length !== 1
+    ) {
+      throw new ManagedConstructionRecompileError(
+        'Schema-v3 style patch must stay inside exactly one attached writer slot.',
+        'presentation-conflict',
+        'precondition',
+      );
+    }
   }
 
   const bodyStart = block.tikzBodyRange.start;

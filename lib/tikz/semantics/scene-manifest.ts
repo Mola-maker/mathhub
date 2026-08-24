@@ -73,12 +73,24 @@ export interface SceneManifestPoint {
 }
 
 export interface SceneManifestPathSpec {
-  type: 'polyline' | 'circle';
+  type: 'polyline' | 'rectangle' | 'cubic-bezier' | 'circular-arc' | 'ellipse' | 'circle';
   /** Canonical coordinate tokens, e.g. `(A)` or `$(A)!0.5!(B)`. */
   points?: string[];
   cycle?: boolean;
+  sourcePathOperator?: 'polyline' | 'rectangle';
+  start?: string;
+  control1?: string;
+  control2?: string;
+  end?: string;
+  first?: string;
+  opposite?: string;
+  startAngleDeg?: number;
+  endAngleDeg?: number;
   center?: string;
   radius?: number | { through: string } | null;
+  xRadius?: number;
+  yRadius?: number;
+  rotationDegrees?: number;
 }
 
 export interface SceneManifestIntersectionBinding {
@@ -109,8 +121,21 @@ export interface SceneManifestElement {
   style?: SceneElement['style'];
   points?: SceneManifestPosition[];
   cycle?: boolean;
+  /** Lossless source operator used to preserve rectangle transform semantics. */
+  sourcePathOperator?: 'polyline' | 'rectangle';
+  start?: SceneManifestPosition;
+  control1?: SceneManifestPosition;
+  control2?: SceneManifestPosition;
+  end?: SceneManifestPosition;
+  startAngleDeg?: number;
+  endAngleDeg?: number;
   center?: SceneManifestPosition;
+  axisX?: SceneManifestPosition;
+  axisY?: SceneManifestPosition;
   radius?: number | null;
+  xRadius?: number | null;
+  yRadius?: number | null;
+  rotationDegrees?: number | null;
   at?: SceneManifestPosition;
   text?: string;
   anchor?: string;
@@ -118,6 +143,7 @@ export interface SceneManifestElement {
   from?: SceneManifestPosition;
   to?: SceneManifestPosition;
   right?: boolean;
+  outlined?: boolean;
 }
 
 export interface SceneManifestIssue {
@@ -227,7 +253,7 @@ function calcToken(value: CalcExpr): string {
 function coordToken(value: CoordExpr): string {
   switch (value.kind) {
     case 'literal': return `(${numToken(value.x)},${numToken(value.y)})`;
-    case 'ref': return `(${value.name})`;
+    case 'ref': return `(${value.name}${value.anchor ? `.${value.anchor}` : ''})`;
     case 'calc': return `$(${calcToken(value.expr)})`;
   }
 }
@@ -238,6 +264,38 @@ function compactPathSpec(spec: PathSpec): SceneManifestPathSpec {
       type: 'polyline',
       points: spec.points.map(coordToken),
       cycle: spec.cycle,
+    };
+  }
+  if (spec.type === 'rectangle') {
+    return {
+      type: 'rectangle',
+      first: coordToken(spec.first),
+      opposite: coordToken(spec.opposite),
+    };
+  }
+  if (spec.type === 'cubic-bezier') {
+    return {
+      type: 'cubic-bezier',
+      start: coordToken(spec.start),
+      control1: coordToken(spec.control1),
+      control2: coordToken(spec.control2),
+      end: coordToken(spec.end),
+    };
+  }
+  if (spec.type === 'circular-arc') {
+    return {
+      type: 'circular-arc', start: coordToken(spec.start),
+      startAngleDeg: finiteNumber(spec.startAngleDeg) ?? undefined,
+      endAngleDeg: finiteNumber(spec.endAngleDeg) ?? undefined,
+      radius: finiteNumber(spec.radius),
+    };
+  }
+  if (spec.type === 'ellipse') {
+    return {
+      type: 'ellipse',
+      center: coordToken(spec.center),
+      xRadius: finiteNumber(spec.xRadius) ?? undefined,
+      yRadius: finiteNumber(spec.yRadius) ?? undefined,
     };
   }
   return {
@@ -303,8 +361,52 @@ function elementManifest(element: SceneElement, index: number, stmts: readonly S
     style: element.style,
   };
   switch (element.kind) {
-    case 'polyline': return { ...base, points: element.points.map(position), cycle: element.cycle };
+    case 'polyline': return {
+      ...base,
+      points: element.points.map(position),
+      cycle: element.cycle,
+      sourcePathOperator: element.sourcePathOperator ?? 'polyline',
+    };
+    case 'cubic-bezier': return {
+      ...base,
+      start: position(element.start),
+      control1: position(element.control1),
+      control2: position(element.control2),
+      end: position(element.end),
+    };
+    case 'circular-arc': return {
+      ...base,
+      start: position(element.start), end: position(element.end),
+      center: position(element.center), radius: finiteNumber(element.radius),
+      startAngleDeg: finiteNumber(element.startAngleDeg) ?? undefined,
+      endAngleDeg: finiteNumber(element.endAngleDeg) ?? undefined,
+    };
+    case 'elliptical-arc': return {
+      ...base,
+      start: position(element.start), end: position(element.end),
+      center: position(element.center),
+      axisX: position(element.axisX), axisY: position(element.axisY),
+      xRadius: finiteNumber(element.xRadius),
+      yRadius: finiteNumber(element.yRadius),
+      rotationDegrees: finiteNumber(element.rotationDegrees),
+      startAngleDeg: finiteNumber(element.startAngleDeg) ?? undefined,
+      endAngleDeg: finiteNumber(element.endAngleDeg) ?? undefined,
+    };
     case 'circle': return { ...base, center: position(element.center), radius: finiteNumber(element.radius) };
+    case 'graph-node': return {
+      ...base,
+      center: position(element.center),
+      radius: finiteNumber(element.radius),
+      text: element.text,
+      outlined: element.outlined,
+    };
+    case 'ellipse': return {
+      ...base,
+      center: position(element.center),
+      xRadius: finiteNumber(element.xRadius),
+      yRadius: finiteNumber(element.yRadius),
+      rotationDegrees: finiteNumber(element.rotationDegrees),
+    };
     case 'label': return { ...base, at: position(element.at), text: element.text, anchor: element.anchor };
     case 'angle-mark': return {
       ...base,
@@ -355,7 +457,7 @@ function approximateTokens(value: unknown): number {
 
 type ManifestSection = 'points' | 'namedPaths' | 'elements' | 'issues' | 'opaqueNodes' | 'constructionOrder';
 
-function ensureTruncation(manifest: SceneManifest, options: SceneManifestOptions, omitted: Partial<Record<ManifestSection, number>>, budgetExceeded = false): void {
+function ensureTruncation(manifest: UnaliasedSceneManifest, options: SceneManifestOptions, omitted: Partial<Record<ManifestSection, number>>, budgetExceeded = false): void {
   const hasOmissions = Object.values(omitted).some((count) => (count ?? 0) > 0);
   if (!hasOmissions && !budgetExceeded) return;
   manifest.truncated = {
@@ -366,7 +468,16 @@ function ensureTruncation(manifest: SceneManifest, options: SceneManifestOptions
   };
 }
 
-function trimManifest(manifest: SceneManifest, options: SceneManifestOptions): SceneManifest {
+/**
+ * A manifest before addAliases() attaches its non-enumerable `paths`,
+ * `revision` and `source` aliases. Trimming only touches enumerable sections.
+ */
+type UnaliasedSceneManifest = Omit<SceneManifest, 'paths' | 'revision' | 'source'>;
+
+function trimManifest(
+  manifest: UnaliasedSceneManifest,
+  options: SceneManifestOptions,
+): UnaliasedSceneManifest {
   const omitted: Partial<Record<ManifestSection, number>> = {};
   const limits: [ManifestSection, number | undefined][] = [
     ['points', normalizeLimit(options.maxPoints)],
@@ -413,7 +524,7 @@ function trimManifest(manifest: SceneManifest, options: SceneManifestOptions): S
   return manifest;
 }
 
-function addAliases(manifest: SceneManifest): SceneManifest {
+function addAliases(manifest: UnaliasedSceneManifest): SceneManifest {
   Object.defineProperty(manifest, 'paths', { value: manifest.namedPaths, enumerable: false, configurable: false });
   Object.defineProperty(manifest, 'revision', { value: manifest.sourceRevision, enumerable: false, configurable: false });
   Object.defineProperty(manifest, 'source', {
@@ -421,7 +532,9 @@ function addAliases(manifest: SceneManifest): SceneManifest {
     enumerable: false,
     configurable: false,
   });
-  return manifest;
+  // The three aliases exist from here on. defineProperty is invisible to the
+  // type system, so the completed shape is asserted once, at this boundary.
+  return manifest as SceneManifest;
 }
 
 function materializeManifest(

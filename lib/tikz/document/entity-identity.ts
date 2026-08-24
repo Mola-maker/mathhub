@@ -63,8 +63,18 @@ function elementSemanticKey(
   switch (element.kind) {
     case 'polyline':
       return `element:polyline:${ordinal}:${element.cycle ? 'closed' : 'open'}:${refs}`;
+    case 'cubic-bezier':
+      return `element:cubic-bezier:${ordinal}:${refs}`;
+    case 'circular-arc':
+      return `element:circular-arc:${ordinal}:${refs}`;
+    case 'elliptical-arc':
+      return `element:elliptical-arc:${ordinal}:${refs}`;
     case 'circle':
       return `element:circle:${ordinal}:${refs}`;
+    case 'graph-node':
+      return `element:graph-node:${ordinal}:${refs}`;
+    case 'ellipse':
+      return `element:ellipse:${ordinal}:${refs}`;
     case 'label':
       // Label text and anchor are editable properties of the same semantic
       // object. They must not mint a new identity after an Inspector write.

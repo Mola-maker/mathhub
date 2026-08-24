@@ -1,8 +1,8 @@
 export type TokenType =
   | 'cmd' | 'lbrace' | 'rbrace' | 'lbracket' | 'rbracket' | 'lparen' | 'rparen'
-  | 'dashdash' | 'bang' | 'colon' | 'equals' | 'comma' | 'semi' | 'dollar'
+  | 'dashdash' | 'dotdot' | 'dot' | 'bang' | 'colon' | 'equals' | 'comma' | 'semi' | 'dollar'
   | 'plus' | 'minus' | 'star' | 'slash' | 'gt' | 'lt'
-  | 'number' | 'name';
+  | 'number' | 'name' | 'unknown';
 
 export interface Token { type: TokenType; value: string; start: number; end: number }
 
@@ -10,7 +10,7 @@ const SINGLE: Record<string, TokenType> = {
   '{': 'lbrace', '}': 'rbrace', '[': 'lbracket', ']': 'rbracket',
   '(': 'lparen', ')': 'rparen', '!': 'bang', ':': 'colon', '=': 'equals',
   ',': 'comma', ';': 'semi', '$': 'dollar', '+': 'plus', '*': 'star', '/': 'slash',
-  '>': 'gt', '<': 'lt',
+  '>': 'gt', '<': 'lt', '.': 'dot',
 };
 
 export function lex(src: string): Token[] {
@@ -28,7 +28,15 @@ export function lex(src: string): Token[] {
     }
     if (ch === '-' && src[i + 1] === '-') { push('dashdash', '--', i, i + 2); i += 2; continue; }
     if (ch === '-') { push('minus', '-', i, i + 1); i++; continue; }
-    const num = /^\d+(\.\d+)?([eE][+-]?\d+)?/.exec(src.slice(i));
+    // TikZ's cubic path operator is a pair of dots. Recognize it before the
+    // number scanner so `.. controls` and leading decimals such as `.5` remain
+    // distinct, lossless tokens.
+    if (ch === '.' && src[i + 1] === '.') { push('dotdot', '..', i, i + 2); i += 2; continue; }
+    // PGF math accepts a leading decimal point (`.5`), and TikZ style values use
+    // it routinely (`at position .5`). Rejecting it here made the lexer throw,
+    // which demoted the whole statement to opaque and dropped its option
+    // sequence from the semantic projection.
+    const num = /^(?:\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?/.exec(src.slice(i));
     if (num) { push('number', num[0], i, i + num[0].length); i += num[0].length; continue; }
     // TikZ coordinate/path names routinely contain '-' and ':'; keep this
     // grammar aligned with the Construction IR name contract.
@@ -36,7 +44,13 @@ export function lex(src: string): Token[] {
     if (nm) { push('name', nm[0], i, i + nm[0].length); i += nm[0].length; continue; }
     const t = SINGLE[ch];
     if (t) { push(t, ch, i, i + 1); i++; continue; }
-    throw new Error(`无法识别的字符 '${ch}' @${i}`);
+    // The semantic parser is deliberately a subset, but the lossless CST and
+    // exact compiler accept far more TikZ punctuation (Bezier `..`, node text,
+    // plots, matrices, decorations, and library syntax). Preserve such bytes
+    // as tokens so `supportedStatement()` can classify the whole statement as
+    // opaque/exact-only instead of crashing the document analysis pipeline.
+    push('unknown', ch, i, i + 1);
+    i += 1;
   }
   return tokens;
 }

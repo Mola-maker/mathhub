@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,31 +8,86 @@ import { performance } from 'node:perf_hooks';
 
 const MAX_SOURCE_BYTES = 128 * 1024;
 const MAX_LOG_BYTES = 64 * 1024;
-const MAX_SVG_BYTES = 5 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_QUEUE = 16;
 const DEFAULT_CACHE_ENTRIES = 128;
-export const TIKZ_COMPILER_PROFILE = 'tikz-standard-v1';
-export const TIKZ_CACHE_KEY_VERSION = 'tikz-cache-key/v2';
+export const TIKZ_CACHE_KEY_VERSION = 'tikz-cache-key/v3';
 export const TIKZ_SOURCE_POLICY = 'tikz-untrusted-no-io/v1';
-export const TIKZ_WRAPPER_ID = 'tikz-standalone-dvisvgm/v1';
-const TIKZ_LIBRARIES = [
-  'arrows.meta',
-  'calc',
-  'intersections',
-  'through',
-  'angles',
-  'quotes',
-  'patterns',
-  'positioning',
-].join(',');
+const SUPPORTED_COMPILER_PROFILES = new Set([
+  'tikz-standard-v1',
+  'tikz-luatex-graphdrawing-v1',
+]);
+const configuredProfile = process.env.TIKZ_COMPILER_PROFILE?.trim()
+  || 'tikz-standard-v1';
+if (!SUPPORTED_COMPILER_PROFILES.has(configuredProfile)) {
+  throw new Error(`Unsupported TIKZ_COMPILER_PROFILE: ${configuredProfile}`);
+}
+export const TIKZ_COMPILER_PROFILE = configuredProfile;
+const PROFILE_FILE = configuredProfile === 'tikz-luatex-graphdrawing-v1'
+  ? 'luatex-graphdrawing-profile.json'
+  : 'exact-profile.json';
+const PACKAGED_EXACT_PROFILE_URL = new URL(`./${PROFILE_FILE}`, import.meta.url);
+const EXACT_PROFILE_URL = existsSync(PACKAGED_EXACT_PROFILE_URL)
+  ? PACKAGED_EXACT_PROFILE_URL
+  : new URL(`../../lib/tikz/syntax/${PROFILE_FILE}`, import.meta.url);
+const EXACT_PROFILE = JSON.parse(readFileSync(EXACT_PROFILE_URL, 'utf8'));
+const isGraphDrawingProfile = configuredProfile
+  === 'tikz-luatex-graphdrawing-v1';
+if (
+  EXACT_PROFILE.schemaVersion !== 'tikz-exact-profile/v2'
+  || EXACT_PROFILE.profile !== TIKZ_COMPILER_PROFILE
+  || EXACT_PROFILE.sourcePolicy !== TIKZ_SOURCE_POLICY
+  || typeof EXACT_PROFILE.wrapperId !== 'string'
+  || typeof EXACT_PROFILE.bundleIdentityPrefix !== 'string'
+  || EXACT_PROFILE.driverPolicy !== 'dvisvgm-paths-exact/v1'
+  || EXACT_PROFILE.maxSvgBytes !== 4 * 1024 * 1024
+  || (
+    isGraphDrawingProfile
+      ? (
+          EXACT_PROFILE.runtimeCapabilities?.texEngine !== 'lualatex'
+          || EXACT_PROFILE.runtimeCapabilities?.executionMode
+            !== 'immutable-tree-no-network'
+          || EXACT_PROFILE.runtimeCapabilities?.luaExecution !== true
+          || EXACT_PROFILE.runtimeCapabilities?.graphDrawing !== 'enabled'
+          || !Array.isArray(EXACT_PROFILE.wrapperGraphDrawingLibraries)
+        )
+      : (
+          EXACT_PROFILE.runtimeCapabilities?.texEngine !== 'tectonic'
+          || EXACT_PROFILE.runtimeCapabilities?.executionMode !== 'only-cached'
+          || EXACT_PROFILE.runtimeCapabilities?.luaExecution !== false
+          || EXACT_PROFILE.runtimeCapabilities?.graphDrawing !== 'syntax-only'
+          || EXACT_PROFILE.requiredCompanionProfiles?.luaGraphDrawing
+            !== 'tikz-luatex-graphdrawing-v1'
+        )
+  )
+  || !Array.isArray(EXACT_PROFILE.wrapperLibraries)
+) {
+  throw new Error('Invalid TikZ exact profile manifest');
+}
+export const TIKZ_WRAPPER_ID = EXACT_PROFILE.wrapperId;
+const MAX_SVG_BYTES = EXACT_PROFILE.maxSvgBytes;
+export const TIKZ_EXACT_PROFILE_MANIFEST_DIGEST = createHash('sha256')
+  .update(JSON.stringify(EXACT_PROFILE), 'utf8')
+  .digest('hex');
+const TIKZ_LIBRARIES = EXACT_PROFILE.wrapperLibraries.join(',');
+const GRAPH_DRAWING_LIBRARIES = (
+  EXACT_PROFILE.wrapperGraphDrawingLibraries ?? []
+).join(',');
 
 const DOCUMENT_PREFIX = [
   '\\documentclass[border=2pt]{standalone}',
   '\\def\\pgfsysdriver{pgfsys-dvisvgm.def}',
+  '\\usepackage{iftex}',
+  '\\ifPDFTeX\\else',
+  '\\usepackage{fontspec}',
+  '\\IfFontExistsTF{Noto Sans CJK SC}{\\setmainfont{Noto Sans CJK SC}}{\\IfFontExistsTF{Microsoft YaHei}{\\setmainfont{Microsoft YaHei}}{}}',
+  '\\fi',
   '\\usepackage{tikz}',
   '\\usepackage{amsmath}',
   `\\usetikzlibrary{${TIKZ_LIBRARIES}}`,
+  ...(GRAPH_DRAWING_LIBRARIES
+    ? [`\\usegdlibrary{${GRAPH_DRAWING_LIBRARIES}}`]
+    : []),
   '\\begin{document}',
 ].join('\n') + '\n';
 const DOCUMENT_SUFFIX = '\n\\end{document}';
@@ -43,7 +99,7 @@ export const TIKZ_WRAPPER_DIGEST = createHash('sha256')
 // Macro definitions and TikZ library loads are intentionally allowed. The
 // isolated engine profile blocks only control sequences that can escape the
 // source envelope, perform explicit I/O, or construct a blocked control word.
-const BLOCKED_TEX_COMMAND = /\\(documentclass|usepackage|RequirePackage|input|include|includeonly|InputIfFileExists|IfFileExists|openin|closein|openout|closeout|read|readline|write|write18|special|catcode|csname|scantokens|newread|newwrite|everyjob|everypar|shipout|pdfobj|pdfannot|pdfstartlink|pdfendlink|pdfxform|pdfrefxform|pdfextension)\b/;
+const BLOCKED_TEX_COMMAND = /\\(documentclass|usepackage|RequirePackage|input|include|includeonly|InputIfFileExists|IfFileExists|openin|closein|openout|closeout|read|readline|write|write18|special|catcode|csname|scantokens|newread|newwrite|everyjob|everypar|shipout|directlua|latelua|luafunction|luaescapestring|pdfobj|pdfannot|pdfstartlink|pdfendlink|pdfxform|pdfrefxform|pdfextension)\b/;
 const GRAPHIC_ELEMENT = /<(?:path|circle|line|polyline|polygon|rect|text|use)\b/i;
 
 function positiveInteger(value, fallback) {
@@ -161,6 +217,8 @@ export function validateTikzSource(source) {
       )],
     );
   }
+  // Source bytes are part of the compile attestation. Never trim here: the Web
+  // tier verifies the compiler receipt against the exact CodeMirror snapshot.
   return source;
 }
 
@@ -174,9 +232,10 @@ export function compilerInputIdentity(compilerImageDigest) {
     sourcePolicy: TIKZ_SOURCE_POLICY,
     wrapperId: TIKZ_WRAPPER_ID,
     wrapperDigest: TIKZ_WRAPPER_DIGEST,
-    // The cached Tectonic bundle is installed in the immutable Worker image.
-    // This deliberately makes no broader claim about arbitrary TeX packages.
-    bundleIdentity: `tectonic-only-cached@${compilerImageDigest}`,
+    profileManifestDigest: TIKZ_EXACT_PROFILE_MANIFEST_DIGEST,
+    // The bundle prefix is profile-specific and the immutable Worker image
+    // digest pins the actual package tree used for this artifact.
+    bundleIdentity: `${EXACT_PROFILE.bundleIdentityPrefix}@${compilerImageDigest}`,
   };
 }
 
@@ -189,6 +248,7 @@ export function compileCacheKeyDigest({
   wrapperId,
   wrapperDigest,
   bundleIdentity,
+  profileManifestDigest,
 }) {
   return createHash('sha256')
     .update([
@@ -201,6 +261,7 @@ export function compileCacheKeyDigest({
       wrapperId,
       wrapperDigest,
       bundleIdentity,
+      profileManifestDigest,
     ].join('\0'), 'utf8')
     .digest('hex');
 }
@@ -229,6 +290,12 @@ export function sanitizeCompiledSvg(svg) {
 
 function compactLog(chunks) {
   const log = Buffer.concat(chunks).toString('utf8').trim();
+  // TeX loads packages before it reports the source error. Retaining only the
+  // beginning preserved banners and discarded the actionable final lines.
+  // Keep a bounded head for engine identity and a larger tail for diagnostics.
+  if (log.length > 2_000) {
+    return `${log.slice(0, 700)}\n...\n${log.slice(-1_300)}`;
+  }
   return log.length > 2_000 ? `${log.slice(0, 2_000)}…` : log;
 }
 
@@ -320,15 +387,31 @@ async function runProcess(command, args, options) {
 }
 
 function safeMessage(result, fallback) {
-  return result.stderr || result.stdout || fallback;
+  // TeX engines commonly report real compilation diagnostics on stdout while
+  // MiKTeX writes host-maintenance notices to stderr. Showing stderr alone hid
+  // the actionable `input.tex:<line>` error behind "check for updates" and
+  // made a valid retry path look like an environment outage.
+  return [result.stdout, result.stderr].filter(Boolean).join('\n') || fallback;
 }
 
 export function createCompiler(options = {}) {
+  const requestedEngine = options.engine
+    ?? EXACT_PROFILE.runtimeCapabilities.texEngine;
+  const engine = ['pdflatex', 'xelatex', 'lualatex', 'tectonic']
+    .includes(requestedEngine)
+    ? requestedEngine
+    : EXACT_PROFILE.runtimeCapabilities.texEngine;
   const tectonicPath = (
     options.tectonicPath
     ?? process.env.TECTONIC_PATH
     ?? 'tectonic'
   );
+  const lualatexPath = (
+    options.lualatexPath
+    ?? process.env.LUALATEX_PATH
+    ?? 'lualatex'
+  );
+  const compilerPath = engine === 'lualatex' ? lualatexPath : tectonicPath;
   const dvisvgmPath = (
     options.dvisvgmPath
     ?? process.env.DVISVGM_PATH
@@ -385,18 +468,38 @@ export function createCompiler(options = {}) {
 
       const compileStarted = performance.now();
       const compileResult = await execute(
-        tectonicPath,
-        [
-          '-X',
-          'compile',
-          'input.tex',
-          '--outdir',
-          '.',
-          '--outfmt',
-          'xdv',
-          '--untrusted',
-          '--only-cached',
-        ],
+        compilerPath,
+        engine === 'pdflatex' || engine === 'lualatex'
+          ? [
+              engine === 'pdflatex'
+                ? '-output-format=dvi'
+                : '--output-format=dvi',
+              '--no-shell-escape',
+              '--halt-on-error',
+              '--interaction=nonstopmode',
+              '--file-line-error',
+              'input.tex',
+            ]
+          : engine === 'xelatex'
+            ? [
+              '-no-pdf',
+              '--no-shell-escape',
+              '--halt-on-error',
+              '--interaction=nonstopmode',
+              '--file-line-error',
+              'input.tex',
+            ]
+            : [
+              '-X',
+              'compile',
+              'input.tex',
+              '--outdir',
+              '.',
+              '--outfmt',
+              'xdv',
+              '--untrusted',
+              '--only-cached',
+            ],
         { cwd: workRoot, timeoutMs: remainingMs() },
       );
       const compileMs = Math.round(performance.now() - compileStarted);
@@ -404,17 +507,30 @@ export function createCompiler(options = {}) {
         throw new CompilerError(
           `TikZ 编译失败：${safeMessage(
             compileResult,
-            'Tectonic 返回非零状态',
+            `${engine} 返回非零状态`,
           )}`,
           422,
-          'TECTONIC_FAILED',
+          engine === 'pdflatex'
+            ? 'PDFLATEX_FAILED'
+            : engine === 'xelatex'
+              ? 'XELATEX_FAILED'
+              : engine === 'lualatex'
+                ? 'LUALATEX_FAILED'
+                : 'TECTONIC_FAILED',
         );
       }
 
       const convertStarted = performance.now();
       const convertResult = await execute(
         dvisvgmPath,
-        ['--no-mktexmf', '--page=1', '--output=output.svg', 'input.xdv'],
+        engine === 'pdflatex' || engine === 'lualatex'
+          ? ['--no-fonts', '--exact', '--page=1', '--output=output.svg', 'input.dvi']
+          : engine === 'xelatex'
+            ? ['--no-fonts', '--exact', '--page=1', '--output=output.svg', 'input.xdv']
+            : [
+                '--no-mktexmf', '--no-fonts', '--exact', '--page=1',
+                '--output=output.svg', 'input.xdv',
+              ],
         { cwd: workRoot, timeoutMs: remainingMs() },
       );
       const convertMs = Math.round(performance.now() - convertStarted);
@@ -432,7 +548,7 @@ export function createCompiler(options = {}) {
       const svgBuffer = await readFile(join(workRoot, 'output.svg'));
       if (svgBuffer.length > MAX_SVG_BYTES) {
         throw new CompilerError(
-          '编译生成的 SVG 超过 5MB 上限',
+          '编译生成的 SVG 超过 4MB 上限',
           422,
           'SVG_TOO_LARGE',
         );
@@ -447,7 +563,13 @@ export function createCompiler(options = {}) {
       }
       return {
         svg,
-        renderer: 'tectonic-dvisvgm',
+        renderer: engine === 'pdflatex'
+          ? 'pdflatex-dvi-dvisvgm-local-dev'
+          : engine === 'xelatex'
+            ? 'xelatex-xdv-dvisvgm-local-dev'
+            : engine === 'lualatex'
+              ? 'lualatex-dvi-dvisvgm'
+              : 'tectonic-dvisvgm',
         sourceHash: executedSourceDigest,
         executedSourceDigest,
         executedDocumentDigest,
@@ -460,7 +582,33 @@ export function createCompiler(options = {}) {
         convertMs,
       };
     } finally {
-      await rm(workRoot, { recursive: true, force: true });
+      try {
+        await rm(workRoot, {
+          recursive: true,
+          force: true,
+          // MiKTeX can hold its log file briefly after the process exits on
+          // Windows. Retrying cleanup must not turn a valid compile into EBUSY.
+          maxRetries: 5,
+          retryDelay: 120,
+        });
+      } catch (error) {
+        if (
+          process.platform !== 'win32'
+          || !['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(error?.code)
+        ) throw error;
+        // The compile result is already fully resident and attested. Schedule
+        // a longer bounded cleanup after MiKTeX releases its log/font handles;
+        // do not report a successful render as failed because of teardown.
+        const cleanup = setTimeout(() => {
+          void rm(workRoot, {
+            recursive: true,
+            force: true,
+            maxRetries: 10,
+            retryDelay: 500,
+          }).catch(() => undefined);
+        }, 1_500);
+        cleanup.unref?.();
+      }
     }
   }
 

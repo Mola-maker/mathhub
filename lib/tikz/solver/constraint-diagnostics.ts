@@ -73,7 +73,7 @@ const constraintDof: Record<string, number> = {
   // Line incidence plus circle incidence; excluding the known point chooses a
   // discrete branch and therefore does not change the continuous count.
   'line-circle-other-intersection': 2,
-  inversion: 2, cyclic: 1, 'complete-quadrilateral': 1,
+  inversion: 2, cyclic: 1, collinear: 1, 'complete-quadrilateral': 1,
 };
 
 function refs(args: readonly { entityId?: string }[]): string[] {
@@ -147,7 +147,7 @@ export function diagnoseConstraintStructure(input: ConstraintDiagnosticsInput): 
     const activeConstraints = cs
       .map((id) => constraintsById.get(id))
       .filter((constraint): constraint is GeometryConstraint => (
-        Boolean(constraint)
+        constraint !== undefined
         && constraint.enabled !== false
         && !duplicateConstraintIds.has(constraint.id)
         && !danglingConstraintIds.has(constraint.id)

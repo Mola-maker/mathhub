@@ -4,6 +4,7 @@ import { coordinateLiteralPatch } from '../patch/source-patch';
 import { buildDependencyGraph } from '../semantics/dependency-graph';
 import { solveNonlinear } from './nonlinear-solver';
 import type { DerivedDragRequest, DerivedDragResult } from './protocol';
+import { sourceCoordinateForWorldPoint } from '../subset/coordinate-transform';
 
 function unsolved(request: DerivedDragRequest, message: string): DerivedDragResult {
   return {
@@ -53,7 +54,10 @@ export function solveDerivedDrag(request: DerivedDragRequest): DerivedDragResult
     variablePoints.map((name, index) => coordinateLiteralPatch(
       request.source,
       initialAnalysis.freePointRanges.get(name)!,
-      { x: values[index * 2], y: values[index * 2 + 1] },
+      sourceCoordinateForWorldPoint(
+        initialAnalysis.freePointTransforms.get(name),
+        { x: values[index * 2], y: values[index * 2 + 1] },
+      ),
     ))
   );
   const targetResidual = (values: readonly number[]): [number, number] => {

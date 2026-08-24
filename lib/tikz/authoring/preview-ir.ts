@@ -86,6 +86,9 @@ const EVALUATED_DERIVED_PLAN_KINDS: ReadonlySet<ConstructionPlanKind> = new Set(
   'perpendicular-bisector',
   'angle-bisector',
   'circumcircle',
+  'nine-point-circle',
+  'simson-line',
+  'fermat-point',
   'tangent-at-point',
   'reflect-point',
   'reflect-line',
@@ -113,9 +116,11 @@ export interface ConstructionPreviewIR {
 }
 
 function toPoint(value: ConstructionPoint): Pt {
-  return Array.isArray(value)
-    ? { x: value[0], y: value[1] }
-    : { x: value.x, y: value.y };
+  // Array.isArray does not narrow a readonly tuple out of this union; the `in`
+  // check is the idiom construction-ir.ts uses for the same shape.
+  return 'x' in value
+    ? { x: value.x, y: value.y }
+    : { x: value[0], y: value[1] };
 }
 
 function finitePoint(value: Pt): boolean {

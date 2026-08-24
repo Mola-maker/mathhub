@@ -147,10 +147,18 @@ export async function POST(req: NextRequest) {
       'the relevant theorems named). Never output code blocks or GeoGebra commands — prose and math only.';
     const content = `题目：\n${problem || '（未提供题面，按作图本身讲解）'}\n\n作图步骤：\n${steps.join('\n')}`;
 
-    return makeSseStream(async (send, sendEvent) => {
+    return makeSseStream(async (send, sendEvent, signal) => {
       sendEvent({ model, mode });
-      await streamProvider(provider, [{ role: 'user', content }], send, cfg, model, narratePrompt);
-    });
+      await streamProvider(
+        provider,
+        [{ role: 'user', content }],
+        send,
+        cfg,
+        model,
+        narratePrompt,
+        { signal },
+      );
+    }, { signal: req.signal });
   }
 
   // ── REPAIR ───────────────────────────────────────────────────────────────
@@ -174,16 +182,16 @@ export async function POST(req: NextRequest) {
       : undefined;
     const messages: Message[] = [{ role: 'user', content: formatRepairUserContent(commands, failures, canvasState) }];
 
-    return makeSseStream(async (send, sendEvent) => {
+    return makeSseStream(async (send, sendEvent, signal) => {
       sendEvent({ model, mode });
       sendEvent({ ggbLookup: { count: ggbContext.commandNames.length, commands: ggbContext.commandNames } });
-      const fullText = await streamProvider(provider, messages, send, cfg, model, prompt);
+      const fullText = await streamProvider(provider, messages, send, cfg, model, prompt, { signal });
       // Pre-flight (hallucinated names → real commands, bare pair names →
       // segments), then reorder so every object is defined before use.
       const pre = preflightFix(parseGgbBlock(fullText));
       const fixed = reorderByDependencies(pre.commands);
       sendEvent({ ggbCommands: { count: fixed.length, commands: fixed, preflightFixes: pre.fixes } });
-    });
+    }, { signal: req.signal });
   }
 
   // ── BUILD ────────────────────────────────────────────────────────────────
@@ -210,7 +218,7 @@ export async function POST(req: NextRequest) {
   });
   const messages = buildApiMessages(problemText, history, activeCommand);
 
-  return makeSseStream(async (send, sendEvent) => {
+  return makeSseStream(async (send, sendEvent, signal) => {
     sendEvent({ model, mode });
     sendEvent({ drawingCommand: activeCommand });
     sendEvent({
@@ -220,11 +228,11 @@ export async function POST(req: NextRequest) {
         categories: ggbContext.categories,
       },
     });
-    const fullText = await streamProvider(provider, messages, send, cfg, model, prompt);
+    const fullText = await streamProvider(provider, messages, send, cfg, model, prompt, { signal });
     // Pre-flight (hallucinated names, bare pair names) + reorder so every
     // object is defined before use — both classes fixed with zero LLM cost.
     const pre = preflightFix(parseGgbBlock(fullText));
     const commands = reorderByDependencies(pre.commands);
     sendEvent({ ggbCommands: { count: commands.length, commands, preflightFixes: pre.fixes } });
-  });
+  }, { signal: req.signal });
 }

@@ -3,9 +3,12 @@ import { writeFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   CompilerError,
+  compileCacheKeyDigest,
+  compilerInputIdentity,
   createCompiler,
   sanitizeCompiledSvg,
   validateTikzSource,
+  wrapTikzDocument,
 } from './compiler-core.mjs';
 
 const source = String.raw`
@@ -15,11 +18,25 @@ const source = String.raw`
 `;
 
 test('validates the single TikZ environment and rejects TeX file access', () => {
-  assert.equal(validateTikzSource(source), source.trim());
+  assert.equal(validateTikzSource(source), source);
   assert.throws(
     () => validateTikzSource(String.raw`\begin{tikzpicture}\input{secret}\end{tikzpicture}`),
-    (error) => error instanceof CompilerError && error.code === 'FORBIDDEN_COMMAND',
+    (error) => error instanceof CompilerError
+      && error.code === 'SOURCE_POLICY_VIOLATION'
+      && error.diagnostics?.[0]?.rule === 'blocked-control-sequence',
   );
+  assert.throws(
+    () => validateTikzSource(String.raw`\begin{tikzpicture}\directlua{os.execute('id')}\end{tikzpicture}`),
+    (error) => error instanceof CompilerError
+      && error.code === 'SOURCE_POLICY_VIOLATION'
+      && error.diagnostics?.[0]?.command === String.raw`\directlua`,
+  );
+});
+
+test('the pinned exact wrapper preloads the static graph syntax libraries', () => {
+  const wrapped = wrapTikzDocument(String.raw`\begin{tikzpicture}\graph { a -> b };\end{tikzpicture}`);
+  assert.match(wrapped, /\\usetikzlibrary\{[^}]*graphs[^}]*graphs\.standard[^}]*\}/);
+  assert.doesNotMatch(wrapped, /graphdrawing/);
 });
 
 test('sanitizes active SVG while preserving local fragment references', () => {
@@ -29,6 +46,23 @@ test('sanitizes active SVG while preserving local fragment references', () => {
   );
   assert.doesNotMatch(clean, /onload|script|image|https:\/\/evil/);
   assert.match(clean, /href="#glyph"/);
+});
+
+test('cache identity changes with the exact profile manifest', () => {
+  const identity = compilerInputIdentity('worker-image');
+  const common = {
+    compilerImageDigest: 'worker-image',
+    visibility: 'private',
+    submittedSourceDigest: 'source-digest',
+    ...identity,
+  };
+  assert.notEqual(
+    compileCacheKeyDigest(common),
+    compileCacheKeyDigest({
+      ...common,
+      profileManifestDigest: 'different-profile-manifest',
+    }),
+  );
 });
 
 test('serial compiler caches a successful content-addressed result', async () => {
@@ -60,4 +94,93 @@ test('serial compiler caches a successful content-addressed result', async () =>
   assert.equal(second.cacheHit, true);
   assert.equal(first.sourceHash, second.sourceHash);
   assert.deepEqual(calls, ['fake-tectonic', 'fake-dvisvgm']);
+});
+
+test('native pdflatex mode emits DVI so pgfsys-dvisvgm specials remain intact', async () => {
+  const calls = [];
+  const execute = async (command, args, options) => {
+    calls.push({ command, args });
+    if (command === 'fake-pdflatex') {
+      await writeFile(`${options.cwd}/input.dvi`, 'dvi', 'utf8');
+    } else {
+      await writeFile(
+        `${options.cwd}/output.svg`,
+        '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>',
+        'utf8',
+      );
+    }
+    return { exitCode: 0, signal: null, stdout: '', stderr: '' };
+  };
+  const compiler = createCompiler({
+    engine: 'pdflatex',
+    tectonicPath: 'fake-pdflatex',
+    dvisvgmPath: 'fake-dvisvgm',
+    execute,
+    timeoutMs: 1_000,
+  });
+
+  const result = await compiler.render(source);
+
+  assert.equal(result.renderer, 'pdflatex-dvi-dvisvgm-local-dev');
+  assert.ok(calls[0].args.includes('-output-format=dvi'));
+  assert.ok(calls[1].args.includes('input.dvi'));
+  assert.ok(calls[1].args.includes('--no-fonts'));
+  assert.ok(calls[1].args.includes('--exact'));
+  assert.ok(!calls[1].args.includes('--pdf'));
+});
+
+test('native pdflatex failures retain stdout diagnostics before MiKTeX notices', async () => {
+  const compiler = createCompiler({
+    engine: 'pdflatex',
+    tectonicPath: 'fake-pdflatex',
+    dvisvgmPath: 'fake-dvisvgm',
+    execute: async () => ({
+      exitCode: 1,
+      signal: null,
+      stdout: 'input.tex:42: Undefined control sequence.',
+      stderr: 'pdflatex: major issue: check for updates',
+    }),
+    timeoutMs: 1_000,
+  });
+
+  await assert.rejects(
+    () => compiler.render(source),
+    (error) => (
+      error?.code === 'PDFLATEX_FAILED'
+      && error.message.indexOf('input.tex:42')
+        < error.message.indexOf('pdflatex: major issue')
+    ),
+  );
+});
+
+test('native xelatex mode emits XDV and converts Unicode text as paths', async () => {
+  const calls = [];
+  const execute = async (command, args, options) => {
+    calls.push({ command, args });
+    if (command === 'fake-xelatex') {
+      await writeFile(`${options.cwd}/input.xdv`, 'xdv', 'utf8');
+    } else {
+      await writeFile(
+        `${options.cwd}/output.svg`,
+        '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>',
+        'utf8',
+      );
+    }
+    return { exitCode: 0, signal: null, stdout: '', stderr: '' };
+  };
+  const compiler = createCompiler({
+    engine: 'xelatex',
+    tectonicPath: 'fake-xelatex',
+    dvisvgmPath: 'fake-dvisvgm',
+    execute,
+    timeoutMs: 1_000,
+  });
+
+  const result = await compiler.render('\\begin{tikzpicture}\\node {九点圆};\\end{tikzpicture}');
+
+  assert.equal(result.renderer, 'xelatex-xdv-dvisvgm-local-dev');
+  assert.ok(calls[0].args.includes('-no-pdf'));
+  assert.ok(calls[1].args.includes('--no-fonts'));
+  assert.ok(calls[1].args.includes('--exact'));
+  assert.ok(calls[1].args.includes('input.xdv'));
 });

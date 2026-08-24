@@ -1,0 +1,51 @@
+/* ============================================================
+   Backdrop — fixed scroll-journey layers.
+   Below ALL content (header z-50, main stacks after it in DOM
+   order), above the body's --cobalt base. pointer-events: none.
+   Solid fills ONLY — opacity crossfade, never gradients.
+   ============================================================ */
+
+.journey {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+
+  /* Scene 6 finale tone ("Two instruments" gateway) — after the
+     ivory interlude (chapters 3–4) the journey closes on #0C1E44,
+     the deepest ink-navy of the blue family, NO purple. Declared
+     here (scoped to the journey stack) because the ladder is owned
+     by Backdrop; tokens.css carries steps 1–5. */
+  --journey-6: #0c1e44;
+}
+
+.journey__layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  will-change: opacity;
+}
+
+.journey__layer--1 {
+  background: var(--journey-1);
+}
+
+.journey__layer--2 {
+  background: var(--journey-2);
+}
+
+.journey__layer--3 {
+  background: var(--journey-3);
+}
+
+.journey__layer--4 {
+  background: var(--journey-4);
+}
+
+.journey__layer--5 {
+  background: var(--journey-5);
+}
+
+.journey__layer--6 {
+  background: var(--journey-6);
+}

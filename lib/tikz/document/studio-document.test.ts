@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  MAX_STUDIO_TRANSACTION_RECORDS,
   StudioDocument,
   applyTextPatch,
   minimalTextPatch,
@@ -43,6 +44,76 @@ describe('StudioDocument', () => {
     document.replaceSource('abcd', 'keyboard');
     expect(document.applyPatch({ from: 0, to: 1, insert: 'x' }, 'canvas', 0)).toBe(false);
     expect(document.getSnapshot().source).toBe('abcd');
+  });
+
+  it('emits one bounded lifecycle event only after source truth commits', () => {
+    const document = new StudioDocument('abc', {
+      documentId: 'event-document',
+      epoch: 'event-epoch',
+    });
+    const changes = vi.fn();
+    document.subscribeChanges(changes);
+
+    document.setCstTree({} as never, 0);
+    expect(changes).not.toHaveBeenCalled();
+    expect(document.applyPatch(
+      { from: 1, to: 2, insert: 'xyz' },
+      'ai',
+      0,
+      {
+        transactionId: 'event-transaction',
+        idempotencyKey: 'event-key',
+        requestFingerprint: 'event-fingerprint',
+      },
+    )).toBe(true);
+
+    expect(changes).toHaveBeenCalledOnce();
+    expect(changes).toHaveBeenCalledWith({
+      schemaVersion: 'tikz-studio-document-change/v1',
+      documentId: 'event-document',
+      epoch: 'event-epoch',
+      transactionId: 'event-transaction',
+      idempotencyKey: 'event-key',
+      fromRevision: 0,
+      toRevision: 1,
+      origin: 'ai',
+      motionHint: 'update',
+      sourceLengthBefore: 3,
+      sourceLengthAfter: 5,
+      patches: [{ from: 1, to: 2, insertLength: 3 }],
+      changedRangesAfter: [{ start: 1, end: 4 }],
+    });
+    expect(JSON.stringify(changes.mock.calls[0]?.[0])).not.toContain('xyz');
+  });
+
+  it('bounds the hot journal while retaining idempotency tombstones', () => {
+    const document = new StudioDocument('');
+    for (let index = 0; index < MAX_STUDIO_TRANSACTION_RECORDS + 12; index += 1) {
+      const revision = document.getSnapshot().revision;
+      expect(document.applyPatch(
+        { from: revision, to: revision, insert: 'x' },
+        'external',
+        revision,
+        {
+          idempotencyKey: `bounded-${index}`,
+          requestFingerprint: `fingerprint-${index}`,
+        },
+      )).toBe(true);
+    }
+
+    expect(document.getTransactionsSince(0)).toHaveLength(MAX_STUDIO_TRANSACTION_RECORDS);
+    expect(document.hasAppliedIdempotencyKey('bounded-0')).toBe(true);
+    const revision = document.getSnapshot().revision;
+    expect(document.applyPatch(
+      { from: 0, to: 0, insert: 'duplicate' },
+      'external',
+      revision,
+      {
+        idempotencyKey: 'bounded-0',
+        requestFingerprint: 'fingerprint-0',
+      },
+    )).toBe(true);
+    expect(document.getSnapshot().revision).toBe(revision);
   });
 });
 

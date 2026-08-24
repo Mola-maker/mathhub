@@ -177,4 +177,30 @@ describe('style options', () => {
       '\n  draw = red,\n  color = blue,  very thick,\n  custom/.style={x,y}\n',
     );
   });
+
+  it('preserves nested pgfkeys mini-languages and duplicate dispatch order', () => {
+    const existing = String.raw`red,postaction={decorate,decoration={markings,mark=at position .5 with {\node{A,B};}}},red,thick`;
+    const draft = styleDraftFromRaw(existing);
+
+    expect(buildOptionsRaw(
+      { ...draft, width: 'very thick' },
+      existing,
+      ['width'],
+    )).toBe(
+      String.raw`red,postaction={decorate,decoration={markings,mark=at position .5 with {\node{A,B};}}},red,very thick`,
+    );
+  });
+
+  it('updates an option after a comment without deleting the comment', () => {
+    const existing = 'red,% keep this note\r\n  thick,postaction={decorate,x={1,2}}';
+    const draft = styleDraftFromRaw(existing);
+
+    expect(buildOptionsRaw(
+      { ...draft, width: 'very thick' },
+      existing,
+      ['width'],
+    )).toBe(
+      'red,% keep this note\r\n  very thick,postaction={decorate,x={1,2}}',
+    );
+  });
 });

@@ -1,9 +1,20 @@
 import type { Pt } from '../semantics/calc-eval';
+import { flattenCircularArc } from '../geometry/circular-arc';
+import {
+  ellipticalArcSvgUnitPath,
+  flattenEllipticalArc,
+} from '../geometry/elliptical-arc';
 import type { Scene, SceneElement, ScenePoint } from '../semantics/scene';
 import type { SourceRange } from '../subset/ast';
 import { labelOffset } from './label-layout';
-import { DEFAULT_ANGLE_MARK_RADIUS } from './svg-decoration-primitives';
-import { sceneToScreen, type Viewport } from './viewport';
+import { DEFAULT_ANGLE_MARK_RADIUS, SvgArrows } from './svg-decoration-primitives';
+import {
+  presentationDashArray,
+  presentationDashOffset,
+  presentationFont,
+  presentationStrokeWidth,
+} from './presentation-scale';
+import { sceneToScreen, tikzPresentationScale, type Viewport } from './viewport';
 
 export interface RenderTheme {
   handleRadius: number;
@@ -21,7 +32,10 @@ export const defaultTheme: RenderTheme = {
   handleDerivedFill: '#ffffff',
   selectionColor: '#0a84ff',
   hoverColor: '#64b5ff',
-  labelFont: 'italic 13px Georgia, "Times New Roman", serif',
+  // KaTeX_Math is already loaded by the Studio shell and tracks Computer
+  // Modern's italic metrics much more closely than the previous Georgia
+  // approximation used by the interactive surface.
+  labelFont: 'italic 13px KaTeX_Math, "Times New Roman", serif',
   angleRadius: DEFAULT_ANGLE_MARK_RADIUS,
 };
 
@@ -41,49 +55,6 @@ function unit(from: Pt, to: Pt): Pt | null {
   return length > 1e-9 ? { x: dx / length, y: dy / length } : null;
 }
 
-function arrowPath(tip: Pt, direction: Pt, strokeWidth: number): string {
-  const factor = 1 + 0.5 * Math.max(strokeWidth - 1, 0);
-  const length = 10 * factor;
-  const halfWidth = 4 * factor;
-  const normal = { x: -direction.y, y: direction.x };
-  const base = {
-    x: tip.x - direction.x * length,
-    y: tip.y - direction.y * length,
-  };
-  return [
-    `M ${tip.x} ${tip.y}`,
-    `L ${base.x + normal.x * halfWidth} ${base.y + normal.y * halfWidth}`,
-    `L ${base.x - normal.x * halfWidth} ${base.y - normal.y * halfWidth}`,
-    'Z',
-  ].join(' ');
-}
-
-function Arrows({
-  points,
-  arrow,
-  color,
-  strokeWidth,
-}: {
-  points: Pt[];
-  arrow: 'none' | '->' | '<-' | '<->';
-  color: string;
-  strokeWidth: number;
-}) {
-  if (arrow === 'none' || points.length < 2) return null;
-  const firstDirection = unit(points[1], points[0]);
-  const lastDirection = unit(points[points.length - 2], points[points.length - 1]);
-  return (
-    <g data-tikz-decoration="arrows" fill={color} pointerEvents="none">
-      {(arrow === '<-' || arrow === '<->') && firstDirection
-        ? <path d={arrowPath(points[0], firstDirection, strokeWidth)} />
-        : null}
-      {(arrow === '->' || arrow === '<->') && lastDirection
-        ? <path d={arrowPath(points[points.length - 1], lastDirection, strokeWidth)} />
-        : null}
-    </g>
-  );
-}
-
 function anglePath(el: Extract<SceneElement, { kind: 'angle-mark' }>, vp: Viewport, theme: RenderTheme): string {
   const vertex = sceneToScreen(el.vertex, vp);
   const from = sceneToScreen(el.from, vp);
@@ -92,15 +63,13 @@ function anglePath(el: Extract<SceneElement, { kind: 'angle-mark' }>, vp: Viewpo
   const second = unit(vertex, to);
   if (!first || !second) return '';
 
+  const radius = presentationStrokeWidth(theme.angleRadius, vp);
   if (el.right) {
-    const size = 12;
-    const p1 = { x: vertex.x + first.x * size, y: vertex.y + first.y * size };
-    const corner = { x: p1.x + second.x * size, y: p1.y + second.y * size };
-    const p2 = { x: vertex.x + second.x * size, y: vertex.y + second.y * size };
+    const p1 = { x: vertex.x + first.x * radius, y: vertex.y + first.y * radius };
+    const corner = { x: p1.x + second.x * radius, y: p1.y + second.y * radius };
+    const p2 = { x: vertex.x + second.x * radius, y: vertex.y + second.y * radius };
     return `M ${p1.x} ${p1.y} L ${corner.x} ${corner.y} L ${p2.x} ${p2.y}`;
   }
-
-  const radius = theme.angleRadius;
   const start = { x: vertex.x + first.x * radius, y: vertex.y + first.y * radius };
   const end = { x: vertex.x + second.x * radius, y: vertex.y + second.y * radius };
   const cross = first.x * second.y - first.y * second.x;
@@ -135,27 +104,24 @@ function ElementSvg({
   hovered,
   sourceRange,
 }: ElementProps) {
-  const stroke = selected
-    ? theme.selectionColor
-    : hovered
-      ? theme.hoverColor
-      : el.style.stroke;
-  const strokeWidth = selected
-    ? el.style.strokeWidth * 1.8
-    : hovered
-      ? el.style.strokeWidth * 1.45
-      : el.style.strokeWidth;
+  // Keep presentation truth independent from editor selection state. The
+  // selection/hover feedback is provided by overlay CSS and handles.
+  const stroke = el.style.stroke;
+  const strokeWidth = presentationStrokeWidth(el.style.strokeWidth, vp);
   const common = {
     ...semanticProps(el, selected, hovered, sourceRange),
     stroke,
     strokeWidth,
-    strokeDasharray: el.style.dash ?? undefined,
+    strokeDasharray: presentationDashArray(el.style.dash, vp),
+    strokeDashoffset: presentationDashOffset(el.style.dashOffset, vp),
     fill: el.style.fill ?? 'none',
     fillOpacity: el.style.fillOpacity,
+    strokeOpacity: el.style.strokeOpacity,
     opacity: el.style.opacity,
     vectorEffect: 'non-scaling-stroke' as const,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
+    strokeLinecap: el.style.lineCap,
+    strokeLinejoin: el.style.lineJoin,
+    strokeMiterlimit: el.style.miterLimit,
   };
 
   if (el.kind === 'polyline') {
@@ -166,11 +132,95 @@ function ElementSvg({
         {el.cycle
           ? <polygon {...common} points={pointString} />
           : <polyline {...common} points={pointString} />}
-        <Arrows
+        <SvgArrows
           points={points}
           arrow={el.style.arrow}
+          arrowTip={el.style.arrowTip}
           color={stroke}
           strokeWidth={strokeWidth}
+          presentationScale={tikzPresentationScale(vp)}
+          opacity={el.style.opacity * el.style.strokeOpacity}
+        />
+      </g>
+    );
+  }
+
+  if (el.kind === 'cubic-bezier') {
+    const start = sceneToScreen(el.start, vp);
+    const control1 = sceneToScreen(el.control1, vp);
+    const control2 = sceneToScreen(el.control2, vp);
+    const end = sceneToScreen(el.end, vp);
+    return (
+      <g>
+        <path
+          {...common}
+          d={`M ${start.x} ${start.y} C ${control1.x} ${control1.y}, ${control2.x} ${control2.y}, ${end.x} ${end.y}`}
+          fill="none"
+        />
+        <SvgArrows
+          points={[start, control1, control2, end]}
+          arrow={el.style.arrow}
+          arrowTip={el.style.arrowTip}
+          color={stroke}
+          strokeWidth={strokeWidth}
+          presentationScale={tikzPresentationScale(vp)}
+          opacity={el.style.opacity * el.style.strokeOpacity}
+        />
+      </g>
+    );
+  }
+  if (el.kind === 'circular-arc') {
+    const start = sceneToScreen(el.start, vp);
+    const end = sceneToScreen(el.end, vp);
+    const delta = el.endAngleDeg - el.startAngleDeg;
+    const arrowPoints = flattenCircularArc(el, 6).map((point) => sceneToScreen(point, vp));
+    return (
+      <g>
+        <path
+          {...common}
+          d={`M ${start.x} ${start.y} A ${el.radius * vp.scale} ${el.radius * vp.scale} 0 ${Math.abs(delta) > 180 ? 1 : 0} ${delta < 0 ? 1 : 0} ${end.x} ${end.y}`}
+          fill="none"
+        />
+        <SvgArrows
+          points={[...arrowPoints]}
+          arrow={el.style.arrow}
+          arrowTip={el.style.arrowTip}
+          color={stroke}
+          strokeWidth={strokeWidth}
+          presentationScale={tikzPresentationScale(vp)}
+          opacity={el.style.opacity * el.style.strokeOpacity}
+        />
+      </g>
+    );
+  }
+  if (el.kind === 'elliptical-arc') {
+    const center = sceneToScreen(el.center, vp);
+    const transform = [
+      el.axisX.x * vp.scale,
+      -el.axisX.y * vp.scale,
+      el.axisY.x * vp.scale,
+      -el.axisY.y * vp.scale,
+      center.x,
+      center.y,
+    ].join(' ');
+    const arrowPoints = flattenEllipticalArc(el, 6)
+      .map((point) => sceneToScreen(point, vp));
+    return (
+      <g>
+        <path
+          {...common}
+          d={ellipticalArcSvgUnitPath(el)}
+          transform={`matrix(${transform})`}
+          fill="none"
+        />
+        <SvgArrows
+          points={arrowPoints}
+          arrow={el.style.arrow}
+          arrowTip={el.style.arrowTip}
+          color={stroke}
+          strokeWidth={strokeWidth}
+          presentationScale={tikzPresentationScale(vp)}
+          opacity={el.style.opacity * el.style.strokeOpacity}
         />
       </g>
     );
@@ -181,21 +231,70 @@ function ElementSvg({
     return <circle {...common} cx={center.x} cy={center.y} r={el.radius * vp.scale} />;
   }
 
+
+  if (el.kind === 'ellipse') {
+    const center = sceneToScreen(el.center, vp);
+    return (
+      <ellipse
+        {...common}
+        cx={center.x}
+        cy={center.y}
+        rx={el.xRadius * vp.scale}
+        ry={el.yRadius * vp.scale}
+        transform={el.rotationDegrees === 0
+          ? undefined
+          : `rotate(${-el.rotationDegrees} ${center.x} ${center.y})`}
+      />
+    );
+  }
   if (el.kind === 'label') {
     const at = sceneToScreen(el.at, vp);
-    const offset = labelOffset(el.anchor);
+    const offset = labelOffset(el.anchor, tikzPresentationScale(vp));
     return (
       <text
         {...semanticProps(el, selected, hovered, sourceRange)}
         x={at.x + offset.x}
         y={at.y + offset.y}
-        fill={selected ? theme.selectionColor : el.style.stroke}
+        fill={el.style.stroke}
+        fillOpacity={el.style.textOpacity}
         opacity={el.style.opacity}
-        style={{ font: theme.labelFont }}
+        style={{ font: presentationFont(theme.labelFont, vp) }}
         textAnchor={offset.x < 0 ? 'end' : offset.x > 0 ? 'start' : 'middle'}
       >
         {el.text.replace(/\$/g, '')}
       </text>
+    );
+  }
+
+  if (el.kind === 'graph-node') {
+    const center = sceneToScreen(el.center, vp);
+    return (
+      <g {...semanticProps(el, selected, hovered, sourceRange)}>
+        {el.outlined
+          ? (
+            <circle
+              cx={center.x}
+              cy={center.y}
+              r={el.radius * vp.scale}
+              stroke={el.style.stroke}
+              strokeWidth={presentationStrokeWidth(el.style.strokeWidth, vp)}
+              fill={el.style.fill ?? 'white'}
+              fillOpacity={el.style.fillOpacity}
+              vectorEffect="non-scaling-stroke"
+            />
+          )
+          : null}
+        <text
+          x={center.x}
+          y={center.y}
+          fill={el.style.stroke}
+          style={{ font: presentationFont(theme.labelFont, vp) }}
+          textAnchor="middle"
+          dominantBaseline="central"
+        >
+          {el.text.replace(/\$/g, '')}
+        </text>
+      </g>
     );
   }
 
@@ -247,14 +346,24 @@ function HandleSvg({
         )
         : null}
       <circle
+        className="tz-point-hit-target"
+        cx={screen.x}
+        cy={screen.y}
+        r={theme.handleRadius + 5}
+        fill="transparent"
+        stroke="none"
+        data-tikz-point={point.name}
+        data-tikz-free={String(point.free)}
+      />
+      <circle
         className="tz-point-handle"
         cx={screen.x}
         cy={screen.y}
         r={theme.handleRadius}
         fill={point.free ? theme.handleFill : theme.handleDerivedFill}
         stroke={hovered ? theme.hoverColor : theme.handleFill}
-        data-tikz-point={point.name}
-        data-tikz-free={String(point.free)}
+        opacity={selected || hovered ? 1 : 0}
+        pointerEvents="none"
         data-selected={selected ? 'true' : undefined}
       />
     </g>

@@ -5,10 +5,14 @@ import type {
   SourceTextPatch,
 } from './model';
 import type {
+  GeometryOperation,
   GeometryPrecondition,
   GeometryResourceReference,
   GeometryTransactionRequest,
 } from './transactions';
+import { createGeometryWorkspaceEdit } from './geometry-workspace-edit';
+import { applyTextPatches } from '../document/source-transaction';
+import { parseManagedConstructionBlocks } from '../semantics/managed-construction';
 
 /**
  * A narrow, source-preserving write protocol for AI.
@@ -46,10 +50,22 @@ export interface AiPatchBindingContext {
   writeCapabilities?: readonly (
     | 'create-managed-construction'
     | 'replace-managed-construction'
+    | 'update-managed-presentation'
   )[];
   managedConstructionId?: string;
   managedPlanKind?: string;
+  /** Concrete managed syntax kind (point/segment/circle/...). */
+  managedSyntaxKind?: string;
   managedContentFingerprint?: string;
+  /** CAS token for a losslessly hydrated non-canonical presentation body. */
+  managedPresentationFingerprint?: string;
+  managedWriterId?: string;
+  managedWriterRevision?: number;
+  managedWriterSlotIds?: readonly string[];
+  managedWriterSlotSemanticFingerprints?: readonly string[];
+  managedAttachmentsFingerprint?: string;
+  /** Revision-bound CAS token for the trusted document create capability. */
+  createCapabilityFingerprint?: string;
 }
 
 export interface AiPatchBindingPreconditions {
@@ -194,7 +210,9 @@ function nonEmptyString(value: unknown): value is string {
 function bindingMap(
   bindings: readonly AiPatchBindingContext[] | ReadonlyMap<string, AiPatchBindingContext>,
 ): ReadonlyMap<string, AiPatchBindingContext> {
-  if (!Array.isArray(bindings)) return bindings;
+  // Array.isArray does not narrow a readonly array out of this union, so test
+  // for a Map-only member instead.
+  if ('get' in bindings) return bindings;
   return new Map(bindings.map((binding): [string, AiPatchBindingContext] => [binding.bindingId, binding]));
 }
 
@@ -625,6 +643,43 @@ export function validateAiPatchProposal(
     }
   }
 
+  if (context.source !== undefined && errors.length === 0) {
+    try {
+      const previousCounts = new Map<string, number>();
+      for (const block of parseManagedConstructionBlocks(context.source)) {
+        previousCounts.set(block.id, (previousCounts.get(block.id) ?? 0) + 1);
+      }
+      const candidate = applyTextPatches(
+        context.source,
+        operations.map((operation) => ({
+          from: operation.range.start,
+          to: operation.range.end,
+          insert: operation.insert,
+        })),
+      );
+      const createsManagedBlock = parseManagedConstructionBlocks(candidate)
+        .some((block) => {
+          const remaining = previousCounts.get(block.id) ?? 0;
+          if (remaining === 0) return true;
+          previousCounts.set(block.id, remaining - 1);
+          return false;
+        });
+      if (createsManagedBlock) {
+        errors.push({
+          code: 'operation-kind',
+          message: 'Raw AI patches cannot create managed constructions; use construction-plan-proposal/v1.',
+        });
+      }
+    } catch (error) {
+      errors.push({
+        code: 'overlapping-operations',
+        message: error instanceof Error
+          ? error.message
+          : 'Raw AI patch set cannot be applied atomically.',
+      });
+    }
+  }
+
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, proposal: proposal as AiPatchProposal, bindings };
 }
@@ -690,6 +745,25 @@ export function compileAiPatchProposal(
     preconditions.push(sourceSlicePrecondition(operation));
   });
 
+  const sourceOperation = {
+    operationId: `${valid.proposalId}:source-patch`,
+    op: 'source-patch',
+    patches,
+    preconditions,
+  } satisfies GeometryOperation;
+  const workspaceEdit = createGeometryWorkspaceEdit([sourceOperation], [{
+    operationId: sourceOperation.operationId,
+    label: 'Apply AI TikZ edit',
+    description: `${patches.length} source patch${patches.length === 1 ? '' : 'es'} will be applied atomically.`,
+    patchAnnotations: valid.operations.map((operation) => ({
+      label: operation.kind === 'insert'
+        ? 'Add TikZ geometry'
+        : operation.kind === 'delete'
+          ? 'Delete TikZ geometry'
+          : 'Modify TikZ geometry',
+      description: `Update the attested source binding ${operation.bindingId}.`,
+    })),
+  }]);
   const transaction: GeometryTransactionRequest = {
     schemaVersion: 'geometry-transaction/v1',
     transactionId: valid.proposalId,
@@ -703,18 +777,17 @@ export function compileAiPatchProposal(
     ...(options.expectedKernelHash ?? valid.basis.kernelHash
       ? { expectedKernelHash: options.expectedKernelHash ?? valid.basis.kernelHash }
       : {}),
+    ...(valid.basis.projectionHash
+      ? { expectedProjectionHash: valid.basis.projectionHash }
+      : {}),
     ...(options.pluginSetDigest ?? valid.basis.pluginSetDigest
       ? { pluginSetDigest: options.pluginSetDigest ?? valid.basis.pluginSetDigest }
       : {}),
     readSet,
     writeSet,
     preconditions,
-    operations: [{
-      operationId: `${valid.proposalId}:source-patch`,
-      op: 'source-patch',
-      patches,
-      preconditions,
-    }],
+    operations: [sourceOperation],
+    workspaceEdit,
     ...(options.actorId ? { actorId: options.actorId } : {}),
     ...(options.correlationId ? { correlationId: options.correlationId } : {}),
     metadata: {

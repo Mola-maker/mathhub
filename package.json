@@ -2,14 +2,22 @@
   "name": "molamaker-math-app",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "mathhub"
+  ],
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "dev:tikz": "node tools/dev-tikz-studio.mjs",
+    "dev:compiler:native": "node services/tikz-compiler/local-dev-server.mjs",
+    "dev:mathhub": "npm run dev --workspace mathhub",
+    "build:mathhub": "npm run build --workspace mathhub",
+    "build": "npm run build:mathhub && next build",
     "build:sites": "vinext build",
     "start": "next start",
     "generate:tikz-parser": "lezer-generator --typeScript --output lib/tikz/editor/tikz-parser.ts lib/tikz/editor/tikz.grammar",
+    "generate:tikz-registry": "node tools/generate-pgf-registry.mjs",
     "lint": "eslint . --max-warnings 0",
-    "test": "vitest run",
+    "test": "vitest run --maxWorkers=2",
     "test:compiler": "node --test services/tikz-compiler/*.test.mjs",
     "audit:cdn": "node tools/audit-static-assets.mjs"
   },
@@ -22,8 +30,6 @@
     "@lezer/common": "^1.5.2",
     "@lezer/highlight": "^1.2.3",
     "@lezer/lr": "^1.4.10",
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.6.1",
     "katex": "^0.17.0",
     "motion": "^12.43.0",
     "next": "16.2.12",
@@ -34,7 +40,6 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
-    "three": "^0.185.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -46,7 +51,6 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^6.0.2",
     "@vitejs/plugin-rsc": "^0.5.26",
     "@vitest/coverage-v8": "^4.1.10",

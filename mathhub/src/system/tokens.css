@@ -1,0 +1,262 @@
+/* ============================================================
+   MathHub Hero — Design Tokens
+   Monochromatic cobalt. NO gradients, NO purple, NO cyan.
+   ============================================================ */
+
+/* ---- Self-hosted fonts (see public/fonts/README.md for licenses) ----
+   DINish: SIL OFL 1.1 variable DIN revival (wdth 75–125, wght 300–900)
+   — Latin-only display face; CJK always falls through to PingFang/YaHei.
+   Ioskeley Mono NL: OFL-licensed Iosevka build (open Berkeley Mono
+   alternative) — the house code face. Both use font-display: swap. */
+@font-face {
+  font-family: "DINish";
+  src: url("/mathhub/fonts/DINish-var.woff2") format("woff2-variations");
+  font-weight: 300 900;
+  font-stretch: 75% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ioskeley Mono NL";
+  src: url("/mathhub/fonts/IoskeleyMonoNL-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ioskeley Mono NL";
+  src: url("/mathhub/fonts/IoskeleyMonoNL-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* ---- Palette (exact, do not add hues) ---- */
+  --cobalt: #1D4199;      /* dominant page background / hero field */
+  --deep: #16367F;        /* recessed canvas areas, pressed states (sparing) */
+  --soft: #4965AA;        /* secondary geometry, faint marks, inactive states */
+  --paper: #F5F4EE;       /* primary typography, active geometry (warm — keep) */
+  --mist: rgba(255, 255, 255, 0.55); /* secondary text, metadata, inactive controls */
+  /* Brighter mist for deep-field readability. Contrast audit (WCAG):
+     on --journey-1 #1D4199, --mist = 3.97:1 (FAILS 4.5 AA for 10.5px
+     metadata); --mist-hi = 5.20:1. On --journey-5 #0F2454, --mist =
+     5.48:1 (passes but thin at meta size); --mist-hi = 7.62:1. */
+  --mist-hi: rgba(255, 255, 255, 0.68); /* metadata on the blue journey tones */
+  --line-faint: rgba(245, 244, 238, 0.12);  /* construction lines */
+  --line-strong: rgba(245, 244, 238, 0.25); /* separators, annotations */
+
+  /* ---- Scroll-journey backdrop ladder (Backdrop.tsx) ----
+     BLUE → IVORY → BLUE. Chapters 1–2 cobalt, chapters 3–4 IVORY
+     (ch4 fractionally deeper for chapter separation), chapters 5–6
+     return into deep blue. One solid tone per chapter, crossfaded
+     via OPACITY ONLY (solid fills, never gradients).
+     On the ivory chapters the paper/mist foregrounds would be
+     unreadable, so the UI foreground FLIPS to cobalt ink via the
+     semantic --fg* set below (html[data-journey] overrides at the
+     end of this file). */
+  --journey-1: #1D4199;
+  --journey-2: #1A3C8E;
+  --journey-3: #F5F4EE;   /* IVORY (matches --paper) */
+  --journey-4: #EDECE2;   /* ivory, fractionally deeper */
+  --journey-5: #16367F;
+
+  /* ---- Semantic UI foreground (journey-aware) ----
+     Defaults = the paper-on-cobalt set. Scenes 1/2/5/6 keep using
+     --paper/--mist directly; journey-aware chrome consumes these.
+     html[data-journey='3'|'4'] below flips them to cobalt-on-ivory. */
+  --fg: var(--paper);
+  --fg-dim: var(--mist);
+  --fg-hi: var(--mist-hi);
+  --line-ui: var(--line-strong);
+
+  /* ---- Typography — two-family system + code face ----
+     --font-display: DINish (Latin-only) → neo-grotesk → CJK fallbacks.
+       Hero display/headlines only; Chinese glyphs always fall through
+       to PingFang SC / Microsoft YaHei inside the same stack.
+     --font-body: CJK-capable neo-grotesk stack (unchanged behavior).
+     --font-code: Ioskeley Mono NL → system mono fallbacks, for all
+       source/mono text (SourceLine, KeyHint, prompts, transactions).
+     --font-sans / --font-mono: legacy aliases kept for CONTRACTS.md. */
+  --font-display: "DINish", "Helvetica Neue", "Neue Haas Grotesk", Inter,
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: "Helvetica Neue", "Neue Haas Grotesk", Inter, system-ui,
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-code: "Ioskeley Mono NL", "IBM Plex Mono", "JetBrains Mono",
+    ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-code);
+
+  /* Extreme scale contrast */
+  --text-hero: clamp(96px, 12vw, 160px);
+  --text-title: clamp(40px, 5.5vw, 72px);
+  --text-body: 13px;
+  --text-meta: 10.5px;
+  --tracking-meta: 0.22em;
+  --tracking-wordmark: 0.02em;
+
+  /* ---- Spacing (editorial) ---- */
+  --margin-x: clamp(48px, 6vw, 80px);
+  --gutter: 24px;
+
+  /* ---- Shape ---- */
+  --radius: 1px; /* hard cap: 2px */
+}
+
+/* ---- Base reset ---- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: var(--soft) var(--deep);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+/* ---- Selection ---- */
+::selection {
+  background: var(--paper);
+  color: var(--cobalt);
+}
+
+/* ---- Scrollbar (webkit) ---- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--deep);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--soft);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mist);
+}
+
+/* ============================================================
+   IVORY JOURNEY (chapters 3–4) — cobalt ink on ivory.
+   Backdrop.tsx sets document.documentElement.dataset.journey to
+   the current chapter ('1'..'6') — flipping DURING the boundary
+   band once the incoming layer's ramp passes ~40% — so on ivory
+   chapters the UI foreground flips from paper-on-cobalt to
+   cobalt-on-ivory in step with the lightening field.
+
+   Contrast audit (WCAG, measured on #F5F4EE):
+     --fg    #16367F solid            10.20:1 (passes all)
+     --fg-dim rgba(29,65,153,0.80)     5.14:1 (passes AA ≥4.5)
+     --fg-hi  rgba(29,65,153,0.88)     6.27:1 (passes AA large+body)
+   Note: the originally drafted 0.62 alpha measured 3.33:1 (fails
+   4.5:1 for 10.5px metadata); the 0.75/0.78 pair (4.54:1 / 4.89:1)
+   still read faint on ivory — bumped to 0.80 / 0.88.
+   ============================================================ */
+
+html[data-journey="3"],
+html[data-journey="4"] {
+  --fg: #16367F;
+  --fg-dim: rgba(29, 65, 153, 0.8);
+  --fg-hi: rgba(29, 65, 153, 0.88);
+  --line-ui: rgba(22, 54, 127, 0.3);
+  scrollbar-color: #1D4199 #F5F4EE;
+}
+
+/* Fixed chrome (header .top) is always visible, so it flips
+   through a scoped descendant override of the palette vars —
+   independent of whatever the scenes do with their own logic. */
+html[data-journey="3"] .top,
+html[data-journey="4"] .top {
+  color: #16367F;
+  --mist: rgba(29, 65, 153, 0.8);
+  --paper: #16367F;
+  --line-strong: rgba(22, 54, 127, 0.3);
+  --line-faint: rgba(22, 54, 127, 0.14);
+}
+
+/* Departing/arriving scene roots flip with the band too. Scene 2
+   (cobalt chapter) still renders its paper-on-cobalt palette while
+   the ivory chapter-3 field ramps in beneath it; without this
+   override its white text crosses a lightening background
+   unreadably. Scoped to the same cobalt-ink values as .top so the
+   whole viewport flips as one. Scenes 3–4 consume the semantic
+   --fg* set (flipped at the :root level above), so no mirror rule
+   is needed when the journey returns to blue. */
+html[data-journey="3"] .scene-2,
+html[data-journey="4"] .scene-2 {
+  --paper: #16367F;
+  --mist: rgba(29, 65, 153, 0.75);
+  --mist-hi: rgba(29, 65, 153, 0.85);
+  --line-strong: rgba(22, 54, 127, 0.3);
+  --line-faint: rgba(22, 54, 127, 0.14);
+}
+
+/* The flip happens mid-band — soften it with color-only
+   transitions (no layout-affecting properties). */
+html .top,
+html .scene-2 {
+  transition: color 600ms ease;
+}
+
+/* Selection + scrollbar follow the cobalt-on-ivory flip. */
+html[data-journey="3"] ::selection,
+html[data-journey="4"] ::selection {
+  background: #16367F;
+  color: #F5F4EE;
+}
+
+html[data-journey="3"] ::-webkit-scrollbar-track,
+html[data-journey="4"] ::-webkit-scrollbar-track {
+  background: #F5F4EE;
+}
+html[data-journey="3"] ::-webkit-scrollbar-thumb,
+html[data-journey="4"] ::-webkit-scrollbar-thumb {
+  background: #1D4199;
+}
+html[data-journey="3"] ::-webkit-scrollbar-thumb:hover,
+html[data-journey="4"] ::-webkit-scrollbar-thumb:hover {
+  background: #16367F;
+}

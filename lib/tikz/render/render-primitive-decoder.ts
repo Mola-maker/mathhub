@@ -6,16 +6,29 @@ import type {
 } from '../ir/model';
 import type { Pt } from '../semantics/calc-eval';
 import type { PersistentSourceCircleDefinition } from '../ir/persistent-entity-reference';
+import { flattenCircularArc } from '../geometry/circular-arc';
+import { flattenEllipticalArc } from '../geometry/elliptical-arc';
+import { flattenEllipse } from '../geometry/ellipse';
+import { DEFAULT_STYLE } from './style-resolver';
+import { labelSceneFitPoints } from './label-layout';
 
 export type RenderArrow = 'none' | '->' | '<-' | '<->';
+export type RenderArrowTip = 'to' | 'stealth' | 'latex';
 
 export interface DecodedRenderStyle {
   readonly stroke: string;
   readonly strokeWidth: number;
   readonly dash?: string;
+  readonly dashOffset: number;
+  readonly lineCap: 'butt' | 'round' | 'square';
+  readonly lineJoin: 'miter' | 'round' | 'bevel';
+  readonly miterLimit: number;
   readonly arrow: RenderArrow;
+  readonly arrowTip: RenderArrowTip;
   readonly fill?: string;
+  readonly strokeOpacity: number;
   readonly fillOpacity: number;
+  readonly textOpacity: number;
   readonly opacity: number;
 }
 
@@ -48,10 +61,53 @@ export type DecodedRenderPrimitive =
     readonly points: readonly Pt[];
   })
   | (DecodedRenderPrimitiveBase & {
+    readonly kind: 'cubic-bezier';
+    readonly start: Pt;
+    readonly control1: Pt;
+    readonly control2: Pt;
+    readonly end: Pt;
+  })
+  | (DecodedRenderPrimitiveBase & {
+    readonly kind: 'circular-arc';
+    readonly center: Pt;
+    readonly radius: number;
+    readonly startAngleDeg: number;
+    readonly endAngleDeg: number;
+    readonly start: Pt;
+    readonly end: Pt;
+  })
+  | (DecodedRenderPrimitiveBase & {
+    readonly kind: 'elliptical-arc';
+    readonly center: Pt;
+    readonly axisX: Pt;
+    readonly axisY: Pt;
+    readonly xRadius: number;
+    readonly yRadius: number;
+    readonly rotationDegrees: number;
+    readonly startAngleDeg: number;
+    readonly endAngleDeg: number;
+    readonly start: Pt;
+    readonly end: Pt;
+  })
+  | (DecodedRenderPrimitiveBase & {
     readonly kind: 'circle';
     readonly center: Pt;
     readonly radius: number;
     readonly circleDefinition?: PersistentSourceCircleDefinition;
+  })
+  | (DecodedRenderPrimitiveBase & {
+    readonly kind: 'graph-node';
+    readonly center: Pt;
+    readonly radius: number;
+    readonly text: string;
+    readonly outlined: boolean;
+  })
+  | (DecodedRenderPrimitiveBase & {
+    readonly kind: 'ellipse';
+    readonly center: Pt;
+    readonly xRadius: number;
+    readonly yRadius: number;
+    readonly rotationDegrees: number;
   })
   | (DecodedRenderPrimitiveBase & {
     readonly kind: 'label';
@@ -65,6 +121,18 @@ export type DecodedRenderPrimitive =
     readonly from: Pt;
     readonly to: Pt;
   });
+
+/**
+ * Selects the decoded primitives that can carry `K`. Plain `Extract` collapses
+ * to `never` for the members declared with a grouped discriminant such as
+ * `kind: 'segment' | 'vector' | 'line' | 'ray'`.
+ */
+export type DecodedRenderPrimitiveOf<K extends DecodedRenderPrimitive['kind']> =
+  DecodedRenderPrimitive extends infer Member
+    ? Member extends { kind: infer Discriminant }
+      ? K extends Discriminant ? Member : never
+      : never
+    : never;
 
 export interface RenderPrimitiveDecodeIssue {
   readonly primitiveId: string;
@@ -155,6 +223,18 @@ function arrowValue(value: JsonValue | undefined): RenderArrow | null {
     : null;
 }
 
+function arrowTipValue(value: JsonValue | undefined): RenderArrowTip | null {
+  return value === 'to' || value === 'stealth' || value === 'latex' ? value : null;
+}
+
+function lineCapValue(value: JsonValue | undefined): DecodedRenderStyle['lineCap'] | null {
+  return value === 'butt' || value === 'round' || value === 'square' ? value : null;
+}
+
+function lineJoinValue(value: JsonValue | undefined): DecodedRenderStyle['lineJoin'] | null {
+  return value === 'miter' || value === 'round' || value === 'bevel' ? value : null;
+}
+
 function styleOf(
   primitive: RenderPrimitive,
   semanticKind: string,
@@ -165,16 +245,35 @@ function styleOf(
     : 'none';
   const strokeWidth = finiteNumber(style.strokeWidth);
   const fillOpacity = finiteNumber(style.fillOpacity);
+  const strokeOpacity = finiteNumber(style.strokeOpacity);
+  const textOpacity = finiteNumber(style.textOpacity);
   const opacity = finiteNumber(style.opacity);
+  const dashOffset = finiteNumber(style.dashOffset);
+  const miterLimit = finiteNumber(style.miterLimit);
   return {
-    stroke: stringValue(style.stroke) ?? '#1d1d1f',
-    strokeWidth: strokeWidth !== null && strokeWidth > 0 ? strokeWidth : 1.25,
+    stroke: stringValue(style.stroke) ?? DEFAULT_STYLE.stroke,
+    strokeWidth: strokeWidth !== null && strokeWidth > 0
+      ? strokeWidth
+      : DEFAULT_STYLE.strokeWidth,
     dash: stringValue(style.dash) ?? undefined,
+    dashOffset: dashOffset ?? DEFAULT_STYLE.dashOffset,
+    lineCap: lineCapValue(style.lineCap) ?? DEFAULT_STYLE.lineCap,
+    lineJoin: lineJoinValue(style.lineJoin) ?? DEFAULT_STYLE.lineJoin,
+    miterLimit: miterLimit !== null && miterLimit > 0
+      ? miterLimit
+      : DEFAULT_STYLE.miterLimit,
     arrow: arrowValue(style.arrow) ?? semanticArrow,
+    arrowTip: arrowTipValue(style.arrowTip) ?? DEFAULT_STYLE.arrowTip,
     fill: stringValue(style.fill) ?? undefined,
+    strokeOpacity: strokeOpacity === null
+      ? DEFAULT_STYLE.strokeOpacity
+      : Math.min(1, Math.max(0, strokeOpacity)),
     fillOpacity: fillOpacity === null
       ? 1
       : Math.min(1, Math.max(0, fillOpacity)),
+    textOpacity: textOpacity === null
+      ? DEFAULT_STYLE.textOpacity
+      : Math.min(1, Math.max(0, textOpacity)),
     opacity: opacity === null
       ? 1
       : Math.min(1, Math.max(0, opacity)),
@@ -269,6 +368,80 @@ function decodePrimitive(
     };
   }
 
+  if (kind === 'cubic-bezier') {
+    const start = pointValue(geometry.start);
+    const control1 = pointValue(geometry.control1);
+    const control2 = pointValue(geometry.control2);
+    const end = pointValue(geometry.end);
+    if (!start || !control1 || !control2 || !end) {
+      return invalid('cubic-bezier requires finite start, control1, control2 and end points');
+    }
+    return {
+      ...baseOf(primitive, 'cubic-bezier'),
+      kind: 'cubic-bezier',
+      start,
+      control1,
+      control2,
+      end,
+    };
+  }
+
+  if (kind === 'circular-arc') {
+    const center = pointValue(geometry.center);
+    const radius = finiteNumber(geometry.radius);
+    const startAngleDeg = finiteNumber(geometry.startAngleDeg);
+    const endAngleDeg = finiteNumber(geometry.endAngleDeg);
+    const start = pointValue(geometry.start);
+    const end = pointValue(geometry.end);
+    if (!center || radius === null || radius <= 0 || startAngleDeg === null || endAngleDeg === null || !start || !end) {
+      return invalid('circular-arc requires finite center, angles, endpoints and positive radius');
+    }
+    return {
+      ...baseOf(primitive, 'circular-arc'), kind: 'circular-arc',
+      center, radius, startAngleDeg, endAngleDeg, start, end,
+    };
+  }
+
+  if (kind === 'elliptical-arc') {
+    const center = pointValue(geometry.center);
+    const axisX = pointValue(geometry.axisX);
+    const axisY = pointValue(geometry.axisY);
+    const xRadius = finiteNumber(geometry.xRadius);
+    const yRadius = finiteNumber(geometry.yRadius);
+    const rotationDegrees = finiteNumber(geometry.rotationDegrees);
+    const startAngleDeg = finiteNumber(geometry.startAngleDeg);
+    const endAngleDeg = finiteNumber(geometry.endAngleDeg);
+    const start = pointValue(geometry.start);
+    const end = pointValue(geometry.end);
+    const determinant = axisX && axisY
+      ? axisX.x * axisY.y - axisX.y * axisY.x
+      : 0;
+    if (
+      !center || !axisX || !axisY || !start || !end
+      || xRadius === null || xRadius <= 0
+      || yRadius === null || yRadius <= 0
+      || rotationDegrees === null
+      || startAngleDeg === null || endAngleDeg === null
+      || !Number.isFinite(determinant) || Math.abs(determinant) < 1e-12
+    ) {
+      return invalid('elliptical-arc requires finite invertible axes, angles, endpoints and positive radii');
+    }
+    return {
+      ...baseOf(primitive, 'elliptical-arc'),
+      kind: 'elliptical-arc',
+      center,
+      axisX,
+      axisY,
+      xRadius,
+      yRadius,
+      rotationDegrees,
+      startAngleDeg,
+      endAngleDeg,
+      start,
+      end,
+    };
+  }
+
   if (kind === 'circle') {
     const center = pointValue(geometry.center);
     const radius = finiteNumber(geometry.radius);
@@ -282,6 +455,49 @@ function decodePrimitive(
       radius,
       circleDefinition: circleDefinitionValue(geometry.circleDefinition)
         ?? undefined,
+    };
+  }
+
+  if (kind === 'graph-node') {
+    const center = pointValue(geometry.center);
+    const radius = finiteNumber(geometry.radius);
+    const text = stringValue(geometry.text);
+    const outlined = booleanValue(geometry.outlined);
+    if (!center || radius === null || radius <= 0 || text === null || outlined === null) {
+      return invalid('graph-node requires a finite center, positive radius, text and outlined flag');
+    }
+    return {
+      ...baseOf(primitive, 'graph-node'),
+      kind: 'graph-node',
+      center,
+      radius,
+      text,
+      outlined,
+    };
+  }
+
+  if (kind === 'ellipse') {
+    const center = pointValue(geometry.center);
+    const xRadius = finiteNumber(geometry.xRadius);
+    const yRadius = finiteNumber(geometry.yRadius);
+    const rotationDegrees = geometry.rotationDegrees === undefined
+      ? 0
+      : finiteNumber(geometry.rotationDegrees);
+    if (
+      !center
+      || xRadius === null || xRadius <= 0
+      || yRadius === null || yRadius <= 0
+      || rotationDegrees === null
+    ) {
+      return invalid('ellipse requires a finite center, rotation, and positive x/y radii');
+    }
+    return {
+      ...baseOf(primitive, 'ellipse'),
+      kind: 'ellipse',
+      center,
+      xRadius,
+      yRadius,
+      rotationDegrees,
     };
   }
 
@@ -386,6 +602,16 @@ export function decodedRenderPrimitiveFitPoints(
       case 'polygon':
         points.push(...primitive.points);
         break;
+      case 'cubic-bezier':
+        // Control points safely over-approximate the analytical curve bounds.
+        points.push(primitive.start, primitive.control1, primitive.control2, primitive.end);
+        break;
+      case 'circular-arc':
+        points.push(...flattenCircularArc(primitive, 10));
+        break;
+      case 'elliptical-arc':
+        points.push(...flattenEllipticalArc(primitive, 10));
+        break;
       case 'circle':
         points.push(
           {
@@ -406,8 +632,23 @@ export function decodedRenderPrimitiveFitPoints(
           },
         );
         break;
+      case 'graph-node':
+        points.push(
+          { x: primitive.center.x - primitive.radius, y: primitive.center.y },
+          { x: primitive.center.x + primitive.radius, y: primitive.center.y },
+          { x: primitive.center.x, y: primitive.center.y - primitive.radius },
+          { x: primitive.center.x, y: primitive.center.y + primitive.radius },
+        );
+        break;
+      case 'ellipse':
+        points.push(...flattenEllipse(primitive, 48));
+        break;
       case 'label':
-        points.push(primitive.at);
+        points.push(...labelSceneFitPoints(
+          primitive.at,
+          primitive.text,
+          primitive.anchor ?? '',
+        ));
         break;
       case 'angle':
       case 'right-angle':

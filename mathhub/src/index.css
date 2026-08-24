@@ -1,0 +1,26 @@
+@import "./system/tokens.css";
+
+/* ============================================================
+   MathHub Hero — base layout
+   ============================================================ */
+
+html,
+body {
+  background: var(--cobalt);
+}
+
+body {
+  color: var(--paper);
+  overflow-x: hidden;
+  min-height: 100svh;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+main {
+  position: relative;
+  /* explicit stack above the fixed journey backdrop (z-index: 0) */
+  z-index: 1;
+}

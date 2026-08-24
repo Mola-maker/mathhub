@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (2,0);
+\draw (A) -- (B);
+\end{tikzpicture}

@@ -94,6 +94,7 @@ function publicJob(job) {
     wrapperId: job.wrapperId,
     wrapperDigest: job.wrapperDigest,
     bundleIdentity: job.bundleIdentity,
+    profileManifestDigest: job.profileManifestDigest,
     visibility: job.visibility,
     attempt: job.attempt,
     createdAt: job.createdAt,

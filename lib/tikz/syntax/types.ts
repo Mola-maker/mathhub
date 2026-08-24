@@ -68,6 +68,27 @@ export interface TikzCapabilityFlags {
   exact: boolean;
 }
 
+export type TikzCapabilityStatus =
+  | 'verified'
+  | 'partial'
+  | 'conditional'
+  | 'blocked';
+
+export interface TikzCapabilityLaneTruth {
+  status: TikzCapabilityStatus;
+  /** Stable implementation/profile evidence, never a marketing claim. */
+  evidence: readonly string[];
+  reason: string;
+}
+
+export interface TikzCapabilityTruth {
+  preserve: TikzCapabilityLaneTruth;
+  syntax: TikzCapabilityLaneTruth;
+  semantic: TikzCapabilityLaneTruth;
+  interactive: TikzCapabilityLaneTruth;
+  exact: TikzCapabilityLaneTruth;
+}
+
 export type TikzSecurityRiskLevel = 'none' | 'low' | 'moderate' | 'high' | 'critical';
 
 export type TikzSecurityRiskTag =
@@ -199,6 +220,8 @@ export interface TikzSyntaxCapability {
   library: TikzCatalogLibrary;
   recognition: TikzRecognitionMode;
   capabilities: TikzCapabilityFlags;
+  /** Evidence-backed lane status consumed by UI and AI. */
+  truth: TikzCapabilityTruth;
   securityRisk: TikzSecurityRisk;
   /** Search aliases used by CodeMirror command palettes and AI retrieval. */
   searchTokens: readonly string[];

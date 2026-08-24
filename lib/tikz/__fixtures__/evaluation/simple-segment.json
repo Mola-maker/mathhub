@@ -1,0 +1,147 @@
+{
+  "schemaVersion": "geometry-evaluation-expectations/v2",
+  "geometry": {
+    "entities": ["A", "B"],
+    "paths": [["A", "B"]]
+  },
+  "profiles": {
+    "all-lanes": {
+      "schemaVersion": "geometry-evaluation-corpus/v3",
+      "caseId": "local-real-transaction-chain:all-lanes",
+      "title": "Local real transaction chain",
+      "source": {
+        "disposition": "research-reference-only",
+        "source": "mathnet",
+        "recordId": "mathnet:test-local",
+        "sourceUrl": "https://mathnet.mit.edu/",
+        "admission": "not-admitted",
+        "attributionMode": "gateway-record"
+      },
+      "turns": [
+        {
+          "lane": "answer-only",
+          "instruction": "Explain AB without editing.",
+          "expectedCapabilities": ["semantic-read"],
+          "invariants": [
+            { "kind": "source-unchanged" },
+            { "kind": "agent-terminal", "outcome": "answer", "requiredEventTypes": ["context.read"] },
+            { "kind": "grounding-resolves", "minimumRefs": 2, "recordTypes": ["entity"] }
+          ]
+        },
+        {
+          "lane": "construct",
+          "instruction": "Create point C.",
+          "expectedCapabilities": ["atomic-construction"],
+          "invariants": [
+            { "kind": "single-broker-commit" },
+            { "kind": "proposal-schema", "allowed": ["canvas-construction-batch-proposal/v1"] },
+            { "kind": "semantic-entity-delta", "minimum": 1 },
+            { "kind": "post-commit-basis-current" }
+          ]
+        },
+        {
+          "lane": "modify-existing",
+          "instruction": "Style AB green and thick.",
+          "expectedCapabilities": ["binding-scoped-style"],
+          "invariants": [
+            { "kind": "single-broker-commit" },
+            { "kind": "proposal-schema", "allowed": ["inspector-direct-proposal/v1"] },
+            { "kind": "binding-scoped-write" },
+            { "kind": "semantic-style-changed" }
+          ]
+        },
+        {
+          "lane": "transform-selection",
+          "instruction": "Translate AB.",
+          "expectedCapabilities": ["dependency-preserving-transform"],
+          "invariants": [
+            { "kind": "single-broker-commit" },
+            { "kind": "proposal-schema", "allowed": ["canvas-selection-transform-proposal/v1"] },
+            { "kind": "selection-transform-attested" },
+            { "kind": "geometry-position-changed" },
+            { "kind": "semantic-relations-preserved" },
+            { "kind": "external-impact-acknowledged" }
+          ]
+        },
+        {
+          "lane": "verify-rendering",
+          "instruction": "Capture both render lanes.",
+          "expectedCapabilities": ["interactive-render", "exact-render"],
+          "invariants": [
+            { "kind": "source-unchanged" },
+            { "kind": "render-artifacts-attested", "lanes": ["interactive", "exact"] },
+            { "kind": "render-read-only" }
+          ]
+        }
+      ]
+    },
+    "construct-only": {
+      "schemaVersion": "geometry-evaluation-corpus/v3",
+      "caseId": "local-real-transaction-chain:construct-only",
+      "title": "Local real transaction chain",
+      "source": {
+        "disposition": "research-reference-only",
+        "source": "mathnet",
+        "recordId": "mathnet:test-local",
+        "sourceUrl": "https://mathnet.mit.edu/",
+        "admission": "not-admitted",
+        "attributionMode": "gateway-record"
+      },
+      "turns": [
+        {
+          "lane": "construct",
+          "instruction": "Create point C.",
+          "expectedCapabilities": ["atomic-construction"],
+          "invariants": [
+            { "kind": "single-broker-commit" },
+            { "kind": "proposal-schema", "allowed": ["canvas-construction-batch-proposal/v1"] },
+            { "kind": "semantic-entity-delta", "minimum": 1 },
+            { "kind": "post-commit-basis-current" }
+          ]
+        }
+      ]
+    },
+    "missing-label-capability": {
+      "schemaVersion": "geometry-evaluation-corpus/v3",
+      "caseId": "local-real-transaction-chain:missing-label-capability",
+      "title": "Local real transaction chain",
+      "source": {
+        "disposition": "research-reference-only",
+        "source": "mathnet",
+        "recordId": "mathnet:test-local",
+        "sourceUrl": "https://mathnet.mit.edu/",
+        "admission": "not-admitted",
+        "attributionMode": "gateway-record"
+      },
+      "turns": [
+        {
+          "lane": "modify-existing",
+          "instruction": "Style and label.",
+          "expectedCapabilities": ["binding-scoped-style", "label-intent"],
+          "invariants": [{ "kind": "label-entity-delta", "minimum": 1 }]
+        }
+      ]
+    },
+    "verify-exact-only": {
+      "schemaVersion": "geometry-evaluation-corpus/v3",
+      "caseId": "local-real-transaction-chain:verify-exact-only",
+      "title": "Local real transaction chain",
+      "source": {
+        "disposition": "research-reference-only",
+        "source": "mathnet",
+        "recordId": "mathnet:test-local",
+        "sourceUrl": "https://mathnet.mit.edu/",
+        "admission": "not-admitted",
+        "attributionMode": "gateway-record"
+      },
+      "turns": [
+        {
+          "lane": "verify-rendering",
+          "instruction": "Verify exact.",
+          "expectedCapabilities": ["exact-render"],
+          "invariants": [{ "kind": "render-artifacts-attested", "lanes": ["exact"] }]
+        }
+      ]
+    }
+  }
+}

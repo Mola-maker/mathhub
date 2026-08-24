@@ -15,6 +15,29 @@ const DOC = `\\begin{tikzpicture}[scale=1]
 \\end{tikzpicture}`;
 
 describe('parseTikz', () => {
+  it('parses the official static graph chain with lossless node and edge options', () => {
+    const source = String.raw`\begin{tikzpicture}
+\graph [nodes={draw,circle}, edges={thick}, grow right=2cm] {
+  A/Alpha ->[red] B -> C <-> A;
+};
+\end{tikzpicture}`;
+    const graph = parseTikz(source).statements[0];
+    if (graph.kind !== 'graph') throw new Error('bad graph');
+    expect(graph.nodes.map((node) => [node.name, node.text])).toEqual([
+      ['A', 'Alpha'],
+      ['B', 'B'],
+      ['C', 'C'],
+    ]);
+    expect(graph.edges.map((edge) => edge.connector)).toEqual(['->', '->', '<->']);
+    expect(graph.edges[0]?.options?.raw).toBe('red');
+    expect(source.slice(graph.nodes[0]!.range.start, graph.nodes[0]!.range.end)).toBe('A/Alpha');
+  });
+
+  it('keeps dynamic graph groups outside the static interactive parser', () => {
+    const source = String.raw`\begin{tikzpicture}\graph { A -- { B, C } };\end{tikzpicture}`;
+    expect(() => parseTikz(source)).toThrowError(/group|静态名称/u);
+  });
+
   it('语句种类与数量正确', () => {
     const pic = parseTikz(DOC);
     expect(pic.scale).toBe(1);
@@ -98,5 +121,106 @@ describe('parseTikz', () => {
     expect(() => parseTikz('\\begin{tikzpicture}\\foreach \\x in {1,2} {}\\end{tikzpicture}')).toThrowError(/不支持的命令/);
     expect(() => parseTikz('\\begin{tikzpicture}\\coordinate (A) at (1cm,2);\\end{tikzpicture}')).toThrowError(/纯数字/);
     expect(() => parseTikz('\\begin{tikzpicture}\\coordinate (A) at (1,2);')).toThrowError(/end{tikzpicture}/);
+  });
+
+  it('parses the official cubic Bezier operator without confusing it with decimals', () => {
+    const source = '\\begin{tikzpicture}\\draw (0,0) .. controls (.5,1) and (2,1) .. (3,0);\\end{tikzpicture}';
+    const statement = parseTikz(source).statements[0];
+    if (statement.kind !== 'path') throw new Error('bad path');
+    expect(statement.specs[0]).toMatchObject({
+      type: 'cubic-bezier',
+      start: { kind: 'literal', x: 0, y: 0 },
+      control1: { kind: 'literal', x: 0.5, y: 1 },
+      control2: { kind: 'literal', x: 2, y: 1 },
+      end: { kind: 'literal', x: 3, y: 0 },
+    });
+  });
+
+  it('treats a named point center anchor as the same reversible point reference', () => {
+    const source = '\\begin{tikzpicture}\\coordinate (A) at (1,2);\\draw (A.center)--(3,4);\\end{tikzpicture}';
+    const statement = parseTikz(source).statements[1];
+    if (statement.kind !== 'path' || statement.specs[0]?.type !== 'polyline') {
+      throw new Error('bad path');
+    }
+    expect(statement.specs[0].points[0]).toMatchObject({
+      kind: 'ref',
+      name: 'A',
+      anchor: 'center',
+    });
+  });
+
+  it('keeps unsupported shape-dependent anchors out of interactive semantics', () => {
+    const source = '\\begin{tikzpicture}\\coordinate (A) at (1,2);\\draw (A.north)--(3,4);\\end{tikzpicture}';
+    expect(() => parseTikz(source)).toThrowError(/暂只支持命名点的 center 锚点/);
+  });
+
+  it('parses both positional and keyed official circular arc forms', () => {
+    const positionalSource = '\\begin{tikzpicture}\\draw (2,0) arc (0:120:2);\\end{tikzpicture}';
+    const keyedSource = '\\begin{tikzpicture}\\draw (2,0) arc[start angle=0,end angle=120,radius=2];\\end{tikzpicture}';
+    const positional = parseTikz(positionalSource).statements[0];
+    const keyed = parseTikz(keyedSource).statements[0];
+    if (positional.kind !== 'path' || keyed.kind !== 'path') throw new Error('bad path');
+    expect(positional.specs[0]).toMatchObject({
+      type: 'circular-arc', startAngleDeg: 0, endAngleDeg: 120, radius: 2,
+    });
+    expect(keyed.specs[0]).toMatchObject({
+      type: 'circular-arc', startAngleDeg: 0, endAngleDeg: 120, radius: 2,
+    });
+    const positionalArc = positional.specs[0];
+    const keyedArc = keyed.specs[0];
+    if (positionalArc?.type !== 'circular-arc' || keyedArc?.type !== 'circular-arc') {
+      throw new Error('bad circular arc');
+    }
+    expect(positionalSource.slice(
+      positionalArc.parameterSources.startAngle.range.start,
+      positionalArc.parameterSources.startAngle.range.end,
+    )).toBe('0');
+    expect(positionalSource.slice(
+      positionalArc.parameterSources.endAngle.range.start,
+      positionalArc.parameterSources.endAngle.range.end,
+    )).toBe('120');
+    expect(positionalSource.slice(
+      positionalArc.parameterSources.radius.range.start,
+      positionalArc.parameterSources.radius.range.end,
+    )).toBe('2');
+    expect(keyedSource.slice(
+      keyedArc.parameterSources.startAngle.range.start,
+      keyedArc.parameterSources.startAngle.range.end,
+    )).toBe('0');
+    expect(keyedSource.slice(
+      keyedArc.parameterSources.endAngle.range.start,
+      keyedArc.parameterSources.endAngle.range.end,
+    )).toBe('120');
+    expect(keyedSource.slice(
+      keyedArc.parameterSources.radius.range.start,
+      keyedArc.parameterSources.radius.range.end,
+    )).toBe('2');
+  });
+
+  it('parses the official rectangle path operation without lowering it to fake source points', () => {
+    const source = '\\begin{tikzpicture}\\draw (A) rectangle (B);\\end{tikzpicture}';
+    const statement = parseTikz(source).statements[0];
+    if (statement.kind !== 'path') throw new Error('bad path');
+    expect(statement.specs[0]).toMatchObject({
+      type: 'rectangle',
+      first: { kind: 'ref', name: 'A' },
+      opposite: { kind: 'ref', name: 'B' },
+    });
+    const rectangle = statement.specs[0];
+    if (rectangle?.type !== 'rectangle') throw new Error('bad rectangle');
+    expect(source.slice(rectangle.range.start, rectangle.range.end)).toBe('(A) rectangle (B)');
+  });
+
+  it('parses the official axis-aligned ellipse path with physical units', () => {
+    const statement = parseTikz(
+      '\\begin{tikzpicture}\\coordinate (O) at (0,0);\\draw (O) ellipse (20mm and 1cm);\\end{tikzpicture}',
+    ).statements[1];
+    if (statement.kind !== 'path') throw new Error('bad path');
+    expect(statement.specs[0]).toMatchObject({
+      type: 'ellipse',
+      center: { kind: 'ref', name: 'O' },
+      xRadius: 2,
+      yRadius: 1,
+    });
   });
 });

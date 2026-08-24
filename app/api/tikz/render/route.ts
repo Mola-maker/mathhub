@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clientIp } from '@/lib/client-ip';
 import { checkRate } from '@/lib/rate-limit';
+import { BoundedJsonError, readBoundedJson } from '@/lib/http/read-bounded-json';
 import {
   createTikzCompileJob,
   fetchTikzCompileArtifact,
@@ -9,6 +10,7 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+const MAX_RENDER_REQUEST_BYTES = 160 * 1024;
 
 export async function POST(req: NextRequest): Promise<Response> {
   const ip = await clientIp();
@@ -36,9 +38,18 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   let code = '';
   try {
-    const body = await req.json() as { code?: unknown };
+    const body = await readBoundedJson(
+      req,
+      MAX_RENDER_REQUEST_BYTES,
+    ) as { code?: unknown };
     code = typeof body.code === 'string' ? body.code : '';
-  } catch {
+  } catch (error) {
+    if (error instanceof BoundedJsonError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
       { error: '请求体不是合法 JSON' },
       { status: 400 },
@@ -46,17 +57,18 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   try {
-    const job = await createTikzCompileJob(code);
+    const job = await createTikzCompileJob(code, req.signal);
     if (job.status === 'failed') {
       throw new TikzCompileError(
         job.error || 'TikZ 精确编译失败',
         422,
         job.errorCode || 'COMPILE_FAILED',
+        job.diagnostics ?? [],
       );
     }
     if (job.status !== 'succeeded') {
       return NextResponse.json(
-        { jobId: job.id, status: job.status },
+        { jobId: job.id, status: job.status, profile: job.profile },
         {
           status: 202,
           headers: {
@@ -73,11 +85,16 @@ export async function POST(req: NextRequest): Promise<Response> {
         'INVALID_ARTIFACT_ATTESTATION',
       );
     }
-    const svg = await fetchTikzCompileArtifact(job.id, job.attestation);
+    const svg = await fetchTikzCompileArtifact(
+      job.id,
+      job.attestation,
+      req.signal,
+    );
     return NextResponse.json(
       {
         jobId: job.id,
         status: 'succeeded',
+        profile: job.profile,
         svg,
         renderer: job.renderer,
         attestation: job.attestation,
@@ -92,6 +109,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     const message = error instanceof Error
       ? error.message
       : 'TikZ 精确渲染失败';
-    return NextResponse.json({ error: message, code }, { status });
+    return NextResponse.json({
+      error: message,
+      code,
+      diagnostics: error instanceof TikzCompileError
+        ? error.diagnostics
+        : [],
+    }, { status });
   }
 }

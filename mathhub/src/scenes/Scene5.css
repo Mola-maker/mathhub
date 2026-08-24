@@ -1,0 +1,315 @@
+/* ============================================================
+   SCENE 5 — Workspace reveal.
+   Open fragments on the cobalt field; hairline rules only.
+   Transform/opacity choreography driven inline from progress.
+   ============================================================ */
+
+.scene-5 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Tilted stage — the faint perspective unfolding (≤2deg). */
+.scene-5__stage {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 62%;
+  will-change: transform;
+}
+
+/* Scene 5 rides journey tone 5 (#0F2454) — the deepest field.
+   Frag labels and quiet chrome use --mist-hi (see the contrast
+   mapping in tokens.css; utility classes cover the SourceLine /
+   TinyLabel instances). */
+.scene-5 .frag__label {
+  color: var(--mist-hi);
+}
+
+/* ---- Central geometry canvas ---- */
+
+.scene-5__canvas-wrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(64vmin, 620px);
+  aspect-ratio: 1 / 1;
+  will-change: transform, opacity;
+}
+
+/* Model-density whisper pinned to the canvas corner — rides the
+   canvas morph because it lives inside the wrap. */
+.scene-5__canvas-meta {
+  position: absolute;
+  top: calc(100% + 14px);
+  right: 0;
+  font-size: 10px;
+  letter-spacing: var(--tracking-meta);
+  text-transform: uppercase;
+  color: var(--mist-hi);
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+.scene-5__canvas-drift {
+  width: 100%;
+  height: 100%;
+}
+
+.scene-5__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- TOP — tool-chord toolbar ---- */
+
+.scene-5__toolbar {
+  padding-bottom: 10px;
+}
+
+.scene-5__tools {
+  display: flex;
+  align-items: center;
+}
+
+.scene-5__tool {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+}
+
+.scene-5__tool:first-child {
+  padding-left: 0;
+}
+
+.scene-5__tool:last-child {
+  padding-right: 0;
+}
+
+/* hairline separators between tool chords */
+.scene-5__tool + .scene-5__tool {
+  border-left: 1px solid var(--line-strong);
+}
+
+/* ---- Capability chips — real panels orbiting the canvas ----
+   A quiet row below the toolbar, surfacing after the docks settle. */
+
+.scene-5__chips {
+  position: absolute;
+  left: 50%;
+  top: calc(max(8%, 80px) + 44px);
+  display: flex;
+  gap: 10px;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.scene-5__chip {
+  font-size: var(--text-meta);
+  letter-spacing: var(--tracking-meta);
+  text-transform: uppercase;
+  color: var(--mist-hi);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+
+/* ---- LEFT — command deck ---- */
+
+.scene-5__deck {
+  min-width: 200px;
+  max-width: 260px; /* Chinese history lines wrap to a flexible height
+                       instead of overflowing the left edge */
+}
+
+.scene-5__prompt {
+  margin-bottom: 6px;
+}
+
+.scene-5__history {
+  opacity: 0.75;
+  line-height: 1.65; /* room for CJK glyphs when a line wraps */
+}
+
+/* Long zh history lines (e.g. the AI-resolution line) wrap to a
+   flexible height inside the deck instead of overflowing — the
+   .sourceline default is white-space: pre, so override with the
+   deck-scoped selector (higher specificity, order-independent). */
+.scene-5__deck .scene-5__history {
+  white-space: pre-wrap;
+}
+
+/* Fail-closed badge — the AI proposal that bound to the live
+   board. A hairline chip, not a card. */
+.scene-5__badge-row {
+  margin-top: 8px;
+}
+
+.scene-5__badge {
+  display: inline-block;
+  font-family: var(--font-code);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 3px 7px;
+}
+
+/* ---- RIGHT — 关系 inspector ---- */
+
+.scene-5__inspector {
+  text-align: right;
+  max-width: 300px; /* relation fields wrap right-aligned instead
+                       of running into the stage edge */
+}
+
+/* relation fields wrap to a flexible height (right edge stays
+   flush; the ragged side faces the canvas) */
+.scene-5__inspector .sourceline {
+  white-space: normal;
+}
+
+/* Inspector tab strip — 几何 / 样式 / 关系, the open tab active. */
+.scene-5__tabs {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+/* Solver status chip — hairline above, the live status below. */
+.scene-5__solver {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line-strong);
+  will-change: transform, opacity;
+}
+
+.scene-5__solver-label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.scene-5__solver-chip {
+  display: inline-block;
+  font-family: var(--font-code);
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  color: var(--mist-hi);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  white-space: normal;
+}
+
+/* resolved state — constraints held */
+.scene-5__solver-chip--held {
+  color: var(--paper);
+}
+
+/* ---- BOTTOM — source dock ---- */
+
+.scene-5__source {
+  padding-top: 10px;
+}
+
+.scene-5__source-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  white-space: nowrap;
+}
+
+.scene-5__source-strip .sourceline {
+  font-size: 11px;
+}
+
+.scene-5__tx {
+  align-self: center;
+}
+
+/* collapse affordance — a single quiet minus */
+.scene-5__collapse {
+  align-self: center;
+  font-size: 11px;
+  color: var(--mist-hi);
+  user-select: none;
+}
+
+/* Managed-block ledger — recorded lines beneath the live strip. */
+.scene-5__ledger {
+  margin-top: 8px;
+}
+
+.scene-5__ledger-line {
+  font-size: 10px;
+  line-height: 1.6;
+  will-change: transform, opacity;
+}
+
+/* ---- END — gateway link ---- */
+
+.scene-5__enter {
+  position: absolute;
+  left: 50%;
+  top: 93.5%;
+  font-size: var(--text-meta);
+  letter-spacing: var(--tracking-meta);
+  text-transform: uppercase;
+  color: var(--mist-hi);
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: 3px;
+  will-change: transform, opacity;
+}
+
+.scene-5__enter:hover {
+  color: var(--paper);
+}
+
+/* ---- Narrow stages: tighten the flanks ---- */
+
+@media (max-width: 720px) {
+  /* zh tool chords (选择 V/线段 L/圆 C/中点 M/中垂线 B/反演 I) stay on
+     one hairline-separated row — tighten the gaps before wrapping */
+  .scene-5__tool {
+    padding: 0 8px;
+  }
+
+  .scene-5__chips {
+    top: calc(max(8%, 80px) + 40px);
+    gap: 8px;
+  }
+
+  .scene-5__deck {
+    min-width: 0;
+    max-width: 46vw;
+  }
+
+  /* history lines 3+ (divs 4+, after the prompt div) drop on a
+     narrow stage — prompt plus two history lines still narrate */
+  .scene-5__history:nth-of-type(n + 4) {
+    display: none;
+  }
+
+  /* the ledger is depth, not anatomy — drop it when the strip
+     itself is already shedding lines */
+  .scene-5__ledger {
+    display: none;
+  }
+
+  /* right inspector crowds a narrow stage — toolbar, deck and
+     source dock still describe the anatomy */
+  .scene-5__inspector {
+    display: none;
+  }
+
+  .scene-5__source-strip {
+    gap: 14px;
+  }
+
+  .scene-5__source-strip .sourceline:first-of-type {
+    display: none;
+  }
+}

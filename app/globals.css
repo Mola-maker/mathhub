@@ -31,18 +31,3 @@ body {
 .math-shell > .wp-tile--math {
   width: min(720px, 100%);
 }
-
-/* Hero (components/hero/*) — design tokens for entrance animation + reduce-motion override.
-   The DOM/SVG layer reads these via useHeroTokens; CSS uses them directly. */
-:root {
-  --hero-from-x: -16px;
-  --hero-to-x: 0px;
-  --hero-stagger-ms: 60;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --hero-from-x: 0px;
-    --hero-stagger-ms: 0;
-  }
-}

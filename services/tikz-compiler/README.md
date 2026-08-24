@@ -11,7 +11,39 @@
 队列采用 `waiting list -> processing list -> running lease` 模型。Worker 崩溃后，
 过期任务会自动回队；每次领取都会增加 `attempt`，旧 Worker 不能覆盖新尝试的结果。
 
+## 两个不可混用的精确编译 profile
+
+源码在 Web 边界按实际语法能力选择编译器，而不是让一个运行时“试试看”：
+
+- `tikz-standard-v1`：Tectonic `--untrusted --only-cached`，覆盖普通 TikZ、
+  `graphs` 与 `graphs.standard`；
+- `tikz-luatex-graphdrawing-v1`：不可变 TeX Live/LuaLaTeX 包树，覆盖
+  `graphdrawing`、`\usegdlibrary` 与 Lua 布局算法。
+
+普通 `\graph` 不会误触发 LuaTeX；只有 graphdrawing 库、算法库或布局键会分流。
+两个 profile 分别绑定 wrapper digest、manifest digest、Worker image digest、Redis
+namespace 和 artifact attestation。未配置 companion 服务时返回
+`GRAPHDRAWING_COMPILER_NOT_CONFIGURED`，不会把源码降级到 Tectonic 或伪称精确成功。
+用户源码中的 `\directlua` 等任意 Lua 入口始终由 source policy 拒绝；只有固定镜像内
+PGF graph drawing 包自身的 Lua 代码能够执行。
+
 ## 本地启动
+
+### 推荐：一条命令启动 Studio 与精准编译服务
+
+本机已安装 Tectonic 与 dvisvgm 时，直接运行：
+
+```powershell
+npm run dev:tikz
+```
+
+该入口会启动 Next.js 和 development-only compiler，并为两者注入一致的
+`TIKZ_COMPILER_URL/TOKEN`。如果 8787 已有 compiler，它会复用现有服务。
+compiler 会在监听前检查 Tectonic 与 dvisvgm；工具缺失时交互画板仍可使用，
+`/healthz` 与精准预览会明确返回缺失的运行时，而不会把环境问题报告成 TikZ
+语法错误。本地服务使用与生产 `tikz-standard-v1` 相同的
+Tectonic `--untrusted --only-cached` + dvisvgm profile；XeLaTeX 结果不能冒充该
+profile 的精确产物。
 
 ### 方式一：由产品方验证容器环境
 
@@ -33,9 +65,9 @@ TIKZ_COMPILER_TOKEN=local-tikz-compiler-token
 Invoke-RestMethod http://127.0.0.1:8787/healthz
 ```
 
-### 方式二：不用容器
+### 方式二：不用容器、分别启动服务
 
-先确保 Redis、Tectonic 和 dvisvgm 已安装，再分别启动 Worker 与 API。
+生产式队列调试需确保 Redis、Tectonic 和 dvisvgm 已安装，再分别启动 Worker 与 API。
 
 Worker 终端：
 
@@ -61,10 +93,19 @@ $env:PORT = '8787'
 node services/tikz-compiler/server.mjs
 ```
 
+仅调试本机同步 compiler API、无需 Redis 时，也可以单独运行：
+
+```powershell
+npm run dev:compiler:native
+```
+
 ## ECS 运行约束
 
 - `compiler-api` 与 `compiler-worker` 使用不同任务定义。API 镜像不包含 TeX，
   Worker 不监听公网端口。
+- Lua graph drawing 使用第二组 `api-graphdrawing` / `worker-graphdrawing` 任务定义，
+  Web 只通过 `TIKZ_GRAPHDRAWING_COMPILER_URL/TOKEN` 访问；不得与标准队列共享
+  Worker image reference 或 Redis prefix。
 - Web 任务只通过 VPC 内网访问 compiler API 8080，不允许公网直接调用。
 - Web 的 `TIKZ_COMPILER_TOKEN` 与 API 的 `COMPILER_TOKEN` 是同一个随机密钥，
   通过 ECS Secrets 注入。
@@ -126,10 +167,17 @@ npm run build
 docker compose -f services/tikz-compiler/compose.yaml build
 docker compose -f services/tikz-compiler/compose.yaml up -d
 
+docker build --target api-graphdrawing -f services/tikz-compiler/Dockerfile .
+docker build --target worker-graphdrawing -f services/tikz-compiler/Dockerfile .
+
 & .\tools\benchmark-tikz-compiler.ps1 `
   -TectonicPath 'C:\path\to\tectonic.exe' `
   -OnlyCached
 ```
+
+`worker-graphdrawing` 在镜像构建期用 `spring layout` 执行 LuaLaTeX → DVI →
+dvisvgm warmup。只有该门禁与 compiler-isolation 测试通过后才配置 Web 的 companion
+URL。
 
 容器启动后，在 `/tikz` 输入“画一个九点圆”。确认：
 

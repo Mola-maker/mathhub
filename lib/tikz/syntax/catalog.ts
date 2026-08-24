@@ -14,6 +14,7 @@ import {
   type TikzSecurityRiskTag,
   type TikzSyntaxCapability,
 } from './types';
+import { withCapabilityTruth } from './capability-truth';
 
 const SOURCE_ROOT = `${PGF_TIKZ_REPOSITORY_URL}/blob/${PGF_TIKZ_TAG_SHA}`;
 
@@ -139,7 +140,7 @@ type CapabilitySeed = {
 
 function seedToCapability(seed: CapabilitySeed): TikzSyntaxCapability {
   const officialRef = officialReference(seed.sourceFile, seed.section);
-  return {
+  return withCapabilityTruth({
     id: seed.id,
     title: seed.title,
     layer: seed.layer,
@@ -151,7 +152,7 @@ function seedToCapability(seed: CapabilitySeed): TikzSyntaxCapability {
     searchTokens: seed.searchTokens,
     ...(seed.examples ? { examples: seed.examples } : {}),
     ...(seed.notes ? { notes: seed.notes } : {}),
-  };
+  });
 }
 
 const CORE_CAPABILITIES: readonly TikzSyntaxCapability[] = [
@@ -228,7 +229,7 @@ const CORE_CAPABILITIES: readonly TikzSyntaxCapability[] = [
     sourceFile: 'doc/generic/pgf/pgfmanual-en-tikz-matrices.tex',
     section: 'TikZ core / matrices',
     library: 'core',
-    recognition: 'tex-expansion',
+    recognition: 'static',
     capabilities: laneCapabilities({ semantic: true, interactive: false }),
     securityRisk: EXPANSION_RISK,
     searchTokens: ['matrix', 'matrix of nodes', 'row sep', 'column sep'],
@@ -247,7 +248,10 @@ const CORE_CAPABILITIES: readonly TikzSyntaxCapability[] = [
     securityRisk: EXPANSION_RISK,
     searchTokens: ['graph', 'edge', 'edge from parent', 'graph syntax'],
     examples: ['\\graph { A -- { B, C } };'],
-    notes: ['Graph expansion is retained exactly but is not currently a direct drag model.'],
+    notes: [
+      'Static graph chains and nested chain groups are projected as read-only nodes and graph-edge relations.',
+      'Quoted/anonymous nodes, foreach expansion, subgraphs, graph macros, and graphdrawing layouts remain exact-only.',
+    ],
   }),
   seedToCapability({
     id: 'core:pics',
@@ -1084,42 +1088,16 @@ const LIBRARY_TITLES: Record<TikzLibraryName, string> = {
 };
 
 const INTERACTIVE_LIBRARIES: ReadonlySet<TikzLibraryName> = new Set([
-  '3d',
   'angles',
   'arrows',
-  'bending',
   'calc',
   'intersections',
-  'matrix',
-  'positioning',
-  'quotes',
-  'shapes',
-  'shapes.arrows',
-  'shapes.callouts',
-  'shapes.geometric',
-  'shapes.misc',
-  'shapes.multipart',
-  'shapes.symbols',
+  'patterns',
   'through',
-  'topaths',
 ]);
 
 const SEMANTIC_LIBRARIES: ReadonlySet<TikzLibraryName> = new Set([
   ...INTERACTIVE_LIBRARIES,
-  'automata',
-  'chains',
-  'circuits',
-  'circuits.ee',
-  'circuits.ee.IEC',
-  'circuits.logic',
-  'circuits.logic.CDH',
-  'circuits.logic.IEC',
-  'circuits.logic.US',
-  'graphs',
-  'graphs.standard',
-  'mindmap',
-  'petri',
-  'trees',
 ]);
 
 const EXPANSION_LIBRARIES: ReadonlySet<TikzLibraryName> = new Set([
@@ -1334,6 +1312,21 @@ export function assertTikzSyntaxCatalogIntegrity(): void {
     ids.add(entry.id);
     if (!entry.title || !entry.officialRef.url || !entry.officialRef.source) {
       throw new Error(`Incomplete TikZ syntax capability: ${entry.id}`);
+    }
+    if (
+      entry.capabilities.exact !== (entry.truth.exact.status === 'verified')
+      || entry.capabilities.interactive !== (
+        entry.truth.interactive.status === 'verified'
+        || entry.truth.interactive.status === 'partial'
+      )
+    ) {
+      throw new Error(`Capability flags drifted from evidence truth: ${entry.id}`);
+    }
+    if (
+      (entry.layer === 'basic-layer' || entry.layer === 'system-layer')
+      && entry.truth.interactive.status !== 'blocked'
+    ) {
+      throw new Error(`Lower PGF layer cannot claim Canvas writeback: ${entry.id}`);
     }
     if (entry.library && entry.library !== 'core' && !TIKZ_LIBRARY_NAMES.includes(entry.library)) {
       throw new Error(`Unknown TikZ library in capability: ${entry.id}`);

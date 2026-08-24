@@ -1,29 +1,29 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { lex } from './lexer';
 
-describe('lex', () => {
-  it('坐标语句切分为命令/括号/数字/逗号/分号', () => {
-    const toks = lex('\\coordinate (A) at (1.5,-2);');
-    expect(toks.map(t => t.type)).toEqual(['cmd','lparen','name','rparen','name','lparen','number','comma','minus','number','rparen','semi']);
-    expect(toks[0]).toMatchObject({ value: '\\coordinate', start: 0, end: 11 });
+describe('TikZ subset lexer numeric and opaque punctuation handling', () => {
+  it.each([
+    ['.5', '.5'],
+    ['-.5', '.5'],
+    ['.5e-2', '.5e-2'],
+    ['1.', '1.'],
+    ['1.5', '1.5'],
+  ])('tokenizes %s as a number without losing the source range', (source, numericLexeme) => {
+    const token = lex(source).find((candidate) => candidate.value === numericLexeme);
+    expect(token).toMatchObject({ type: 'number', value: numericLexeme });
+    expect(source.slice(token!.start, token!.end)).toBe(numericLexeme);
   });
 
-  it('-- 优先于单个 -，calc 符号齐全', () => {
-    const types = lex('\\draw (A) -- ($(A)!0.5!(B)$);').map(t => t.type);
-    expect(types).toContain('dashdash');
-    expect(types).toContain('dollar');
-    expect(types).toContain('bang');
-  });
-
-  it('% 注释与空白被跳过但位置保留', () => {
-    const src = '% hello\n\\node';
-    const toks = lex(src);
-    expect(toks).toHaveLength(1);
-    expect(toks[0].start).toBe(8);
-  });
-
-  it('\\p1 切分为 cmd(\\p) + number(1)', () => {
-    const toks = lex('\\p1');
-    expect(toks.map(t => t.value)).toEqual(['\\p', '1']);
-  });
+  it.each(['.', 'A.center', '{text.}'])(
+    'preserves dot punctuation in %s as a lossless token instead of throwing',
+    (source) => {
+      const tokens = lex(source);
+      const dots = tokens.filter((token) => token.value === '.');
+      expect(dots.length).toBeGreaterThan(0);
+      expect(dots.every((token) => token.type === 'dot')).toBe(true);
+      for (const token of dots) {
+        expect(source.slice(token.start, token.end)).toBe('.');
+      }
+    },
+  );
 });

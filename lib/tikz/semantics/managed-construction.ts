@@ -24,16 +24,16 @@ export const LEGACY_MANAGED_CONSTRUCTION_SCHEMA_VERSION =
   MANAGED_CONSTRUCTION_SCHEMA_V1;
 
 /**
- * Historical write/default name.  New managed blocks still serialize as
- * schema-v2 until the schema-v3 presentation contract is implemented.
+ * Historical write/default name. Callers that are not explicitly routed
+ * through the narrow schema-v3 writer policy still serialize as schema-v2.
  */
 export const MANAGED_CONSTRUCTION_SCHEMA_VERSION =
   MANAGED_CONSTRUCTION_SCHEMA_V2;
 
 /**
- * Typed semantic records currently have v2 semantics; v3 is reserved for the
- * future presentation-aware contract.  The parser's explicit v1/v2 gate keeps
- * v3 fail-closed until that contract is implemented.
+ * v3 intentionally reuses the closed v2 semantic record vocabulary while
+ * adding a separately attested presentation envelope. Unsupported v3 writer
+ * shapes remain read-only at the codec boundary.
  */
 export function isTypedSemanticSchema(version: number | null): version is 2 | 3 {
   return version === MANAGED_CONSTRUCTION_SCHEMA_V2
@@ -41,6 +41,39 @@ export function isTypedSemanticSchema(version: number | null): version is 2 | 3 
 }
 export const MANAGED_CONSTRUCTION_FINGERPRINT_ALGORITHM =
   'fnv1a64-utf8' as const;
+
+/**
+ * Conservative source-ownership guard for malformed and complete MathGeo
+ * directive regions. Adoption may only wrap ordinary source that is outside
+ * every such region, even when the main managed-block parser cannot recover a
+ * complete block from malformed markers.
+ */
+export function sourceRangeOverlapsManagedDirectiveRegion(
+  source: string,
+  range: { readonly start: number; readonly end: number },
+): boolean {
+  const directive = /^[ \t]*%[ \t]*@mathgeo[ \t]+(begin|end)\b[^\r\n]*(?:\r?\n|$)/gmi;
+  const openBegins: number[] = [];
+  const protectedRanges: Array<{ start: number; end: number }> = [];
+  let match: RegExpExecArray | null;
+  while ((match = directive.exec(source))) {
+    if (match[1]!.toLowerCase() === 'begin') {
+      openBegins.push(match.index);
+      continue;
+    }
+    const start = openBegins.pop();
+    protectedRanges.push({
+      start: start ?? match.index,
+      end: directive.lastIndex,
+    });
+  }
+  for (const start of openBegins) {
+    protectedRanges.push({ start, end: source.length });
+  }
+  return protectedRanges.some((protectedRange) => (
+    range.start < protectedRange.end && range.end > protectedRange.start
+  ));
+}
 
 const MAX_RECORDS_PER_BLOCK = 256;
 const MAX_RECORD_LENGTH = 16 * 1024;
@@ -199,10 +232,14 @@ function isScalarRecordValue(value: unknown): value is number | string {
   );
 }
 
+// The parameter is `unknown` rather than Record<string, unknown> because a
+// predicate's narrowed type must be assignable to its parameter type, and the
+// record union is built from interfaces without index signatures.
 function validSemanticRecordShape(
-  value: Record<string, unknown>,
+  value: unknown,
   schemaVersion: number | null,
 ): value is ManagedConstructionSemanticRecord {
+  if (!isRecord(value)) return false;
   if (typeof value.id !== 'string' || value.id.length === 0) return false;
   if (value.recordType === 'input') {
     return typeof value.role === 'string' && typeof value.ref === 'string';
@@ -369,6 +406,8 @@ function validSemanticRecordShape(
       case 'cyclic':
       case 'complete-quadrilateral':
         return isStringTuple(value.points, 4);
+      case 'collinear':
+        return isTypedSemanticSchema(schemaVersion) && isStringTuple(value.points, 3);
       default:
         return false;
     }
@@ -554,6 +593,8 @@ function schemaV2SemanticRecordIssue(
           ?? reference('excludePoint', value.excludePoint);
       case 'cyclic':
       case 'complete-quadrilateral':
+        return references('points', value.points);
+      case 'collinear':
         return references('points', value.points);
       default:
         return null;
@@ -746,6 +787,8 @@ function semanticReferencesOf(
       case 'cyclic':
       case 'complete-quadrilateral':
         return tuple('points', record.points, 'point');
+      case 'collinear':
+        return tuple('points', record.points, 'point');
     }
     return [];
   }
@@ -923,11 +966,13 @@ function schemaVersionOf(
     };
   }
   const value = Number(raw);
-  // Keep the read/write gate explicit while schema-v3 remains undefined:
-  // declaring the version and typed predicate must not make v3 metadata valid.
+  // Keep the accepted metadata schemas explicit. v3 reuses the closed v2
+  // record vocabulary here; its additional writer-slot authority is validated
+  // separately by managed-construction-v3 and is never inferred from this gate.
   if (
     value !== MANAGED_CONSTRUCTION_SCHEMA_V1
     && value !== MANAGED_CONSTRUCTION_SCHEMA_V2
+    && value !== MANAGED_CONSTRUCTION_SCHEMA_V3
   ) {
     return {
       value,
@@ -1141,7 +1186,7 @@ function recordsOf(
       if (schemaIssue) {
         issues.push(issue(
           'invalid-semantic-reference',
-          `Managed schema-v2 ${parsed.recordType} record ${parsed.id}: ${schemaIssue.message}`,
+          `Managed typed-schema ${parsed.recordType} record ${parsed.id}: ${schemaIssue.message}`,
           range,
         ));
         continue;

@@ -1,0 +1,4566 @@
+{
+  "schema": "pgf-upstream-registry-shard/v1",
+  "id": "static-pgf-function-0001",
+  "surface": "pgf-function",
+  "status": "static",
+  "entries": [
+    {
+      "id": "pgf-3.1.11a:pgf-function:#1:44cde1e180",
+      "title": "PGF math function #1",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryfpu.code.tex",
+        "line": [
+          480,
+          480
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 0"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:#1:9f43f6e24f",
+      "title": "PGF math function #1",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.code.tex",
+        "line": [
+          31,
+          31
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity \\csname    pgfmath@operation@#1@arity\\endcsname"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:#1:e0fe163ff8",
+      "title": "PGF math function #1",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.code.tex",
+        "line": [
+          258,
+          258
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 0"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:#1:f596fc2fcd",
+      "title": "PGF math function #1",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.code.tex",
+        "line": [
+          202,
+          202
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity #2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:@hours:e8c4724b15",
+      "title": "PGF math function @hours",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/modules/pgfmoduleanimations.code.tex",
+        "line": [
+          243,
+          243
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:@minutes:e42af3f7ae",
+      "title": "PGF math function @minutes",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/modules/pgfmoduleanimations.code.tex",
+        "line": [
+          231,
+          231
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:@seconds:5d7a0bc6bb",
+      "title": "PGF math function @seconds",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/modules/pgfmoduleanimations.code.tex",
+        "line": [
+          202,
+          202
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:Hex:34e572af8e",
+      "title": "PGF math function Hex",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.base.code.tex",
+        "line": [
+          33,
+          33
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:Mod:7d424de00f",
+      "title": "PGF math function Mod",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          287,
+          287
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:\\tikz@math@function@name:9e3cc0eac4",
+      "title": "PGF math function \\tikz@math@function@name",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarymath.code.tex",
+        "line": [
+          695,
+          695
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity \\the\\c@pgf@counta"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:abs:f7222f5aab",
+      "title": "PGF math function abs",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          301,
+          301
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:acos:dadc9869e4",
+      "title": "PGF math function acos",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          305,
+          305
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:add:73758e0a9b",
+      "title": "PGF math function add",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          16,
+          16
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:and:0dc0ba35cf",
+      "title": "PGF math function and",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          129,
+          129
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:approxequalto:07fe3a1e7d",
+      "title": "PGF math function approxequalto",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          54,
+          54
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:array:8f8ff76c2c",
+      "title": "PGF math function array",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          302,
+          302
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:asin:34cdd9abc5",
+      "title": "PGF math function asin",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          248,
+          248
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:atan2:f6aa1c50de",
+      "title": "PGF math function atan2",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          362,
+          362
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:atan:65a53dc0aa",
+      "title": "PGF math function atan",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          329,
+          329
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:bin:ba73e3664b",
+      "title": "PGF math function bin",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.base.code.tex",
+        "line": [
+          16,
+          16
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:ceil:4632eea983",
+      "title": "PGF math function ceil",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.round.code.tex",
+        "line": [
+          66,
+          66
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:cos:77327b4cd7",
+      "title": "PGF math function cos",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          134,
+          134
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:cosec:685fd961d4",
+      "title": "PGF math function cosec",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          209,
+          209
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:cosh:ac9e979337",
+      "title": "PGF math function cosh",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          90,
+          90
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:cot:70c4720451",
+      "title": "PGF math function cot",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          227,
+          227
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:deg:4e7d96881e",
+      "title": "PGF math function deg",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          55,
+          55
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:depth:baec7bf2fd",
+      "title": "PGF math function depth",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          290,
+          290
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:dim:b98795c852",
+      "title": "PGF math function dim",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          334,
+          334
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:div:18dbd91c59",
+      "title": "PGF math function div",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          254,
+          254
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:divide:9c03155e84",
+      "title": "PGF math function divide",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          66,
+          66
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:e:044960f2cd",
+      "title": "PGF math function e",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          329,
+          329
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 0"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:equal:25a9547f02",
+      "title": "PGF math function equal",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          38,
+          38
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:exp:55e47e6e94",
+      "title": "PGF math function exp",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          530,
+          530
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:factorial:7985b25e9d",
+      "title": "PGF math function factorial",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          785,
+          785
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:false:52e0b9d5e1",
+      "title": "PGF math function false",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          179,
+          179
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 0"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:floor:d4c125bf40",
+      "title": "PGF math function floor",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.round.code.tex",
+        "line": [
+          39,
+          39
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:frac:2bf808361a",
+      "title": "PGF math function frac",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.round.code.tex",
+        "line": [
+          104,
+          104
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:gcd:444c33b910",
+      "title": "PGF math function gcd",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.integerarithmetics.code.tex",
+        "line": [
+          9,
+          9
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:greater:18efc7e49a",
+      "title": "PGF math function greater",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          14,
+          14
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:height:d0b9be2ed5",
+      "title": "PGF math function height",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          279,
+          279
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:hex:7bbdd65d08",
+      "title": "PGF math function hex",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.base.code.tex",
+        "line": [
+          24,
+          24
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:i@encountered:7ec062efe4",
+      "title": "PGF math function i@encountered",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/modules/pgfmoduleanimations.code.tex",
+        "line": [
+          219,
+          219
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:ifthenelse:adfff7c7b7",
+      "title": "PGF math function ifthenelse",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          77,
+          77
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 3"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:int:edc1d73733",
+      "title": "PGF math function int",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.round.code.tex",
+        "line": [
+          83,
+          83
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:iseven:ea70097124",
+      "title": "PGF math function iseven",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.integerarithmetics.code.tex",
+        "line": [
+          113,
+          113
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:isodd:ba44752817",
+      "title": "PGF math function isodd",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.integerarithmetics.code.tex",
+        "line": [
+          102,
+          102
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:isprime:6fcdba275f",
+      "title": "PGF math function isprime",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.integerarithmetics.code.tex",
+        "line": [
+          47,
+          47
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:less:92653de014",
+      "title": "PGF math function less",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          26,
+          26
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:ln:9c3f343838",
+      "title": "PGF math function ln",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          336,
+          336
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:log10:7696f50e48",
+      "title": "PGF math function log10",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          513,
+          513
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:log2:158050265b",
+      "title": "PGF math function log2",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          502,
+          502
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:m@encountered:bdd3d063b6",
+      "title": "PGF math function m@encountered",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/modules/pgfmoduleanimations.code.tex",
+        "line": [
+          212,
+          212
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:max:f1e6de01cf",
+      "title": "PGF math function max",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          356,
+          356
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity ..."
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:min:3a7893ca62",
+      "title": "PGF math function min",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          383,
+          383
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity ..."
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:mod:6f56aaf522",
+      "title": "PGF math function mod",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          271,
+          271
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:multiply:cd13afc25f",
+      "title": "PGF math function multiply",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          53,
+          53
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:neg:532f2d64ce",
+      "title": "PGF math function neg",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          39,
+          39
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:not:325fd75805",
+      "title": "PGF math function not",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          162,
+          162
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:notequal:f8e5fdb792",
+      "title": "PGF math function notequal",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          90,
+          90
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:notgreater:941be69b7b",
+      "title": "PGF math function notgreater",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          116,
+          116
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:notless:11697293dd",
+      "title": "PGF math function notless",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          103,
+          103
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:oct:6f57fba6c7",
+      "title": "PGF math function oct",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.base.code.tex",
+        "line": [
+          42,
+          42
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:or:7c3dd53613",
+      "title": "PGF math function or",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          145,
+          145
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:pi:54184f0938",
+      "title": "PGF math function pi",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          19,
+          19
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 0"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:pow:9288183224",
+      "title": "PGF math function pow",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          741,
+          741
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:rad:dad11f10c6",
+      "title": "PGF math function rad",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          71,
+          71
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:radians:d949a4ded2",
+      "title": "PGF math function radians",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          43,
+          43
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:rand:05062836d5",
+      "title": "PGF math function rand",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.random.code.tex",
+        "line": [
+          119,
+          119
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 0"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:random:3c4a512121",
+      "title": "PGF math function random",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.random.code.tex",
+        "line": [
+          147,
+          147
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity ..."
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:real:d67c57330c",
+      "title": "PGF math function real",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.round.code.tex",
+        "line": [
+          117,
+          117
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:reciprocal:4d76d7196d",
+      "title": "PGF math function reciprocal",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          204,
+          204
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:rnd:25f22a52e8",
+      "title": "PGF math function rnd",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.random.code.tex",
+        "line": [
+          96,
+          96
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 0"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:round:e80500437d",
+      "title": "PGF math function round",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.round.code.tex",
+        "line": [
+          16,
+          16
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:scalar:0bd69ee1f5",
+      "title": "PGF math function scalar",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          412,
+          412
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:sec:6f8129f074",
+      "title": "PGF math function sec",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          218,
+          218
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:sign:ba44947b9f",
+      "title": "PGF math function sign",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          312,
+          312
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:sin:0f442cc3cc",
+      "title": "PGF math function sin",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          88,
+          88
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:sinh:f6f1ef69b1",
+      "title": "PGF math function sinh",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          101,
+          101
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:sqrt:ef6a934e65",
+      "title": "PGF math function sqrt",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          562,
+          562
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:subtract:5a420b07e2",
+      "title": "PGF math function subtract",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.basic.code.tex",
+        "line": [
+          28,
+          28
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:tan:0c8aba20fb",
+      "title": "PGF math function tan",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.trigonometric.code.tex",
+        "line": [
+          192,
+          192
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:tanh:a12a239d10",
+      "title": "PGF math function tanh",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          113,
+          113
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:time@colon:e65a25bef5",
+      "title": "PGF math function time@colon",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/modules/pgfmoduleanimations.code.tex",
+        "line": [
+          250,
+          250
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:true:958db3343b",
+      "title": "PGF math function true",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.comparison.code.tex",
+        "line": [
+          175,
+          175
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 0"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:veclen:610795404c",
+      "title": "PGF math function veclen",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          19,
+          19
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 2"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:pgf-function:width:fd26e5c67e",
+      "title": "PGF math function width",
+      "surface": "pgf-function",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/math/pgfmathfunctions.misc.code.tex",
+        "line": [
+          267,
+          267
+        ]
+      },
+      "namespaces": [
+        "/pgf/math"
+      ],
+      "valueGrammar": {
+        "kind": "expression",
+        "description": "Declared arity 1"
+      },
+      "effects": {
+        "scope": "local",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "number",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "never",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    }
+  ]
+}

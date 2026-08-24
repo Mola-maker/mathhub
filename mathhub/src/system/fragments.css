@@ -1,0 +1,92 @@
+/* ============================================================
+   Floating UI fragments — open layout, hairline rules, no cards.
+   ============================================================ */
+
+.frag {
+  position: absolute;
+  pointer-events: auto;
+  background: transparent; /* hard rule: no card background */
+  padding: 10px 0;
+}
+
+.frag--edge-top {
+  border-top: 1px solid var(--line-strong);
+}
+.frag--edge-bottom {
+  border-bottom: 1px solid var(--line-strong);
+}
+.frag--edge-left {
+  border-left: 1px solid var(--line-strong);
+  padding-left: 12px;
+}
+.frag--edge-right {
+  border-right: 1px solid var(--line-strong);
+  padding-right: 12px;
+}
+
+.frag__label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.tinylabel {
+  font-size: var(--text-meta);
+  font-weight: 500;
+  letter-spacing: var(--tracking-meta);
+  text-transform: uppercase;
+  color: var(--mist);
+  white-space: nowrap;
+}
+
+.tinylabel--active {
+  color: var(--paper);
+}
+
+.sourceline {
+  font-family: var(--font-code);
+  font-size: 11.5px;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+  color: var(--paper);
+  white-space: pre;
+}
+
+.sourceline--dim {
+  color: var(--mist);
+}
+
+.keyhint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-meta);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mist);
+}
+
+.keyhint__key {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-family: var(--font-code);
+  font-size: 10px;
+  color: var(--paper);
+}
+
+/* ---- Deep-field variants (opt-in) ----
+   On journey tones 3–5, 10.5px metadata should ride --mist-hi instead
+   of --mist (see the contrast mapping in tokens.css). Scenes opt in by
+   adding these modifier classes; default behavior is unchanged. */
+.tinylabel--on-deep {
+  color: var(--mist-hi);
+}
+
+.sourceline--dim-on-deep {
+  color: var(--mist-hi);
+}
+
+.keyhint--on-deep {
+  color: var(--mist-hi);
+}

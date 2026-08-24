@@ -1,5 +1,5 @@
 import type { Pt } from '../semantics/calc-eval';
-import type { RenderArrow } from './render-primitive-decoder';
+import type { RenderArrow, RenderArrowTip } from './render-primitive-decoder';
 
 function unit(from: Pt, to: Pt): Pt | null {
   const dx = to.x - from.x;
@@ -8,8 +8,8 @@ function unit(from: Pt, to: Pt): Pt | null {
   return length > 1e-9 ? { x: dx / length, y: dy / length } : null;
 }
 
-export const DEFAULT_ANGLE_MARK_RADIUS = 16;
-export const RIGHT_ANGLE_MARK_SIZE = 12;
+/** TikZ angles library default: /tikz/angle radius is initially 5mm. */
+export const DEFAULT_ANGLE_MARK_RADIUS = 5 * (96 / 25.4);
 
 export type AngleMarkGeometry =
   | {
@@ -26,44 +26,100 @@ export type AngleMarkGeometry =
     readonly points: readonly Pt[];
   };
 
-function arrowPath(tip: Pt, direction: Pt, strokeWidth: number): string {
-  const factor = 1 + 0.5 * Math.max(strokeWidth - 1, 0);
-  const length = 10 * factor;
-  const halfWidth = 4 * factor;
+function arrowGeometry(
+  tip: Pt,
+  direction: Pt,
+  strokeWidth: number,
+  presentationScale: number,
+) {
+  const length = 5 * (96 / 72.27) * presentationScale + strokeWidth * 1.5;
+  const halfWidth = 2.1 * (96 / 72.27) * presentationScale + strokeWidth * 0.5;
   const normal = { x: -direction.y, y: direction.x };
   const base = {
     x: tip.x - direction.x * length,
     y: tip.y - direction.y * length,
   };
-  return [
-    `M ${tip.x} ${tip.y}`,
-    `L ${base.x + normal.x * halfWidth} ${base.y + normal.y * halfWidth}`,
-    `L ${base.x - normal.x * halfWidth} ${base.y - normal.y * halfWidth}`,
-    'Z',
-  ].join(' ');
+  const upper = { x: base.x + normal.x * halfWidth, y: base.y + normal.y * halfWidth };
+  const lower = { x: base.x - normal.x * halfWidth, y: base.y - normal.y * halfWidth };
+  const inset = {
+    x: tip.x - direction.x * length * 0.68,
+    y: tip.y - direction.y * length * 0.68,
+  };
+  return { tip, upper, lower, inset };
+}
+
+function ArrowTipSvg({
+  tip,
+  direction,
+  kind,
+  color,
+  strokeWidth,
+  presentationScale,
+}: {
+  tip: Pt;
+  direction: Pt;
+  kind: RenderArrowTip;
+  color: string;
+  strokeWidth: number;
+  presentationScale: number;
+}) {
+  const geometry = arrowGeometry(tip, direction, strokeWidth, presentationScale);
+  if (kind === 'to') {
+    return (
+      <path
+        d={`M ${geometry.upper.x} ${geometry.upper.y} L ${geometry.tip.x} ${geometry.tip.y} L ${geometry.lower.x} ${geometry.lower.y}`}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    );
+  }
+  const path = kind === 'stealth'
+    ? [
+        `M ${geometry.tip.x} ${geometry.tip.y}`,
+        `L ${geometry.upper.x} ${geometry.upper.y}`,
+        `L ${geometry.inset.x} ${geometry.inset.y}`,
+        `L ${geometry.lower.x} ${geometry.lower.y}`,
+        'Z',
+      ].join(' ')
+    : [
+        `M ${geometry.tip.x} ${geometry.tip.y}`,
+        `L ${geometry.upper.x} ${geometry.upper.y}`,
+        `L ${geometry.lower.x} ${geometry.lower.y}`,
+        'Z',
+      ].join(' ');
+  return <path d={path} fill={color} stroke={color} strokeWidth={Math.max(0.2, strokeWidth * 0.5)} />;
 }
 
 export function SvgArrows({
   points,
   arrow,
+  arrowTip = 'to',
   color,
   strokeWidth,
+  presentationScale = 1,
+  opacity = 1,
 }: {
   points: readonly Pt[];
   arrow: RenderArrow;
+  arrowTip?: RenderArrowTip;
   color: string;
   strokeWidth: number;
+  presentationScale?: number;
+  opacity?: number;
 }) {
   if (arrow === 'none' || points.length < 2) return null;
   const firstDirection = unit(points[1], points[0]);
   const lastDirection = unit(points[points.length - 2], points[points.length - 1]);
   return (
-    <g data-tikz-decoration="arrows" fill={color} pointerEvents="none">
+    <g data-tikz-decoration="arrows" data-tikz-arrow-tip={arrowTip} opacity={opacity} pointerEvents="none">
       {(arrow === '<-' || arrow === '<->') && firstDirection
-        ? <path d={arrowPath(points[0], firstDirection, strokeWidth)} />
+        ? <ArrowTipSvg tip={points[0]!} direction={firstDirection} kind={arrowTip} color={color} strokeWidth={strokeWidth} presentationScale={presentationScale} />
         : null}
       {(arrow === '->' || arrow === '<->') && lastDirection
-        ? <path d={arrowPath(points[points.length - 1], lastDirection, strokeWidth)} />
+        ? <ArrowTipSvg tip={points[points.length - 1]!} direction={lastDirection} kind={arrowTip} color={color} strokeWidth={strokeWidth} presentationScale={presentationScale} />
         : null}
     </g>
   );
@@ -88,16 +144,16 @@ export function angleMarkGeometry({
 
   if (right) {
     const firstPoint = {
-      x: vertex.x + first.x * RIGHT_ANGLE_MARK_SIZE,
-      y: vertex.y + first.y * RIGHT_ANGLE_MARK_SIZE,
+      x: vertex.x + first.x * radius,
+      y: vertex.y + first.y * radius,
     };
     const corner = {
-      x: firstPoint.x + second.x * RIGHT_ANGLE_MARK_SIZE,
-      y: firstPoint.y + second.y * RIGHT_ANGLE_MARK_SIZE,
+      x: firstPoint.x + second.x * radius,
+      y: firstPoint.y + second.y * radius,
     };
     const secondPoint = {
-      x: vertex.x + second.x * RIGHT_ANGLE_MARK_SIZE,
-      y: vertex.y + second.y * RIGHT_ANGLE_MARK_SIZE,
+      x: vertex.x + second.x * radius,
+      y: vertex.y + second.y * radius,
     };
     return { kind: 'right', points: [firstPoint, corner, secondPoint] };
   }

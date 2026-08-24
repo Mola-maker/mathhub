@@ -1,10 +1,13 @@
 \documentclass[border=2pt]{standalone}
 \def\pgfsysdriver{pgfsys-dvisvgm.def}
+\usepackage{fontspec}
+\setmainfont{Noto Sans CJK SC}
 \usepackage{tikz}
 \usepackage{amsmath}
-\usetikzlibrary{arrows.meta,calc,intersections,through,angles,quotes,patterns,positioning}
+\usetikzlibrary{arrows.meta,calc,intersections,through,angles,quotes,patterns,positioning,graphs,graphs.standard}
 \begin{document}
 \begin{tikzpicture}
+  \node at (0,0) {九点圆};
   \coordinate (A) at (0,0);
   \coordinate (B) at (2,0);
   \coordinate (C) at (1,1.5);
@@ -15,5 +18,6 @@
   \draw[pattern=north east lines] (A) -- (B) -- (C) -- cycle;
   \node[draw,circle through=(B)] at (A) {};
   \pic[draw,"$\alpha$",angle radius=5mm] {angle=B--A--C};
+  \graph [nodes={draw,circle}, grow right] { graph-a -> {graph-b,graph-c} };
 \end{tikzpicture}
 \end{document}

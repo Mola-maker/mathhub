@@ -1,3 +1,8 @@
+import {
+  parseTikzOptionSequence,
+  type TikzOptionEntry,
+} from '../syntax/option-sequence';
+
 export const STYLE_COLORS = [
   'black', 'red', 'blue', 'green', 'orange', 'purple', 'gray', 'brown',
 ] as const;
@@ -48,66 +53,6 @@ export const DEFAULT_STYLE_DRAFT: StyleDraft = {
   rotate: null,
   scale: null,
 };
-
-interface TopLevelOptionSpan {
-  segmentStart: number;
-  segmentEnd: number;
-  valueStart: number;
-  valueEnd: number;
-  value: string;
-}
-
-function topLevelOptionSpans(raw: string): TopLevelOptionSpan[] {
-  const options: TopLevelOptionSpan[] = [];
-  let start = 0;
-  let braces = 0;
-  let brackets = 0;
-  let parentheses = 0;
-  const pushOption = (end: number) => {
-    const segment = raw.slice(start, end);
-    const leading = segment.match(/^\s*/)?.[0].length ?? 0;
-    const trailing = segment.match(/\s*$/)?.[0].length ?? 0;
-    const valueStart = start + leading;
-    const valueEnd = end - trailing;
-    if (valueStart < valueEnd) {
-      options.push({
-        segmentStart: start,
-        segmentEnd: end,
-        valueStart,
-        valueEnd,
-        value: raw.slice(valueStart, valueEnd),
-      });
-    }
-  };
-  for (let index = 0; index < raw.length; index += 1) {
-    const char = raw[index];
-    if (char === '\\') {
-      index += 1;
-      continue;
-    }
-    if (char === '{') braces += 1;
-    else if (char === '}') braces = Math.max(0, braces - 1);
-    else if (char === '[') brackets += 1;
-    else if (char === ']') brackets = Math.max(0, brackets - 1);
-    else if (char === '(') parentheses += 1;
-    else if (char === ')') parentheses = Math.max(0, parentheses - 1);
-    else if (
-      char === ','
-      && braces === 0
-      && brackets === 0
-      && parentheses === 0
-    ) {
-      pushOption(index);
-      start = index + 1;
-    }
-  }
-  pushOption(raw.length);
-  return options;
-}
-
-function splitTopLevelOptions(raw: string): string[] {
-  return topLevelOptionSpans(raw).map((option) => option.value);
-}
 
 type StyleDraftKey = keyof StyleDraft;
 type StyleOptionGroup =
@@ -298,16 +243,28 @@ function replacementForGroup(
   }
 }
 
-function removeOptionAt(raw: string, span: TopLevelOptionSpan): string {
-  const hasCommaBefore = span.segmentStart > 0 && raw[span.segmentStart - 1] === ',';
-  const hasCommaAfter = span.segmentEnd < raw.length && raw[span.segmentEnd] === ',';
+function removeOptionAt(raw: string, span: TikzOptionEntry): string {
+  if (
+    span.interpretedRange
+    && (
+      span.interpretedRange.start !== span.range.start
+      || span.interpretedRange.end !== span.range.end
+    )
+  ) {
+    return raw.slice(0, span.interpretedRange.start)
+      + raw.slice(span.interpretedRange.end);
+  }
+  const hasCommaBefore = span.segmentRange.start > 0
+    && raw[span.segmentRange.start - 1] === ',';
+  const hasCommaAfter = span.segmentRange.end < raw.length
+    && raw[span.segmentRange.end] === ',';
   if (hasCommaBefore) {
-    return raw.slice(0, span.segmentStart - 1) + raw.slice(span.segmentEnd);
+    return raw.slice(0, span.segmentRange.start - 1) + raw.slice(span.segmentRange.end);
   }
   if (hasCommaAfter) {
-    return raw.slice(0, span.segmentStart) + raw.slice(span.segmentEnd + 1);
+    return raw.slice(0, span.segmentRange.start) + raw.slice(span.segmentRange.end + 1);
   }
-  return raw.slice(0, span.segmentStart) + raw.slice(span.segmentEnd);
+  return raw.slice(0, span.segmentRange.start) + raw.slice(span.segmentRange.end);
 }
 
 function appendOption(raw: string, option: string): string {
@@ -331,15 +288,23 @@ export function buildOptionsRaw(
   const groups = [...new Set(changedKeys.map(groupForKey))];
   let nextRaw = existingRaw ?? '';
   for (const group of groups) {
-    const spans = topLevelOptionSpans(nextRaw);
+    const spans = parseTikzOptionSequence(nextRaw).entries;
     const target = [...spans]
       .reverse()
-      .find((option) => styleOptionGroups(option.value).includes(group));
-    const replacement = replacementForGroup(group, draft, target?.value ?? null);
+      .find((option) => (
+        option.interpretedRange
+        && styleOptionGroups(option.interpreted).includes(group)
+      ));
+    const replacement = replacementForGroup(
+      group,
+      draft,
+      target?.interpreted ?? null,
+    );
     if (target && replacement !== null) {
-      nextRaw = nextRaw.slice(0, target.valueStart)
+      const range = target.interpretedRange ?? target.range;
+      nextRaw = nextRaw.slice(0, range.start)
         + replacement
-        + nextRaw.slice(target.valueEnd);
+        + nextRaw.slice(range.end);
     } else if (target) {
       nextRaw = removeOptionAt(nextRaw, target);
     } else if (replacement !== null) {
@@ -352,7 +317,7 @@ export function buildOptionsRaw(
 export function styleDraftFromRaw(raw: string | null): StyleDraft {
   if (!raw) return { ...DEFAULT_STYLE_DRAFT };
   const draft = { ...DEFAULT_STYLE_DRAFT };
-  for (const option of splitTopLevelOptions(raw)) {
+  for (const option of parseTikzOptionSequence(raw).entries.map((entry) => entry.interpreted)) {
     if ((STYLE_COLORS as readonly string[]).includes(option)) draft.color = option;
     else if ((STYLE_WIDTHS as readonly string[]).includes(option)) draft.width = option;
     else if ((STYLE_DASHES as readonly string[]).includes(option)) draft.dash = option;

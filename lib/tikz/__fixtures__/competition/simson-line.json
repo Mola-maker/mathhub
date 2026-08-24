@@ -1,1 +1,99 @@
-{"points":{"F1":[2,0],"F2":[0,-1],"F3":[3.2,0.6]}}
+{
+  "schemaVersion": "geometry-evaluation-expectations/v2",
+  "points": { "F1": [2, 0], "F2": [0, -1], "F3": [3.2, 0.6] },
+  "profiles": {
+    "full-triad": {
+      "schemaVersion": "geometry-evaluation-corpus/v3",
+      "caseId": "mathnet-0akr-simson-triad",
+      "title": "Simson line · comprehension, construction and follow-up editing",
+      "source": {
+        "disposition": "research-reference-only",
+        "source": "mathnet",
+        "recordId": "mathnet:0akr",
+        "sourceUrl": "https://mathnet.mit.edu/explorer.html?p=0akr",
+        "admission": "not-admitted",
+        "attributionMode": "gateway-record"
+      },
+      "turns": [
+        {
+          "lane": "answer-only",
+          "instruction": "解释西姆松线中三个垂足为何共线，不要修改画板。",
+          "expectedCapabilities": ["semantic-read"],
+          "invariants": [
+            { "kind": "source-unchanged" },
+            {
+              "kind": "agent-terminal",
+              "outcome": "answer",
+              "requiredEventTypes": ["context.read", "run.completed"]
+            },
+            {
+              "kind": "grounding-resolves",
+              "minimumRefs": 3,
+              "recordTypes": ["entity", "constraint", "relation"]
+            }
+          ]
+        },
+        {
+          "lane": "construct",
+          "instruction": "在当前三角形上构造西姆松线。",
+          "expectedCapabilities": ["atomic-construction"],
+          "invariants": [
+            { "kind": "single-broker-commit" },
+            {
+              "kind": "proposal-schema",
+              "allowed": [
+                "construction-plan-proposal/v1",
+                "ai-construction-intent-batch-proposal/v1",
+                "canvas-construction-batch-proposal/v1"
+              ]
+            },
+            { "kind": "semantic-entity-delta", "minimum": 1 },
+            { "kind": "post-commit-basis-current" },
+            {
+              "kind": "agent-terminal",
+              "outcome": "mutation",
+              "requiredEventTypes": ["proposal.ready", "commit.completed", "commit.verified"]
+            }
+          ]
+        },
+        {
+          "lane": "modify-existing",
+          "instruction": "把刚构造的西姆松线改成绿色并加粗，再给它添加标签。",
+          "expectedCapabilities": ["binding-scoped-style", "label-intent"],
+          "invariants": [
+            { "kind": "single-broker-commit" },
+            { "kind": "proposal-schema", "allowed": ["host-semantic-action-batch/v1"] },
+            { "kind": "binding-scoped-write" },
+            { "kind": "semantic-style-changed" },
+            { "kind": "label-entity-delta", "minimum": 1 },
+            { "kind": "post-commit-basis-current" }
+          ]
+        },
+        {
+          "lane": "transform-selection",
+          "instruction": "整体平移这个构造并保持所有垂直与共线关系。",
+          "expectedCapabilities": ["dependency-preserving-transform"],
+          "invariants": [
+            { "kind": "single-broker-commit" },
+            { "kind": "proposal-schema", "allowed": ["canvas-selection-transform-proposal/v1"] },
+            { "kind": "selection-transform-attested" },
+            { "kind": "geometry-position-changed" },
+            { "kind": "semantic-relations-preserved" },
+            { "kind": "external-impact-acknowledged" },
+            { "kind": "post-commit-basis-current" }
+          ]
+        },
+        {
+          "lane": "verify-rendering",
+          "instruction": "比较当前交互画板与精准 TikZ 产物，报告可见偏差但不要修改源码。",
+          "expectedCapabilities": ["interactive-render", "exact-render"],
+          "invariants": [
+            { "kind": "source-unchanged" },
+            { "kind": "render-artifacts-attested", "lanes": ["interactive", "exact"] },
+            { "kind": "render-read-only" }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,8 +1,14 @@
 import type { Pt } from '../semantics/calc-eval';
+import { flattenCircularArc } from '../geometry/circular-arc';
+import {
+  ellipticalArcSvgUnitPath,
+  flattenEllipticalArc,
+} from '../geometry/elliptical-arc';
 import { clipParametricLineToFrame, type ScreenFrame } from './line-clip';
 import { labelOffset } from './label-layout';
 import type {
   DecodedRenderPrimitive,
+  DecodedRenderPrimitiveOf,
   DecodedRenderPrimitiveSet,
 } from './render-primitive-decoder';
 import {
@@ -10,7 +16,13 @@ import {
   SvgArrows,
 } from './svg-decoration-primitives';
 import { defaultTheme, type RenderTheme } from './svg-renderer';
-import { sceneToScreen, type Viewport } from './viewport';
+import {
+  presentationDashArray,
+  presentationDashOffset,
+  presentationFont,
+  presentationStrokeWidth,
+} from './presentation-scale';
+import { sceneToScreen, tikzPresentationScale, type Viewport } from './viewport';
 
 function primitiveSelected(
   primitive: DecodedRenderPrimitive,
@@ -60,30 +72,27 @@ function semanticProps(
 
 function strokeOf(
   primitive: DecodedRenderPrimitive,
-  theme: RenderTheme,
-  selected: boolean,
-  hovered: boolean,
+  _theme: RenderTheme,
+  _selected: boolean,
+  _hovered: boolean,
 ): string {
-  if (selected) return theme.selectionColor;
-  if (hovered) return theme.hoverColor;
+  // Selection and hover are editor overlays. Mutating the document stroke
+  // here makes the interactive surface diverge from exact TeX output and
+  // contaminates VLM parity captures.
   return primitive.style.stroke;
 }
 
 function strokeWidthOf(
   primitive: DecodedRenderPrimitive,
-  selected: boolean,
-  hovered: boolean,
+  viewport: Viewport,
+  _selected: boolean,
+  _hovered: boolean,
 ): number {
-  if (selected) return primitive.style.strokeWidth * 1.8;
-  if (hovered) return primitive.style.strokeWidth * 1.45;
-  return primitive.style.strokeWidth;
+  return presentationStrokeWidth(primitive.style.strokeWidth, viewport);
 }
 
 function pathPoints(
-  primitive: Extract<
-    DecodedRenderPrimitive,
-    { kind: 'segment' | 'vector' | 'line' | 'ray' }
-  >,
+  primitive: DecodedRenderPrimitiveOf<'segment' | 'vector' | 'line' | 'ray'>,
   viewport: Viewport,
   frame: ScreenFrame,
 ): readonly [Pt, Pt] | null {
@@ -109,17 +118,8 @@ function PathPrimitiveSvg({
   selected,
   hovered,
 }: {
-  primitive: Extract<
-    DecodedRenderPrimitive,
-    {
-      kind:
-        | 'segment'
-        | 'vector'
-        | 'line'
-        | 'ray'
-        | 'polyline'
-        | 'polygon';
-    }
+  primitive: DecodedRenderPrimitiveOf<
+    'segment' | 'vector' | 'line' | 'ray' | 'polyline' | 'polygon'
   >;
   viewport: Viewport;
   frame: ScreenFrame;
@@ -127,26 +127,34 @@ function PathPrimitiveSvg({
   selected: boolean;
   hovered: boolean;
 }) {
-  const screenPoints = primitive.kind === 'polyline' || primitive.kind === 'polygon'
-    ? primitive.points.map((point) => sceneToScreen(point, viewport))
-    : pathPoints(primitive, viewport, frame);
+  // A positive check on the two-point kinds narrows the grouped discriminant;
+  // testing for 'polyline'/'polygon' cannot exclude the two-point member.
+  const screenPoints = primitive.kind === 'segment'
+    || primitive.kind === 'vector'
+    || primitive.kind === 'line'
+    || primitive.kind === 'ray'
+    ? pathPoints(primitive, viewport, frame)
+    : primitive.points.map((point) => sceneToScreen(point, viewport));
   if (!screenPoints || screenPoints.length < 2) return null;
 
   const stroke = strokeOf(primitive, theme, selected, hovered);
-  const strokeWidth = strokeWidthOf(primitive, selected, hovered);
+  const strokeWidth = strokeWidthOf(primitive, viewport, selected, hovered);
   const common = {
     ...semanticProps(primitive, selected, hovered),
     stroke,
     strokeWidth,
-    strokeDasharray: primitive.style.dash,
+    strokeDasharray: presentationDashArray(primitive.style.dash, viewport),
+    strokeDashoffset: presentationDashOffset(primitive.style.dashOffset, viewport),
     fill: primitive.kind === 'polygon'
       ? primitive.style.fill ?? 'none'
       : 'none',
     fillOpacity: primitive.style.fillOpacity,
+    strokeOpacity: primitive.style.strokeOpacity,
     opacity: primitive.style.opacity,
     vectorEffect: 'non-scaling-stroke' as const,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
+    strokeLinecap: primitive.style.lineCap,
+    strokeLinejoin: primitive.style.lineJoin,
+    strokeMiterlimit: primitive.style.miterLimit,
   };
   const pointString = screenPoints
     .map((point) => `${point.x},${point.y}`)
@@ -160,8 +168,11 @@ function PathPrimitiveSvg({
       <SvgArrows
         points={screenPoints}
         arrow={primitive.style.arrow}
+        arrowTip={primitive.style.arrowTip}
         color={stroke}
         strokeWidth={strokeWidth}
+        presentationScale={tikzPresentationScale(viewport)}
+        opacity={primitive.style.opacity * primitive.style.strokeOpacity}
       />
     </g>
   );
@@ -203,7 +214,116 @@ function ElementPrimitiveSvg({
   }
 
   const stroke = strokeOf(primitive, theme, selected, hovered);
-  const strokeWidth = strokeWidthOf(primitive, selected, hovered);
+  const strokeWidth = strokeWidthOf(primitive, viewport, selected, hovered);
+  if (primitive.kind === 'cubic-bezier') {
+    const start = sceneToScreen(primitive.start, viewport);
+    const control1 = sceneToScreen(primitive.control1, viewport);
+    const control2 = sceneToScreen(primitive.control2, viewport);
+    const end = sceneToScreen(primitive.end, viewport);
+    return (
+      <g>
+        <path
+          {...semanticProps(primitive, selected, hovered)}
+          d={`M ${start.x} ${start.y} C ${control1.x} ${control1.y}, ${control2.x} ${control2.y}, ${end.x} ${end.y}`}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeDasharray={presentationDashArray(primitive.style.dash, viewport)}
+          strokeDashoffset={presentationDashOffset(primitive.style.dashOffset, viewport)}
+          fill="none"
+          strokeOpacity={primitive.style.strokeOpacity}
+          opacity={primitive.style.opacity}
+          vectorEffect="non-scaling-stroke"
+          strokeLinecap={primitive.style.lineCap}
+          strokeLinejoin={primitive.style.lineJoin}
+          strokeMiterlimit={primitive.style.miterLimit}
+        />
+        <SvgArrows
+          points={[start, control1, control2, end]}
+          arrow={primitive.style.arrow}
+          arrowTip={primitive.style.arrowTip}
+          color={stroke}
+          strokeWidth={strokeWidth}
+          presentationScale={tikzPresentationScale(viewport)}
+          opacity={primitive.style.opacity * primitive.style.strokeOpacity}
+        />
+      </g>
+    );
+  }
+  if (primitive.kind === 'circular-arc') {
+    const start = sceneToScreen(primitive.start, viewport);
+    const end = sceneToScreen(primitive.end, viewport);
+    const delta = primitive.endAngleDeg - primitive.startAngleDeg;
+    const arrowPoints = flattenCircularArc(primitive, 6)
+      .map((point) => sceneToScreen(point, viewport));
+    const largeArc = Math.abs(delta) > 180 ? 1 : 0;
+    const sweep = delta < 0 ? 1 : 0;
+    return (
+      <g>
+        <path
+          {...semanticProps(primitive, selected, hovered)}
+          d={`M ${start.x} ${start.y} A ${primitive.radius * viewport.scale} ${primitive.radius * viewport.scale} 0 ${largeArc} ${sweep} ${end.x} ${end.y}`}
+          stroke={stroke} strokeWidth={strokeWidth}
+          strokeDasharray={presentationDashArray(primitive.style.dash, viewport)}
+          strokeDashoffset={presentationDashOffset(primitive.style.dashOffset, viewport)} fill="none"
+          strokeOpacity={primitive.style.strokeOpacity}
+          opacity={primitive.style.opacity} vectorEffect="non-scaling-stroke"
+          strokeLinecap={primitive.style.lineCap} strokeLinejoin={primitive.style.lineJoin}
+          strokeMiterlimit={primitive.style.miterLimit}
+        />
+        <SvgArrows
+          points={arrowPoints}
+          arrow={primitive.style.arrow}
+          arrowTip={primitive.style.arrowTip}
+          color={stroke}
+          strokeWidth={strokeWidth}
+          presentationScale={tikzPresentationScale(viewport)}
+          opacity={primitive.style.opacity * primitive.style.strokeOpacity}
+        />
+      </g>
+    );
+  }
+  if (primitive.kind === 'elliptical-arc') {
+    const center = sceneToScreen(primitive.center, viewport);
+    const arrowPoints = flattenEllipticalArc(primitive, 6)
+      .map((point) => sceneToScreen(point, viewport));
+    const transform = [
+      primitive.axisX.x * viewport.scale,
+      -primitive.axisX.y * viewport.scale,
+      primitive.axisY.x * viewport.scale,
+      -primitive.axisY.y * viewport.scale,
+      center.x,
+      center.y,
+    ].join(' ');
+    return (
+      <g>
+        <path
+          {...semanticProps(primitive, selected, hovered)}
+          d={ellipticalArcSvgUnitPath(primitive)}
+          transform={`matrix(${transform})`}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeDasharray={presentationDashArray(primitive.style.dash, viewport)}
+          strokeDashoffset={presentationDashOffset(primitive.style.dashOffset, viewport)}
+          fill="none"
+          strokeOpacity={primitive.style.strokeOpacity}
+          opacity={primitive.style.opacity}
+          vectorEffect="non-scaling-stroke"
+          strokeLinecap={primitive.style.lineCap}
+          strokeLinejoin={primitive.style.lineJoin}
+          strokeMiterlimit={primitive.style.miterLimit}
+        />
+        <SvgArrows
+          points={arrowPoints}
+          arrow={primitive.style.arrow}
+          arrowTip={primitive.style.arrowTip}
+          color={stroke}
+          strokeWidth={strokeWidth}
+          presentationScale={tikzPresentationScale(viewport)}
+          opacity={primitive.style.opacity * primitive.style.strokeOpacity}
+        />
+      </g>
+    );
+  }
   if (primitive.kind === 'circle') {
     const center = sceneToScreen(primitive.center, viewport);
     return (
@@ -214,26 +334,100 @@ function ElementPrimitiveSvg({
         r={primitive.radius * viewport.scale}
         stroke={stroke}
         strokeWidth={strokeWidth}
-        strokeDasharray={primitive.style.dash}
+        strokeDasharray={presentationDashArray(primitive.style.dash, viewport)}
+        strokeDashoffset={presentationDashOffset(primitive.style.dashOffset, viewport)}
         fill={primitive.style.fill ?? 'none'}
         fillOpacity={primitive.style.fillOpacity}
+        strokeOpacity={primitive.style.strokeOpacity}
         opacity={primitive.style.opacity}
         vectorEffect="non-scaling-stroke"
+        strokeLinecap={primitive.style.lineCap}
+        strokeLinejoin={primitive.style.lineJoin}
+        strokeMiterlimit={primitive.style.miterLimit}
       />
     );
   }
-
+  if (primitive.kind === 'graph-node') {
+    const center = sceneToScreen(primitive.center, viewport);
+    const radius = primitive.radius * viewport.scale;
+    return (
+      <g {...semanticProps(primitive, selected, hovered)}>
+        {primitive.outlined
+          ? (
+            <circle
+              cx={center.x}
+              cy={center.y}
+              r={radius}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              strokeDasharray={presentationDashArray(primitive.style.dash, viewport)}
+              strokeDashoffset={presentationDashOffset(primitive.style.dashOffset, viewport)}
+              fill={primitive.style.fill ?? 'white'}
+              fillOpacity={primitive.style.fillOpacity}
+              strokeOpacity={primitive.style.strokeOpacity}
+              opacity={primitive.style.opacity}
+              vectorEffect="non-scaling-stroke"
+            />
+          )
+          : null}
+        <text
+          x={center.x}
+          y={center.y}
+          fill={stroke}
+          fillOpacity={primitive.style.textOpacity}
+          opacity={primitive.style.opacity}
+          style={{ font: presentationFont(theme.labelFont, viewport) }}
+          textAnchor="middle"
+          dominantBaseline="central"
+          pointerEvents="none"
+        >
+          {primitive.text.replace(/\$/g, '')}
+        </text>
+      </g>
+    );
+  }
+  if (primitive.kind === 'ellipse') {
+    const center = sceneToScreen(primitive.center, viewport);
+    return (
+      <ellipse
+        {...semanticProps(primitive, selected, hovered)}
+        cx={center.x}
+        cy={center.y}
+        rx={primitive.xRadius * viewport.scale}
+        ry={primitive.yRadius * viewport.scale}
+        transform={primitive.rotationDegrees === 0
+          ? undefined
+          : `rotate(${-primitive.rotationDegrees} ${center.x} ${center.y})`}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeDasharray={presentationDashArray(primitive.style.dash, viewport)}
+        strokeDashoffset={presentationDashOffset(primitive.style.dashOffset, viewport)}
+        fill={primitive.style.fill ?? 'none'}
+        fillOpacity={primitive.style.fillOpacity}
+        strokeOpacity={primitive.style.strokeOpacity}
+        opacity={primitive.style.opacity}
+        vectorEffect="non-scaling-stroke"
+        strokeLinecap={primitive.style.lineCap}
+        strokeLinejoin={primitive.style.lineJoin}
+        strokeMiterlimit={primitive.style.miterLimit}
+      />
+    );
+  }
   if (primitive.kind === 'label') {
     const at = sceneToScreen(primitive.at, viewport);
-    const offset = labelOffset(primitive.anchor ?? '');
+    const offset = labelOffset(
+      primitive.anchor ?? '',
+      tikzPresentationScale(viewport),
+    );
     return (
       <text
         {...semanticProps(primitive, selected, hovered)}
         x={at.x + offset.x}
         y={at.y + offset.y}
         fill={stroke}
+        fillOpacity={primitive.style.textOpacity}
         opacity={primitive.style.opacity}
-        style={{ font: theme.labelFont }}
+        style={{ font: presentationFont(theme.labelFont, viewport) }}
         textAnchor={offset.x < 0 ? 'end' : offset.x > 0 ? 'start' : 'middle'}
       >
         {primitive.text.replace(/\$/g, '')}
@@ -241,29 +435,36 @@ function ElementPrimitiveSvg({
     );
   }
 
-  const vertex = sceneToScreen(primitive.vertex, viewport);
-  const from = sceneToScreen(primitive.from, viewport);
-  const to = sceneToScreen(primitive.to, viewport);
-  return (
-    <path
-      {...semanticProps(primitive, selected, hovered)}
-      d={angleMarkPath({
-        vertex,
-        from,
-        to,
-        right: primitive.kind === 'right-angle',
-        radius: theme.angleRadius,
-      })}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      strokeDasharray={primitive.style.dash}
-      fill="none"
-      opacity={primitive.style.opacity}
-      vectorEffect="non-scaling-stroke"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  );
+  if (primitive.kind === 'angle' || primitive.kind === 'right-angle') {
+    const vertex = sceneToScreen(primitive.vertex, viewport);
+    const from = sceneToScreen(primitive.from, viewport);
+    const to = sceneToScreen(primitive.to, viewport);
+    return (
+      <path
+        {...semanticProps(primitive, selected, hovered)}
+        d={angleMarkPath({
+          vertex,
+          from,
+          to,
+          right: primitive.kind === 'right-angle',
+          radius: presentationStrokeWidth(theme.angleRadius, viewport),
+        })}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeDasharray={presentationDashArray(primitive.style.dash, viewport)}
+        strokeDashoffset={presentationDashOffset(primitive.style.dashOffset, viewport)}
+        fill="none"
+        strokeOpacity={primitive.style.strokeOpacity}
+        opacity={primitive.style.opacity}
+        vectorEffect="non-scaling-stroke"
+        strokeLinecap={primitive.style.lineCap}
+        strokeLinejoin={primitive.style.lineJoin}
+        strokeMiterlimit={primitive.style.miterLimit}
+      />
+    );
+  }
+
+  return null;
 }
 
 function PointPrimitiveSvg({
@@ -299,14 +500,24 @@ function PointPrimitiveSvg({
         )
         : null}
       <circle
+        className="tz-point-hit-target"
+        cx={screen.x}
+        cy={screen.y}
+        r={theme.handleRadius + 5}
+        fill="transparent"
+        stroke="none"
+        data-tikz-point={primitive.pointName}
+        data-tikz-free={String(primitive.free)}
+      />
+      <circle
         className="tz-point-handle"
         cx={screen.x}
         cy={screen.y}
         r={theme.handleRadius}
         fill={primitive.free ? theme.handleFill : theme.handleDerivedFill}
         stroke={hovered ? theme.hoverColor : theme.handleFill}
-        data-tikz-point={primitive.pointName}
-        data-tikz-free={String(primitive.free)}
+        opacity={selected || hovered ? 1 : 0}
+        pointerEvents="none"
       />
     </g>
   );

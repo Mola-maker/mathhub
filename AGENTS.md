@@ -18,6 +18,9 @@
 
 ## Workspace information architecture
 
+- `mathhub/` is the only landing-page frontend and `/` is its only public entry. Do not add an alternate Hero homepage, `/hero-demo`, or a second landing-page component tree inside the Next.js app.
+- MathHub gateway links must use same-origin relative routes (`/math` and `/tikz`). `MATHHUB_DEV_ORIGIN` is a local server-to-server proxy target only and must never become a browser-facing production callback URL.
+- The production build emits MathHub into `public/mathhub/`; this directory is generated and must not become a hand-edited source tree. The ECS standalone image must copy the generated `public/` directory.
 - Workspace analytics and cross-canvas modules belong on the main dashboard: semantic heatmaps, capability coverage, session activity, health, recent work, and global entry points.
 - TikZ Studio contains only task-local direct-manipulation surfaces: AI/command input, construction tools, Canvas, CodeMirror source, object inspector, and exact preview.
 - The dashboard consumes a read-only, revision-bound semantic snapshot from Studio. It must not parse or persist a second copy of TikZ source, and stale projections must expose their `semanticRevision`.

@@ -1,0 +1,438 @@
+/* ============================================================
+   SCENE 3 — Multiple entry points · BLUEPRINT DECOMPOSED (deep)
+   Ivory-white chapter (journey 3): exploded blueprint parts —
+   numbered index tags, lettered sub-part tags (a/b/c) with dashed
+   micro-leaders, dashed leader lines, bilingual part annotations,
+   a dashed construction path with crosshair registration marks,
+   and a tiny hairline title block in the free bottom-left corner.
+   Ink lines on ivory: hairline/flat only, no gradients, no
+   grid-paper texture, no cards, no shadows.
+
+   Color discipline: semantic tokens only — --fg / --fg-dim /
+   --fg-hi / --line-ui (cobalt-on-ivory when html[data-journey='3']).
+   Every usage carries a fallback to the legacy cobalt-field value
+   so the scene renders correctly while the tokens layer is being
+   integrated by its owner.
+   ============================================================ */
+
+.scene-3 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+
+  /* ---- Scoped legacy-token remap ----
+     Shared primitives owned by other workers (fragments.css:
+     .frag edges / .tinylabel / .sourceline / .keyhint; and
+     GeometryCanvas internals) reference --paper/--mist/--mist-hi/
+     --soft/--line-faint/--line-strong. Redefining those vars on
+     this scene root retints ALL of them semantically — including
+     the incircle/altitudes mini canvases — with zero file
+     conflicts (CSS custom property scoping, no edits elsewhere). */
+  --paper: var(--fg-hi, #F5F4EE);
+  --mist: var(--fg-dim, rgba(255, 255, 255, 0.55));
+  --mist-hi: var(--fg, rgba(255, 255, 255, 0.68));
+  --soft: var(--fg-dim, #4965AA);
+  --line-strong: var(--line-ui, rgba(245, 244, 238, 0.25));
+
+  /* ---- Scene-local faint line: --line-ui at 50% ----
+     tokens.css is owned elsewhere, so --line-ui-soft is declared
+     locally. Plain fallback first for engines without color-mix. */
+  --line-faint: rgba(245, 244, 238, 0.12);
+  --line-faint: color-mix(
+    in srgb,
+    var(--line-ui, rgba(245, 244, 238, 0.25)) 50%,
+    transparent
+  );
+  --line-ui-soft: rgba(245, 244, 238, 0.12);
+  --line-ui-soft: color-mix(
+    in srgb,
+    var(--line-ui, rgba(245, 244, 238, 0.25)) 50%,
+    transparent
+  );
+}
+
+/* ---- Chapter header ---- */
+
+/* Header never enters the top ~76px floating-header zone, even at
+   1280×800 where 9% of the stage is only 72px. */
+.scene-3__header {
+  position: absolute;
+  left: var(--margin-x);
+  top: max(80px, 9%);
+  max-width: 34ch;
+}
+
+.scene-3__headline {
+  margin: 14px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.6vw, 34px);
+  font-weight: 500;
+  line-height: 1.18;
+  letter-spacing: 0.01em;
+  color: var(--fg-hi, var(--paper));
+}
+
+.scene-3__sub {
+  margin: 12px 0 0;
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  color: var(--fg-dim, var(--mist));
+}
+
+/* ---- Blueprint construction layers (dashed path + leaders) ---- */
+
+.scene-3__align,
+.scene-3__leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ---- Part annotations ----
+   Positioned at the leader tip (inline left/top %). Default:
+   text starts 8px past the tip; --end: text ends 8px before it.
+   margin-top optically centers the 10px line on the hairline. */
+
+.scene-3__anno {
+  position: absolute;
+  margin-top: -4px;
+  margin-left: 8px;
+  font-family: var(--font-code);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--fg-dim, var(--mist));
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.scene-3__anno--end {
+  margin-left: 0;
+  margin-right: 8px;
+}
+
+/* ---- Blueprint index tag ('01'…'05' in a hairline square) ----
+   Absolutely placed inside the fragment so it inherits the
+   fragment's entrance motion; straddles the anchor corner. */
+
+.scene-3__index {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--line-ui, rgba(245, 244, 238, 0.25));
+  border-radius: 0;
+  background: transparent; /* hairline box, never a card fill */
+  font-family: var(--font-code);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim, var(--mist));
+  pointer-events: none;
+}
+
+.scene-3__index--tl { top: -8px; left: -8px; }
+.scene-3__index--tr { top: -8px; right: -8px; }
+.scene-3__index--bl { bottom: -8px; left: -8px; }
+.scene-3__index--br { bottom: -8px; right: -8px; }
+
+/* ---- Sub-part decomposition (a/b/c tags + micro-leaders) ----
+   Each sub-part is a relative row; the lettered tag hangs 30px to
+   the left in a hairline square, and a dashed micro-leader draws
+   from the tag toward the body (scaleX, origin left). */
+
+.scene-3__sub {
+  position: relative;
+}
+
+.scene-3__sub + .scene-3__sub {
+  margin-top: 9px;
+}
+
+.scene-3__subtag {
+  position: absolute;
+  left: -30px;
+  top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--line-ui, rgba(245, 244, 238, 0.25));
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-code);
+  font-size: 8px;
+  letter-spacing: 0.02em;
+  color: var(--fg-dim, var(--mist));
+  pointer-events: none;
+}
+
+.scene-3__sublead {
+  position: absolute;
+  left: -15px;
+  top: 8px;
+  width: 11px;
+  height: 0;
+  border-top: 1px dashed var(--line-ui, rgba(245, 244, 238, 0.25));
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+.scene-3__subbody {
+  position: relative;
+}
+
+/* ---- Blueprint title block (free corner, hairline table) ---- */
+
+.scene-3__titleblock {
+  position: absolute;
+  left: var(--margin-x);
+  bottom: 6%;
+  border: 1px solid var(--line-ui, rgba(245, 244, 238, 0.25));
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-code);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  color: var(--fg-dim, var(--mist));
+  pointer-events: none;
+}
+
+.scene-3__titleblock span {
+  display: block;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+
+.scene-3__titleblock span + span {
+  border-top: 1px solid var(--line-ui, rgba(245, 244, 238, 0.25));
+}
+
+/* ---- Persistent geometry echo ---- */
+
+.scene-3__echo {
+  position: absolute;
+  right: 7%;
+  bottom: 9%;
+  width: 128px;
+  height: 128px;
+  pointer-events: none;
+}
+
+/* ---- Fragment metadata label (active = full ink) ----
+   nowrap: zh labels (命令 / AI / 按键 / 画布 / 源码) must size to
+   content and never wrap inside the hairline-separated label row. */
+
+.scene-3__fraglabel {
+  display: block;
+  margin-bottom: 8px;
+  white-space: nowrap;
+}
+
+/* ---- 01 · Command palette fragment (real ⌘K deck) ---- */
+
+.scene-3__cmdplaceholder {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: var(--fg-dim, var(--mist));
+  white-space: nowrap;
+}
+
+.scene-3__cmdresult {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.scene-3__cmdresultname {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: var(--fg-hi, var(--paper));
+}
+
+/* ---- 02 · AI prompt fragment (fail-closed proposal) ---- */
+
+.scene-3__prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.scene-3__promptmark {
+  font-family: var(--font-code);
+  font-size: 12px;
+  color: var(--fg-dim, var(--mist));
+}
+
+.scene-3__prompttext {
+  font-family: var(--font-code);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--fg-hi, var(--paper));
+  white-space: nowrap;
+}
+
+.scene-3__aistatus {
+  font-family: var(--font-code);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-dim, var(--mist));
+  white-space: nowrap;
+}
+
+.scene-3__caret {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  margin-left: 3px;
+  background: var(--fg-hi, var(--paper));
+  animation: scene-3-blink 1.1s steps(1) infinite;
+}
+
+/* ---- 03 · Tool-chord fragment (M / B / I with keypress pulse) ---- */
+
+.scene-3__chippulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transform-origin: 0 50%;
+  white-space: nowrap;
+}
+
+.scene-3__chordname {
+  font-size: var(--text-meta);
+  letter-spacing: 0.1em;
+  color: var(--fg-dim, var(--mist));
+  white-space: nowrap;
+}
+
+/* ---- 04 · Canvas fragment (incircle mini + drag replay) ---- */
+
+.scene-3__minicanvas {
+  position: relative;
+  width: 148px;
+  height: 148px;
+}
+
+.scene-3__dragpath {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  stroke: var(--fg-dim, var(--mist));
+}
+
+.scene-3__cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 2px; /* ≤ 2px rule */
+  background: var(--fg-hi, var(--paper));
+  pointer-events: none;
+}
+
+.scene-3__dragstatus {
+  position: relative;
+  display: inline-block;
+  height: 13px;
+  min-width: 148px;
+}
+
+.scene-3__dragstatusline {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--font-code);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--fg-dim, var(--mist));
+  white-space: nowrap;
+}
+
+.scene-3__dragstatusline--done {
+  color: var(--fg-hi, var(--paper));
+}
+
+/* ---- 05 · Source fragment (TikZ typewriter) ---- */
+
+.scene-3__textcaret {
+  display: inline-block;
+  width: 1px;
+  height: 11px;
+  margin-left: 2px;
+  vertical-align: -1px;
+  background: var(--fg-hi, var(--paper));
+  animation: scene-3-blink 1.1s steps(1) infinite;
+}
+
+/* ---- Caret blink (opacity only; disabled for reduced motion) ---- */
+
+@keyframes scene-3-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-3__caret,
+  .scene-3__textcaret {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ---- Tablet: retain asymmetry, drop the decorative echo only ---- */
+
+@media (max-width: 1024px) {
+  .scene-3__echo {
+    display: none;
+  }
+}
+
+/* ---- Mobile: progressive simplification — one headline, ONE
+       representative fragment (command), no blueprint layers. ---- */
+
+@media (max-width: 720px) {
+  .scene-3__header {
+    max-width: 26ch;
+  }
+
+  .scene-3__echo,
+  .scene-3__align,
+  .scene-3__leaders,
+  .scene-3__anno,
+  .scene-3__titleblock,
+  .scene-3__subtag,
+  .scene-3__sublead,
+  .scene-3__frag--ai,
+  .scene-3__frag--keys,
+  .scene-3__frag--canvas,
+  .scene-3__frag--source {
+    display: none;
+  }
+
+  /* the surviving command fragment stacks under the header */
+  .scene-3__frag--command {
+    left: var(--margin-x) !important;
+    top: 46% !important;
+    max-width: 78vw;
+  }
+}

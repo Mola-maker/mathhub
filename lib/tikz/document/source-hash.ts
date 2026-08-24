@@ -4,7 +4,11 @@ const UINT64_MASK = 0xffffffffffffffffn;
 
 export type SourceHashAlgorithm = 'fnv1a64-utf8' | 'sha256-utf8';
 
-export function utf8Bytes(value: string): Uint8Array {
+// The explicit ArrayBuffer argument matters: since TypeScript 5.7 a bare
+// Uint8Array widens to Uint8Array<ArrayBufferLike>, which no longer satisfies
+// BufferSource at crypto.subtle.digest. Both branches below allocate a real
+// ArrayBuffer, so the narrower type is accurate rather than a cast.
+export function utf8Bytes(value: string): Uint8Array<ArrayBuffer> {
   if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(value);
   const bytes: number[] = [];
   for (const char of value) {
@@ -48,6 +52,37 @@ export function hashSource(source: string): string {
     hash = (hash * FNV_PRIME) & UINT64_MASK;
   }
   return hash.toString(16).padStart(16, '0');
+}
+
+export function isSourceHashAlgorithm(
+  value: unknown,
+): value is SourceHashAlgorithm {
+  return value === 'fnv1a64-utf8' || value === 'sha256-utf8';
+}
+
+/**
+ * Recompute a digest under a caller-named algorithm.
+ *
+ * Verifying a claimed hash requires reproducing it with the algorithm that
+ * produced it: a peer that hashes synchronously can only use the FNV lane, so a
+ * verifier that always prefers SHA-256 would reject every such claim. Naming the
+ * algorithm selects the primitive but grants no trust — the digest is still
+ * recomputed here and compared. Returns null when the named lane is unavailable,
+ * which callers must treat as a failed verification rather than a pass.
+ */
+export async function hashSourceUsing(
+  source: string,
+  algorithm: SourceHashAlgorithm,
+): Promise<string | null> {
+  if (algorithm === 'fnv1a64-utf8') return hashSource(source);
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return null;
+  try {
+    const digest = await subtle.digest('SHA-256', utf8Bytes(source));
+    return bytesToHex(new Uint8Array(digest));
+  } catch {
+    return null;
+  }
 }
 
 /** Prefer SHA-256 when an async Web Crypto lane is available. */

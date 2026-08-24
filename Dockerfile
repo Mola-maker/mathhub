@@ -2,6 +2,7 @@ FROM node:22-bookworm-slim AS dependencies
 
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY mathhub/package.json ./mathhub/package.json
 RUN npm ci --ignore-scripts
 
 
@@ -10,6 +11,7 @@ FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=dependencies /app/mathhub/node_modules ./mathhub/node_modules
 COPY . .
 RUN npm run build
 
@@ -27,6 +29,7 @@ ENV HOSTNAME=0.0.0.0
 
 COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nextjs /app/public ./public
 
 USER nextjs
 EXPOSE 3000

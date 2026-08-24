@@ -1,32 +1,67 @@
 import type {
   ConstructionTruth,
   GeometryEntity,
-  GeometryExpression,
   GeometryRevisionBasis,
+  GeometryStyle,
   GeometryTruthSet,
   JsonObject,
   JsonValue,
   OpaqueConstructionNode,
   SemanticTruth,
 } from './model';
+import { buildGeometryRepoMap } from './geometry-repo-map';
 import {
   constructionPlanSyntaxKind,
   decodeManagedConstructionPlan,
   type ConstructionPlanCodecIssueCode,
 } from '../authoring/construction-plan-codec';
+import {
+  compileConstructionWriterArtifact,
+  type ConstructionPlan,
+} from '../authoring/construction-ir';
 import { parseManagedConstructionBlocks } from '../semantics/managed-construction';
 import {
   buildGeometrySourceMap,
   GEOMETRY_SOURCE_MAP_SCHEMA_VERSION,
   type GeometrySourceMap,
 } from './source-map';
+import type { GeometryDoc } from './geometry-doc';
+import {
+  CONSTRUCTION_CATALOG_DIGEST,
+  CONSTRUCTION_TOOL_SPECS,
+  constructionIntentContract,
+  type ConstructionCategory,
+} from '../authoring/construction-catalog';
+import { constructionAuthorizationScopeFingerprint } from '../authoring/construction-authorization';
 
 export const GEOMETRY_AI_CONTEXT_SCHEMA_VERSION = 'geometry-ai-context/v1' as const;
+
+function isDirectRawCircleDefinition(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (record.kind === 'center-through') {
+    return typeof record.centerName === 'string'
+      && record.centerName.length > 0
+      && typeof record.throughName === 'string'
+      && record.throughName.length > 0;
+  }
+  if (record.kind === 'center-radius') {
+    return typeof record.centerName === 'string'
+      && record.centerName.length > 0
+      && typeof record.radius === 'number'
+      && Number.isFinite(record.radius)
+      && record.radius > 0;
+  }
+  return false;
+}
 
 export interface GeometryAiContextOptions {
   maxEntities?: number;
   maxConstraints?: number;
   maxRelations?: number;
+  maxStyles?: number;
+  /** Total JSON character budget for the provider-facing style slice. */
+  maxStyleContextChars?: number;
   maxBindings?: number;
   maxOpaqueNodes?: number;
   maxManagedConstructions?: number;
@@ -60,15 +95,44 @@ export interface GeometryAiContext {
   >[];
   constraints: SemanticTruth['ir']['constraints'];
   relations: SemanticTruth['ir']['relations'];
+  /** Ordered source option metadata is retained on each style when available. */
+  styles: readonly GeometryStyle[];
   focus: {
     requestedRefs: readonly string[];
     resolvedEntityIds: readonly string[];
     closureEntityIds: readonly string[];
     unresolvedRefs: readonly string[];
+    ambiguousRefs?: readonly string[];
     depth: number;
     truncated: boolean;
+    ranking?: readonly {
+      entityId: string;
+      score: number;
+      distance: number;
+      reasons: readonly string[];
+      evidenceRecordIds: readonly string[];
+    }[];
   };
   construction: {
+    constructionCatalogDigest: string;
+    authorizationScopeFingerprint: string;
+    intentTools: readonly {
+      toolId: string;
+      category: Exclude<ConstructionCategory, 'navigate'>;
+      inputKinds: readonly ('point' | 'circle')[];
+      minInputs: number;
+      maxInputs: number;
+      repeatedInputKind?: 'point' | 'circle';
+      requestedNameKeys: readonly string[];
+      parameterSchema: 'none' | 'point-position' | 'circle-angle' | 'label-text';
+      /** Current focus can satisfy every input without an earlier DAG output. */
+      currentInputReady: boolean;
+      outputSlots: readonly {
+        key: string;
+        produces: 'point' | 'circle';
+        roles: readonly string[];
+      }[];
+    }[];
     sourceMapSchemaVersion: typeof GEOMETRY_SOURCE_MAP_SCHEMA_VERSION;
     authorizedBindingIds: readonly string[];
     sourceBindings: readonly {
@@ -83,24 +147,56 @@ export interface GeometryAiContext {
       writeCapabilities: readonly (
         | 'create-managed-construction'
         | 'replace-managed-construction'
+        | 'update-managed-presentation'
       )[];
+      managedPresentationTargets?: readonly {
+        entityId: string;
+        slotId: string;
+        role: string;
+      }[];
       managedConstructionId?: string;
+      managedSourceRecordId?: string;
       managedPlanKind?: string;
       /** Concrete managed syntax kind; primitive plans retain point/segment/etc. */
       managedSyntaxKind?: string;
       managedContentFingerprint?: string;
+      managedPresentationFingerprint?: string;
+      managedWriterId?: string;
+      managedWriterRevision?: number;
+      managedWriterSlotIds?: readonly string[];
+      managedWriterSlotSemanticFingerprints?: readonly string[];
+      managedAttachmentsFingerprint?: string;
+      createCapabilityFingerprint?: string;
       /**
        * Focus-scoped proof that the current schema-v2 managed block can be
-       * reconstructed by the same canonical writer on server and client.
+       * reconstructed by the same writer ABI on server and client, with a
+       * separate lossless presentation proof when source is non-canonical.
        * This never makes the underlying raw source binding writable.
        */
       managedPlan?:
         | {
           schemaVersion: 'managed-construction-plan-context/v1';
           status: 'canonical';
-          canonicalSource: true;
+          /** True only when the complete block is canonical writer output. */
+          canonicalSource: boolean;
           syntaxKind: string;
           previousPlan: JsonObject;
+          writer: {
+            writerId: string;
+            writerRevision: number;
+            slotIds: readonly string[];
+            slotSemanticFingerprints: readonly string[];
+          };
+          presentation?: {
+            schema: 'managed-presentation/v1';
+            status: 'lossless';
+            writerId: string;
+            writerRevision: number;
+            presentationFingerprint: string;
+            attachmentsFingerprint: string;
+            attachmentCount: number;
+            opaqueSlotCount: number;
+          };
         }
         | {
           schemaVersion: 'managed-construction-plan-context/v1';
@@ -140,6 +236,7 @@ export interface GeometryAiContext {
       'entities'
       | 'constraints'
       | 'relations'
+      | 'styles'
       | 'sourceBindings'
       | 'opaqueNodes'
       | 'managedConstructions',
@@ -178,6 +275,88 @@ function isJsonObject(value: JsonValue): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+const MAX_AI_STYLE_OPTION_ENTRIES = 24;
+const MAX_AI_STYLE_OPTION_KEY_LENGTH = 128;
+const MAX_AI_STYLE_OPTION_VALUE_LENGTH = 512;
+
+function boundedAiText(value: JsonValue | undefined, limit: number): string | null {
+  if (typeof value !== 'string') return null;
+  if (value.length <= limit) return value;
+  return `${value.slice(0, Math.max(0, limit - 1))}…`;
+}
+
+function compactStyleMetadata(metadata: JsonObject | undefined): JsonObject | undefined {
+  const sequence = metadata?.optionSequence;
+  if (!sequence || !isJsonObject(sequence)) return undefined;
+  const rawEntries = Array.isArray(sequence.entries)
+    ? sequence.entries.filter((entry): entry is JsonObject => isJsonObject(entry))
+    : [];
+  const entries = rawEntries.slice(0, MAX_AI_STYLE_OPTION_ENTRIES).map((entry) => {
+    const keySource = entry.interpretedKey ?? entry.key;
+    const interpreted = boundedAiText(
+      keySource,
+      MAX_AI_STYLE_OPTION_KEY_LENGTH,
+    );
+    const valueSource = entry.interpretedValue ?? entry.value;
+    const value = boundedAiText(valueSource, MAX_AI_STYLE_OPTION_VALUE_LENGTH);
+    const originalValueLength = typeof valueSource === 'string' ? valueSource.length : 0;
+    return {
+      ordinal: typeof entry.ordinal === 'number' ? entry.ordinal : 0,
+      key: interpreted ?? '',
+      value,
+      range: isJsonObject(entry.range) ? entry.range : null,
+      ...(typeof valueSource === 'string' && originalValueLength > MAX_AI_STYLE_OPTION_VALUE_LENGTH
+        ? { valueTruncated: true }
+        : {}),
+    };
+  });
+  return {
+    optionSequence: {
+      schema: typeof sequence.schema === 'string' ? sequence.schema : 'unknown',
+      ordered: sequence.ordered === true,
+      balanced: sequence.balanced === true,
+      range: isJsonObject(sequence.range) ? sequence.range : null,
+      entryCount: rawEntries.length,
+      entries,
+      truncated: rawEntries.length > entries.length,
+    },
+  };
+}
+
+function compactStyleForAi(style: GeometryStyle): GeometryStyle {
+  const metadata = compactStyleMetadata(style.metadata);
+  return {
+    recordType: style.recordType,
+    id: style.id,
+    selector: style.selector,
+    properties: style.properties,
+    ...(style.precedence !== undefined ? { precedence: style.precedence } : {}),
+    ...(style.sourceBindingIds ? { sourceBindingIds: style.sourceBindingIds } : {}),
+    ...(metadata ? { metadata } : {}),
+  };
+}
+
+function takeStylesWithinBudget(
+  values: readonly GeometryStyle[],
+  countLimit: number,
+  characterBudget: number,
+): { values: readonly GeometryStyle[]; omitted: number } {
+  const selected: GeometryStyle[] = [];
+  let used = 2; // JSON array brackets.
+  for (const style of values.slice(0, countLimit)) {
+    const compact = compactStyleForAi(style);
+    const serializedLength = JSON.stringify(compact).length;
+    const separatorLength = selected.length > 0 ? 1 : 0;
+    if (used + separatorLength + serializedLength > characterBudget) break;
+    selected.push(compact);
+    used += separatorLength + serializedLength;
+  }
+  return {
+    values: selected,
+    omitted: Math.max(0, values.length - selected.length),
+  };
+}
+
 function managedConstructionSummaries(
   semantic: SemanticTruth,
 ): readonly JsonObject[] {
@@ -188,85 +367,26 @@ function managedConstructionSummaries(
     : [];
 }
 
-function expressionEntityIds(expression: GeometryExpression | undefined): string[] {
-  if (!expression) return [];
-  if (expression.kind === 'entity-reference') return [expression.entityId];
-  if (expression.kind === 'operation') {
-    return expression.arguments.flatMap(expressionEntityIds);
-  }
-  return [];
-}
-
 function focusClosure(
   semantic: SemanticTruth,
   options: GeometryAiContextOptions,
 ): GeometryAiContext['focus'] {
-  const requestedRefs = [...new Set(
-    (options.focusRefs ?? []).map((value) => value.trim()).filter(Boolean),
-  )];
-  const entities = semantic.ir.entities;
-  const aliases = new Map<string, string>();
-  const entityIds = new Set(entities.map((entity) => entity.id));
-  for (const entity of entities) {
-    aliases.set(entity.id, entity.id);
-    if (entity.name) {
-      aliases.set(entity.name, entity.id);
-      aliases.set(`point:${entity.name}`, entity.id);
-    }
-  }
-  const resolvedEntityIds = [...new Set(
-    requestedRefs.flatMap((reference) => {
-      const resolved = aliases.get(reference);
-      return resolved ? [resolved] : [];
-    }),
-  )];
-  const unresolvedRefs = requestedRefs.filter((reference) => !aliases.has(reference));
-  const adjacency = new Map<string, Set<string>>();
-  const connect = (ids: readonly string[]) => {
-    const known = [...new Set(ids.filter((id) => entityIds.has(id)))];
-    for (const left of known) {
-      const neighbors = adjacency.get(left) ?? new Set<string>();
-      adjacency.set(left, neighbors);
-      for (const right of known) {
-        if (left !== right) neighbors.add(right);
-      }
-    }
-  };
-  for (const constraint of semantic.ir.constraints) {
-    connect(constraint.arguments.flatMap((argument) =>
-      argument.entityId ? [argument.entityId] : []));
-  }
-  for (const relation of semantic.ir.relations) {
-    connect(relation.participants.flatMap((participant) =>
-      participant.entityId ? [participant.entityId] : []));
-  }
-  for (const entity of entities) {
-    connect([entity.id, ...expressionEntityIds(entity.definition)]);
-  }
-
   const depth = finiteLimit(options.focusDepth, 2);
   const maxFocusEntities = finiteLimit(options.maxFocusEntities, 160);
-  const visited = new Set(resolvedEntityIds);
-  let frontier = [...resolvedEntityIds];
-  for (let level = 0; level < depth && frontier.length > 0; level += 1) {
-    const next: string[] = [];
-    for (const entityId of frontier) {
-      for (const neighbor of adjacency.get(entityId) ?? []) {
-        if (visited.has(neighbor)) continue;
-        visited.add(neighbor);
-        next.push(neighbor);
-      }
-    }
-    frontier = next;
-  }
-  const fullClosure = [...visited].sort();
-  return {
-    requestedRefs,
-    resolvedEntityIds,
-    closureEntityIds: fullClosure.slice(0, maxFocusEntities),
-    unresolvedRefs,
+  const repoMap = buildGeometryRepoMap(semantic, {
+    focusRefs: options.focusRefs,
     depth,
-    truncated: fullClosure.length > maxFocusEntities,
+    maxEntries: maxFocusEntities,
+  });
+  return {
+    requestedRefs: repoMap.requestedRefs,
+    resolvedEntityIds: repoMap.resolvedEntityIds,
+    closureEntityIds: repoMap.entries.map((entry) => entry.entityId),
+    unresolvedRefs: repoMap.unresolvedRefs,
+    ambiguousRefs: repoMap.ambiguousRefs,
+    depth: repoMap.depth,
+    truncated: repoMap.truncated,
+    ranking: repoMap.entries,
   };
 }
 
@@ -302,6 +422,7 @@ function unavailableManagedPlan(
 
 function compactConstruction(
   construction: ConstructionTruth,
+  semantic: SemanticTruth,
   managedConstructions: readonly JsonObject[],
   sourceMap: GeometrySourceMap,
   focusEntityIds: ReadonlySet<string>,
@@ -376,15 +497,38 @@ function compactConstruction(
         `Managed binding syntax kind ${String(expectedSyntaxKind)} does not match canonical plan kind ${String(decodedSyntaxKind)}.`,
       );
     } else if (decoded.ok && decodedSyntaxKind !== undefined) {
+      const writer = compileConstructionWriterArtifact(decoded.plan);
       result = {
         schemaVersion: 'managed-construction-plan-context/v1',
         status: 'canonical',
-        canonicalSource: true,
+        canonicalSource: decoded.presentation === undefined,
         syntaxKind: decodedSyntaxKind,
         // The codec has validated and byte-recompiled the full plan. Keep the
         // complete plan so either runtime can feed it directly to the trusted
         // recompiler without inventing omitted authoring fields.
         previousPlan: decoded.plan as unknown as JsonObject,
+        writer: {
+          writerId: writer.writerId,
+          writerRevision: writer.writerRevision,
+          slotIds: writer.slots.map((slot) => slot.id),
+          slotSemanticFingerprints: writer.slots.map((slot) => (
+            slot.semanticFingerprint
+          )),
+        },
+        ...(decoded.presentation
+          ? {
+            presentation: {
+              schema: decoded.presentation.schema,
+              status: 'lossless' as const,
+              writerId: decoded.presentation.writerId,
+              writerRevision: decoded.presentation.writerRevision,
+              presentationFingerprint: decoded.presentation.presentationFingerprint,
+              attachmentsFingerprint: decoded.presentation.attachmentsFingerprint,
+              attachmentCount: decoded.presentation.attachments.length,
+              opaqueSlotCount: decoded.presentation.opaqueSlots.length,
+            },
+          }
+          : {}),
       };
     } else if (!decoded.ok) {
       result = {
@@ -406,8 +550,20 @@ function compactConstruction(
     managedPlanCache.set(cacheKey, result);
     return result;
   };
+  // Managed constraint/relation records already appear in the semantic
+  // constraints/relations lanes. Repeating each record as a source binding is
+  // not actionable (managed records are never directly writable) and makes a
+  // single composite construction exceed the API context budget. Keep entity
+  // record bindings because typed construction intents can legitimately use a
+  // managed output point/circle as their next input (for example, labeling the
+  // nine-point center).
+  const actionableBindings = construction.bindings.filter((binding) => {
+    const sourceRecordType = binding.metadata?.sourceRecordType;
+    return sourceRecordType === undefined || sourceRecordType === 'entity';
+  });
+  const compactedBindingCount = construction.bindings.length - actionableBindings.length;
   const orderedBindings = prioritize(
-    construction.bindings,
+    actionableBindings,
     (binding) => sourceMapByBinding.get(binding.id)?.entityIds
       .some((entityId) => focusEntityIds.has(entityId)) ?? false,
   );
@@ -438,6 +594,9 @@ function compactConstruction(
       const managedConstructionId = typeof binding.metadata?.constructionId === 'string'
         ? binding.metadata.constructionId
         : undefined;
+      const managedSourceRecordId = typeof binding.metadata?.sourceRecordId === 'string'
+        ? binding.metadata.sourceRecordId
+        : undefined;
       const managedPlanKind = typeof binding.metadata?.constructionKind === 'string'
         ? binding.metadata.constructionKind
         : undefined;
@@ -457,6 +616,38 @@ function compactConstruction(
         && managedConstructionId
         ? managedPlanOf(binding, managedConstructionId, managedSyntaxKind)
         : undefined;
+      const semanticEntityIdsBySourceRecord = new Map<string, string>();
+      if (managedConstructionId) {
+        for (const recordBinding of construction.bindings) {
+          const recordConstructionId = recordBinding.metadata?.constructionId
+            ?? recordBinding.metadata?.managedConstructionId;
+          const sourceRecordId = recordBinding.metadata?.sourceRecordId;
+          const entityIds = sourceMapByBinding.get(recordBinding.id)?.entityIds ?? [];
+          if (
+            recordConstructionId === managedConstructionId
+            && typeof sourceRecordId === 'string'
+            && entityIds.length === 1
+          ) {
+            semanticEntityIdsBySourceRecord.set(sourceRecordId, entityIds[0]!);
+          }
+        }
+      }
+      const managedPresentationTargets = decodedManagedPlan?.status === 'canonical'
+        ? compileConstructionWriterArtifact(
+          decodedManagedPlan.previousPlan as unknown as ConstructionPlan,
+        ).slots.flatMap((slot) => slot.optionSites.length === 1
+          ? slot.owners.flatMap((owner) => owner.startsWith('entity:')
+            ? (() => {
+              const entityId = semanticEntityIdsBySourceRecord.get(
+                owner.slice('entity:'.length),
+              );
+              return entityId
+                ? [{ entityId, slotId: slot.id, role: slot.role }]
+                : [];
+            })()
+            : [])
+          : [])
+        : [];
       const writeCapabilities = binding.id === 'binding:document:tikzpicture-body-end'
         && binding.writable
         ? ['create-managed-construction' as const]
@@ -470,8 +661,16 @@ function compactConstruction(
           && managedIntegrityStatus === 'valid'
           && decodedManagedPlan?.status === 'canonical'
           && decodedManagedPlan.syntaxKind === managedSyntaxKind
-          ? ['replace-managed-construction' as const]
+          ? [
+            'replace-managed-construction' as const,
+            ...(managedPresentationTargets.length > 0
+              ? ['update-managed-presentation' as const]
+              : []),
+          ]
           : [];
+      const createCapabilityFingerprint = typeof binding.metadata?.capabilityFingerprint === 'string'
+        ? binding.metadata.capabilityFingerprint
+        : undefined;
       return {
         id: binding.id,
         role: binding.role,
@@ -482,15 +681,38 @@ function compactConstruction(
         opaque: false as const,
         insertionPolicy,
         writeCapabilities,
+        ...(managedPresentationTargets.length > 0
+          ? { managedPresentationTargets }
+          : {}),
+        ...(createCapabilityFingerprint ? { createCapabilityFingerprint } : {}),
         ...(managedConstructionId ? { managedConstructionId } : {}),
+        ...(managedSourceRecordId ? { managedSourceRecordId } : {}),
         ...(managedPlanKind ? { managedPlanKind } : {}),
         ...(managedSyntaxKind ? { managedSyntaxKind } : {}),
         ...(managedContentFingerprint ? { managedContentFingerprint } : {}),
+        ...(decodedManagedPlan?.status === 'canonical'
+          ? {
+            managedWriterId: decodedManagedPlan.writer.writerId,
+            managedWriterRevision: decodedManagedPlan.writer.writerRevision,
+            managedWriterSlotIds: decodedManagedPlan.writer.slotIds,
+            managedWriterSlotSemanticFingerprints:
+              decodedManagedPlan.writer.slotSemanticFingerprints,
+          }
+          : {}),
+        ...(decodedManagedPlan?.status === 'canonical'
+          && decodedManagedPlan.presentation
+          ? {
+            managedPresentationFingerprint:
+              decodedManagedPlan.presentation.presentationFingerprint,
+            managedAttachmentsFingerprint:
+              decodedManagedPlan.presentation.attachmentsFingerprint,
+          }
+          : {}),
         ...(focusScoped && decodedManagedPlan
           ? { managedPlan: decodedManagedPlan }
           : {}),
         sliceHash: binding.source.sliceHash,
-        ...(binding.source.verbatim.length <= 4_096
+        ...(managedSourceRecordId === undefined && binding.source.verbatim.length <= 4_096
           ? { verbatim: binding.source.verbatim }
           : {}),
         entityIds,
@@ -507,6 +729,83 @@ function compactConstruction(
       || binding.entityIds.some((entityId) => focusEntityIds.has(entityId))
     ))
     .map((binding) => binding.id);
+  const createCapabilityFingerprint = sourceBindings.find((binding) => (
+    binding.id === 'binding:document:tikzpicture-body-end'
+  ))?.createCapabilityFingerprint ?? '';
+  const authorizedBindingIdSet = new Set(authorizedBindingIds);
+  const pointEntityIds = new Set(
+    semantic.ir.entities
+      .filter((entity) => entity.kind === 'point')
+      .map((entity) => entity.id),
+  );
+  const pointInputEntityCount = new Set(sourceBindings.flatMap((binding) => (
+    authorizedBindingIdSet.has(binding.id)
+    && binding.entityIds.length === 1
+    && pointEntityIds.has(binding.entityIds[0]!)
+      ? [binding.entityIds[0]!]
+      : []
+  ))).size;
+  const circleEntityIds = new Set(
+    semantic.ir.entities
+      .filter((entity) => entity.kind === 'circle')
+      .map((entity) => entity.id),
+  );
+  const managedCircleEntityIds = new Set(sourceBindings.flatMap((binding) => (
+    authorizedBindingIdSet.has(binding.id)
+    && Boolean(binding.managedConstructionId)
+    && Boolean(binding.managedSourceRecordId)
+      ? binding.entityIds.filter((entityId) => circleEntityIds.has(entityId))
+      : []
+  )));
+  const adoptableRawCircleEntityIds = new Set(
+    semantic.ir.entities.flatMap((entity) => {
+      if (
+        entity.kind !== 'circle'
+        || typeof entity.metadata?.persistentSourceReference !== 'string'
+        || !isDirectRawCircleDefinition(entity.parameters?.circleDefinition)
+      ) return [];
+      const binding = sourceBindings.find((candidate) => (
+        candidate.id === `binding:${entity.id}`
+      ));
+      return binding
+        && authorizedBindingIdSet.has(binding.id)
+        && binding.writable
+        && binding.entityIds.length === 1
+        && binding.entityIds[0] === entity.id
+        ? [entity.id]
+        : [];
+    }),
+  );
+  const circleInputEntityCount = new Set([
+    ...managedCircleEntityIds,
+    ...adoptableRawCircleEntityIds,
+  ]).size;
+  const intentTools = CONSTRUCTION_TOOL_SPECS
+    .filter((spec) => spec.category !== 'navigate')
+    .map((spec) => {
+      const contract = constructionIntentContract(spec);
+      const requiredCircleInputs = contract.inputKinds.filter((kind) => (
+        kind === 'circle'
+      )).length;
+      const requiredPointInputs = contract.inputKinds.filter((kind) => (
+        kind === 'point'
+      )).length;
+      return {
+        toolId: spec.id,
+        category: spec.category as Exclude<ConstructionCategory, 'navigate'>,
+        inputKinds: contract.inputKinds,
+        minInputs: contract.minInputs,
+        maxInputs: contract.maxInputs,
+        ...(contract.repeatedInputKind
+          ? { repeatedInputKind: contract.repeatedInputKind }
+          : {}),
+        requestedNameKeys: contract.requestedNameKeys,
+        parameterSchema: contract.parameterSchema,
+        currentInputReady: requiredCircleInputs <= circleInputEntityCount
+          && requiredPointInputs <= pointInputEntityCount,
+        outputSlots: contract.outputSlots,
+      };
+    });
   const managedForContext = managed.values.map((summary) => {
     // Canonical previousPlan is attached only to the focus-scoped managed
     // block binding above. Raw semantic records are intentionally withheld in
@@ -518,6 +817,13 @@ function compactConstruction(
   });
   return {
     value: {
+      constructionCatalogDigest: CONSTRUCTION_CATALOG_DIGEST,
+      authorizationScopeFingerprint: constructionAuthorizationScopeFingerprint({
+        basis: semantic.basis,
+        authorizedBindingIds,
+        createCapabilityFingerprint,
+      }),
+      intentTools,
       sourceMapSchemaVersion: GEOMETRY_SOURCE_MAP_SCHEMA_VERSION,
       authorizedBindingIds,
       sourceBindings,
@@ -531,7 +837,9 @@ function compactConstruction(
       managedConstructions: managedForContext,
     },
     omitted: {
-      ...(bindings.omitted > 0 ? { sourceBindings: bindings.omitted } : {}),
+      ...(bindings.omitted + compactedBindingCount > 0
+        ? { sourceBindings: bindings.omitted + compactedBindingCount }
+        : {}),
       ...(opaque.omitted > 0 ? { opaqueNodes: opaque.omitted } : {}),
       ...(managed.omitted > 0
         ? { managedConstructions: managed.omitted }
@@ -541,15 +849,22 @@ function compactConstruction(
 }
 
 export function buildGeometryAiContext(
-  truths: GeometryTruthSet,
+  truths: GeometryTruthSet | GeometryDoc,
   options: GeometryAiContextOptions = {},
 ): GeometryAiContext {
   const focus = focusClosure(truths.semantic, options);
   const focusEntityIds = new Set(focus.closureEntityIds);
-  const orderedEntities = prioritize(
-    truths.semantic.ir.entities,
-    (entity) => focusEntityIds.has(entity.id),
+  const focusOrder = new Map(
+    focus.closureEntityIds.map((entityId, index) => [entityId, index]),
   );
+  const orderedEntities = [...truths.semantic.ir.entities].sort((left, right) => {
+    const leftRank = focusOrder.get(left.id);
+    const rightRank = focusOrder.get(right.id);
+    if (leftRank !== undefined && rightRank !== undefined) return leftRank - rightRank;
+    if (leftRank !== undefined) return -1;
+    if (rightRank !== undefined) return 1;
+    return 0;
+  });
   const orderedConstraints = prioritize(
     truths.semantic.ir.constraints,
     (constraint) => constraint.arguments.some((argument) =>
@@ -559,6 +874,11 @@ export function buildGeometryAiContext(
     truths.semantic.ir.relations,
     (relation) => relation.participants.some((participant) =>
       participant.entityId ? focusEntityIds.has(participant.entityId) : false),
+  );
+  const orderedStyles = prioritize(
+    truths.semantic.ir.styles,
+    (style) => style.selector.entityIds?.some((entityId) =>
+      focusEntityIds.has(entityId)) ?? false,
   );
   const entities = takeWithOmitted(
     orderedEntities,
@@ -572,10 +892,18 @@ export function buildGeometryAiContext(
     orderedRelations,
     finiteLimit(options.maxRelations, 320),
   );
-  const sourceMap = buildGeometrySourceMap(truths);
+  const styles = takeStylesWithinBudget(
+    orderedStyles,
+    finiteLimit(options.maxStyles, 64),
+    finiteLimit(options.maxStyleContextChars, 24_000),
+  );
+  const sourceMap = 'sourceMap' in truths
+    ? truths.sourceMap
+    : buildGeometrySourceMap(truths);
   const managedConstructions = managedConstructionSummaries(truths.semantic);
   const construction = compactConstruction(
     truths.construction,
+    truths.semantic,
     managedConstructions,
     sourceMap,
     focusEntityIds,
@@ -585,6 +913,7 @@ export function buildGeometryAiContext(
     ...(entities.omitted > 0 ? { entities: entities.omitted } : {}),
     ...(constraints.omitted > 0 ? { constraints: constraints.omitted } : {}),
     ...(relations.omitted > 0 ? { relations: relations.omitted } : {}),
+    ...(styles.omitted > 0 ? { styles: styles.omitted } : {}),
     ...construction.omitted,
   };
   const source = truths.construction.sources[0];
@@ -616,6 +945,10 @@ export function buildGeometryAiContext(
     })),
     constraints: constraints.values,
     relations: relations.values,
+    // Exact presentation bytes remain source-bound. The provider receives a
+    // bounded ordered view so a legal but huge option value cannot amplify the
+    // semantic-kernel request beyond the API budget.
+    styles: styles.values,
     focus,
     construction: construction.value,
     protocol: {
@@ -633,6 +966,105 @@ export function buildGeometryAiContext(
 /** Compact, JSON-safe context for provider prompts and API boundaries. */
 export function serializeGeometryAiContext(context: GeometryAiContext): string {
   return JSON.stringify(context);
+}
+
+/**
+ * Keep complete plans in the trusted host context, but replace them with an
+ * on-demand reference in the provider prompt. Large composite plans otherwise
+ * consume the model budget on every conversational turn even when the user is
+ * only asking a question or adding a label.
+ */
+export function serializeGeometryAiContextForPrompt(
+  context: GeometryAiContext,
+): string {
+  const sourceBindings = context.construction.sourceBindings.map((binding) => {
+    const managedPlan = binding.managedPlan?.status === 'canonical'
+      ? {
+          ...binding.managedPlan,
+          previousPlan: {
+            schemaVersion: 'managed-plan-reference/v1',
+            retrievalTool: 'inspect-geometry',
+            planKind: binding.managedPlanKind,
+            planId: binding.managedConstructionId,
+          },
+        }
+      : binding.managedPlan;
+    return {
+      id: binding.id,
+      sourceId: binding.sourceId,
+      range: binding.range,
+      writable: binding.writable,
+      opaque: binding.opaque,
+      insertionPolicy: binding.insertionPolicy,
+      writeCapabilities: binding.writeCapabilities,
+      managedPresentationTargets: binding.managedPresentationTargets,
+      managedConstructionId: binding.managedConstructionId,
+      managedSourceRecordId: binding.managedSourceRecordId,
+      managedPlanKind: binding.managedPlanKind,
+      managedSyntaxKind: binding.managedSyntaxKind,
+      managedContentFingerprint: binding.managedContentFingerprint,
+      managedPresentationFingerprint: binding.managedPresentationFingerprint,
+      managedWriterId: binding.managedWriterId,
+      managedWriterRevision: binding.managedWriterRevision,
+      managedWriterSlotIds: binding.managedWriterSlotIds,
+      managedWriterSlotSemanticFingerprints:
+        binding.managedWriterSlotSemanticFingerprints,
+      managedAttachmentsFingerprint: binding.managedAttachmentsFingerprint,
+      createCapabilityFingerprint: binding.createCapabilityFingerprint,
+      managedPlan,
+      sliceHash: binding.sliceHash,
+      entityIds: binding.entityIds,
+    };
+  });
+  return JSON.stringify({
+    schemaVersion: context.schemaVersion,
+    basis: context.basis,
+    projection: context.projection,
+    entities: context.entities,
+    constraints: context.constraints.map((constraint) => ({
+      id: constraint.id,
+      kind: constraint.kind,
+      arguments: constraint.arguments.map((argument) => ({
+        role: argument.role,
+        entityId: argument.entityId,
+        value: argument.value,
+      })),
+    })),
+    relations: context.relations.map((relation) => ({
+      id: relation.id,
+      kind: relation.kind,
+      participants: relation.participants.map((participant) => ({
+        role: participant.role,
+        entityId: participant.entityId,
+      })),
+    })),
+    styles: context.styles,
+    // The full evidence-backed ranking remains available to the host and the
+    // inspect-geometry read tool. The initial provider prompt only needs the
+    // already rank-ordered closure; repeating every reason/evidence edge here
+    // wastes the runtime-context budget on large managed constructions.
+    focus: {
+      requestedRefs: context.focus.requestedRefs,
+      resolvedEntityIds: context.focus.resolvedEntityIds,
+      closureEntityIds: context.focus.closureEntityIds,
+      unresolvedRefs: context.focus.unresolvedRefs,
+      ambiguousRefs: context.focus.ambiguousRefs,
+      depth: context.focus.depth,
+      truncated: context.focus.truncated,
+    },
+    construction: {
+      constructionCatalogDigest: context.construction.constructionCatalogDigest,
+      authorizationScopeFingerprint:
+        context.construction.authorizationScopeFingerprint,
+      intentTools: context.construction.intentTools,
+      sourceMapSchemaVersion: context.construction.sourceMapSchemaVersion,
+      authorizedBindingIds: context.construction.authorizedBindingIds,
+      sourceBindings,
+      opaqueNodes: context.construction.opaqueNodes,
+    },
+    protocol: context.protocol,
+    truncation: context.truncation,
+  });
 }
 
 export type GeometryAiContextMetadata = JsonObject;

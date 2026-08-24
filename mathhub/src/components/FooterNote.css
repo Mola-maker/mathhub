@@ -1,0 +1,15 @@
+/* FooterNote — one centered 10px --mist line, letter-spaced,
+   generous 80px vertical padding, normal flow after the last scene. */
+
+.footer-note {
+  padding: 80px var(--margin-x, 48px);
+  text-align: center;
+}
+
+.footer-note__line {
+  margin: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: var(--tracking-meta, 0.22em);
+  color: var(--mist);
+}

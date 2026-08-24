@@ -6,12 +6,16 @@ import {
   getTikzCompileJob,
   TikzCompileError,
 } from '@/lib/tikz/exact/compile-tikz';
+import {
+  isTikzExactCompilerProfileId,
+  type TikzExactCompilerProfileId,
+} from '@/lib/tikz/exact/compiler-profile';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ jobId: string }> },
 ): Promise<Response> {
   const ip = await clientIp();
@@ -39,7 +43,16 @@ export async function GET(
 
   try {
     const { jobId } = await context.params;
-    const job = await getTikzCompileJob(jobId);
+    const requestedProfile = req.nextUrl.searchParams.get('profile');
+    if (
+      requestedProfile !== null
+      && !isTikzExactCompilerProfileId(requestedProfile)
+    ) {
+      throw new TikzCompileError('非法编译 profile', 400, 'INVALID_PROFILE');
+    }
+    const profile: TikzExactCompilerProfileId = requestedProfile
+      ?? 'tikz-standard-v1';
+    const job = await getTikzCompileJob(jobId, req.signal, profile);
     if (job.status === 'failed') {
       return NextResponse.json(
         {
@@ -47,13 +60,14 @@ export async function GET(
           status: 'failed',
           error: job.error || 'TikZ 精确编译失败',
           code: job.errorCode || 'COMPILE_FAILED',
+          diagnostics: job.diagnostics ?? [],
         },
         { status: 422, headers: { 'Cache-Control': 'private, no-store' } },
       );
     }
     if (job.status !== 'succeeded') {
       return NextResponse.json(
-        { jobId: job.id, status: job.status },
+        { jobId: job.id, status: job.status, profile: job.profile },
         {
           status: 202,
           headers: {
@@ -70,11 +84,16 @@ export async function GET(
         'INVALID_ARTIFACT_ATTESTATION',
       );
     }
-    const svg = await fetchTikzCompileArtifact(job.id, job.attestation);
+    const svg = await fetchTikzCompileArtifact(
+      job.id,
+      job.attestation,
+      req.signal,
+    );
     return NextResponse.json(
       {
         jobId: job.id,
         status: 'succeeded',
+        profile: job.profile,
         svg,
         renderer: job.renderer || 'tectonic-dvisvgm',
         attestation: job.attestation,
@@ -89,6 +108,12 @@ export async function GET(
     const message = error instanceof Error
       ? error.message
       : 'TikZ 精确渲染失败';
-    return NextResponse.json({ error: message, code }, { status });
+    return NextResponse.json({
+      error: message,
+      code,
+      diagnostics: error instanceof TikzCompileError
+        ? error.diagnostics
+        : [],
+    }, { status });
   }
 }

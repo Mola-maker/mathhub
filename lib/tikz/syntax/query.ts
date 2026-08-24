@@ -59,6 +59,14 @@ export interface TikzAiCompactEntry {
   capabilities: string;
   /** Alias retained for clients that use the shorter field name. */
   caps: string;
+  /** Evidence-backed status; boolean caps alone cannot express partial/conditional support. */
+  support: {
+    preserve: TikzSyntaxCapability['truth']['preserve']['status'];
+    syntax: TikzSyntaxCapability['truth']['syntax']['status'];
+    semantic: TikzSyntaxCapability['truth']['semantic']['status'];
+    interactive: TikzSyntaxCapability['truth']['interactive']['status'];
+    exact: TikzSyntaxCapability['truth']['exact']['status'];
+  };
   securityRisk: TikzSecurityRiskLevel;
   tokens: readonly string[];
 }
@@ -273,6 +281,13 @@ export function createTikzAiCompactSchema(
       recognition: entry.recognition,
       capabilities,
       caps: capabilities,
+      support: {
+        preserve: entry.truth.preserve.status,
+        syntax: entry.truth.syntax.status,
+        semantic: entry.truth.semantic.status,
+        interactive: entry.truth.interactive.status,
+        exact: entry.truth.exact.status,
+      },
       securityRisk: entry.securityRisk.level,
       tokens: entry.searchTokens,
     };

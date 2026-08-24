@@ -7,31 +7,33 @@ export interface TikzRecipe {
 
 export const TIKZ_RECIPES: TikzRecipe[] = [
   {
+    id: 'fermat-point',
+    keywords: ['费马点', '托里拆利点', 'Fermat point', 'Torricelli point'],
+    title: '费马–托里拆利点（120° 分支构造）',
+    snippet: `Use exactly one GeometryIntent/v2 construct operation with toolId "fermat-point"
+and inputRefs for the three ordered, non-collinear triangle vertices. The trusted
+Catalog chooses the interior Torricelli construction or the >=120-degree
+vertex branch atomically. Never expand this construction into raw TikZ.`,
+  },
+  {
     id: 'nine-point-circle',
     keywords: ['九点圆', '九点圆心', 'nine-point', 'nine point'],
     title: '九点圆（九个派生点 + 三边中点外接圆）',
-    snippet: `% 约定 A、B、C 已定义且不共线
-\\coordinate (D) at ($(B)!0.5!(C)$);
-\\coordinate (E) at ($(C)!0.5!(A)$);
-\\coordinate (F) at ($(A)!0.5!(B)$);
-\\coordinate (Ha) at ($(B)!(A)!(C)$);
-\\coordinate (Hb) at ($(C)!(B)!(A)$);
-\\coordinate (Hc) at ($(A)!(C)!(B)$);
-\\path[name path=altA] ($(A)!-1!(Ha)$) -- ($(A)!3!(Ha)$);
-\\path[name path=altB] ($(B)!-1!(Hb)$) -- ($(B)!3!(Hb)$);
-\\path[name intersections={of=altA and altB}] (intersection-1) coordinate (H);
-\\coordinate (Ja) at ($(A)!0.5!(H)$);
-\\coordinate (Jb) at ($(B)!0.5!(H)$);
-\\coordinate (Jc) at ($(C)!0.5!(H)$);
-\\coordinate (P) at ($(D)!0.5!(E)$);
-\\coordinate (Q) at ($(E)!0.5!(F)$);
-\\path[name path=np1] ($(P)!-2!90:(D)$) -- ($(P)!3!90:(D)$);
-\\path[name path=np2] ($(Q)!-2!90:(E)$) -- ($(Q)!3!90:(E)$);
-\\path[name intersections={of=np1 and np2}] (intersection-1) coordinate (N);
-\\node[draw,blue,thick,circle through=(D)] at (N) {};
-\\fill[blue] (D) circle (0.045) (E) circle (0.045) (F) circle (0.045)
-  (Ha) circle (0.045) (Hb) circle (0.045) (Hc) circle (0.045)
-  (Ja) circle (0.045) (Jb) circle (0.045) (Jc) circle (0.045);`,
+    snippet: `Use exactly one GeometryIntent/v2 construct operation with toolId "nine-point-circle"
+and inputRefs for the three ordered, non-collinear triangle vertices. The trusted
+Catalog creates the complete managed construction atomically. Never expand a
+nine-point circle into raw TikZ statements, multiple action fences, or a direct
+construction-plan create proposal.`,
+  },
+  {
+    id: 'simson-line',
+    keywords: ['西姆松线', '辛普森线', 'Simson line', 'pedal feet'],
+    title: '西姆松线（三垂足共线）',
+    snippet: `Use exactly one GeometryIntent/v2 construct operation with toolId "simson-line"
+and inputRefs for the three ordered, non-collinear triangle vertices. The trusted
+Catalog creates a constrained point on the circumcircle, its three pedal feet,
+and their collinear line atomically. In semantic revision 1 the circle point is
+derived/read-only, not draggable. Never expand this into raw TikZ.`,
   },
   {
     id: 'midpoint',

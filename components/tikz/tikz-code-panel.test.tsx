@@ -1,6 +1,10 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createPrimitiveConstructionPlan } from '@/lib/tikz/authoring/construction-catalog';
+import { compileNewManagedConstructionPlan } from '@/lib/tikz/authoring/construction-ir-v3';
+import { decodeManagedConstructionPlan } from '@/lib/tikz/authoring/construction-plan-codec';
 import { StudioDocument } from '@/lib/tikz/document/studio-document';
+import { parseManagedConstructionBlocks } from '@/lib/tikz/semantics/managed-construction';
 import { TikzCodePanel } from './tikz-code-panel';
 
 afterEach(() => cleanup());
@@ -40,5 +44,43 @@ describe('TikzCodePanel', () => {
       />,
     );
     expect(document.querySelector('.cm-lintRange-error')).toBeTruthy();
+  });
+
+  it('默认折叠画布构造的内部 record JSON，但唯一真源仍可完整解码与重放', () => {
+    const plan = createPrimitiveConstructionPlan('segment', {
+      anchors: [
+        { name: 'A', position: { x: 0, y: 0 }, existing: true },
+        { name: 'B', position: { x: 2, y: 0 }, existing: true },
+      ],
+      nextName: (prefix) => `${prefix}1`,
+      nextConstructionId: () => 'canvas-segment-1',
+    });
+    const source = `${compileNewManagedConstructionPlan(plan).lines.join('\n')}\n`;
+    const studioDocument = new StudioDocument(source);
+    const block = parseManagedConstructionBlocks(
+      studioDocument.getSnapshot().source,
+    )[0]!;
+    const decoded = decodeManagedConstructionPlan(
+      studioDocument.getSnapshot().source,
+      block,
+    );
+
+    expect(source).toContain('% @mathgeo record {"recordType"');
+    expect(decoded.ok).toBe(true);
+    render(<TikzCodePanel document={studioDocument} issues={[]} />);
+
+    const editor = screen.getByTestId('tikz-cm');
+    expect(editor.textContent).toContain('内部语义');
+    expect(editor.textContent).not.toContain('"recordType"');
+    expect(editor.textContent).toContain('\\draw (A) -- (B);');
+    expect(studioDocument.getSnapshot().source).toBe(source);
+
+    fireEvent.click(screen.getByRole('button', { name: /展开 .*条内部语义/ }));
+    expect(editor.textContent).toContain('"recordType"');
+    expect(studioDocument.getSnapshot().source).toBe(source);
+
+    fireEvent.click(screen.getByRole('button', { name: /折叠 .*条内部语义/ }));
+    expect(editor.textContent).not.toContain('"recordType"');
+    expect(studioDocument.getSnapshot().source).toBe(source);
   });
 });

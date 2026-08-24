@@ -1,5 +1,57 @@
 # Math GeoHub
 
+`mathhub/` is the only landing-page frontend. It is a Vite workspace that builds
+to `public/mathhub/`; the Next.js service keeps `/` as the canonical public URL
+and internally serves that artifact. The real studios remain same-origin at
+`/math` and `/tikz`. The retired `Herodeisgn` and `/hero-demo` frontends have been
+removed.
+
+## Local startup without Docker
+
+Install the root workspace once:
+
+```powershell
+Set-Location E:\Portaitsweb\math_geohub
+npm install
+Copy-Item .env.example .env.local
+```
+
+Start the landing-page source and the Next.js application in two terminals:
+
+```powershell
+# Terminal 1
+npm run dev:mathhub
+```
+
+```powershell
+# Terminal 2
+npm run dev
+```
+
+Open <http://localhost:3000>. Next proxies `/` and `/mathhub/*` to the local Vite
+server configured by `MATHHUB_DEV_ORIGIN`. Do not browse port 5173 as the product
+address; it is only the internal development origin.
+
+Production `npm run build` builds MathHub first and then Next.js. The generated
+`public/mathhub/` directory is copied into the standalone ECS image and can be
+served by the CDN. Only its fingerprinted `/mathhub/assets/*` files are
+immutable; the entry HTML must be revalidated.
+
+## API key
+
+Configure the server-side key in `.env.local`:
+
+```dotenv
+LLM_RELAY_API_KEY=your_api_key
+LLM_RELAY_MODEL=
+LLM_RELAY_VISION_MODEL=
+```
+
+All upstream model requests are locked to `https://api.molamaker.cn`. Never use a
+`NEXT_PUBLIC_` key; the browser may only select models returned by the server.
+
+---
+
 Math GeoHub 提供两个浏览器画板：
 
 - Math Studio：通过 `api.molamaker.cn` 获取实时模型目录并生成 GeoGebra 构造；
@@ -29,15 +81,26 @@ LLM_RELAY_MODEL=
 两个画板都由服务端读取 `api.molamaker.cn/v1/models`，客户端只能从返回的实时目录
 选择模型。
 
-然后启动：
+首次安装依赖：
 
 ```powershell
 npm install
+```
+
+然后在两个终端启动，浏览器只访问 Next 的 3000 端口：
+
+```powershell
+# 终端 1
+npm run dev:mathhub
+```
+
+```powershell
+# 终端 2
 npm run dev
 ```
 
-访问 [http://localhost:3000](http://localhost:3000)。如果已经修改 `.env.local`，
-需要重启开发服务器。
+访问 [http://localhost:3000](http://localhost:3000)。5173 仅是 Next 内部代理到
+MathHub 的开发源，不作为产品地址。如果已经修改 `.env.local`，需要重启开发服务器。
 
 ## TikZ 的两条渲染路径
 

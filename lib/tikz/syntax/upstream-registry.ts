@@ -384,10 +384,13 @@ function validateEntry(value: unknown, path: string): PgfCapabilityEntry {
   if (diagnostics?.some((item) => item.source.version !== upstream.version || item.source.sha !== upstream.sha)) {
     fail(`${path}.diagnostics`, 'diagnostic provenance must match the entry version and SHA');
   }
-  if (status !== 'static' && value.writeback !== 'never') {
+  // Cross-field policy reads the validated result, not the raw record: the raw
+  // `lanes` is still `unknown` here, so `value.lanes?.parse` would compare
+  // against a property the checker cannot see.
+  if (status !== 'static' && result.writeback !== 'never') {
     fail(`${path}.writeback`, `${status} entries must use never writeback`);
   }
-  if (value.writeback === 'safe' && value.lanes?.parse === 'opaque') {
+  if (result.writeback === 'safe' && result.lanes.parse === 'opaque') {
     fail(`${path}.writeback`, 'opaque entries cannot be marked safe for writeback');
   }
   if (keyPath !== undefined) (result as { keyPath?: string }).keyPath = keyPath;
@@ -497,9 +500,17 @@ export interface PgfRegistryQuery {
   readonly limit?: number;
 }
 
+/**
+ * Array.isArray narrows to `any[]`, which does not separate `readonly T[]` from
+ * a `T` that happens to be an array; this predicate keeps the element type.
+ */
+function isFilterList<T>(value: T | readonly T[]): value is readonly T[] {
+  return Array.isArray(value);
+}
+
 function arrayFilter<T>(value: T | readonly T[] | undefined): readonly T[] | undefined {
   if (value === undefined) return undefined;
-  return Array.isArray(value) ? value : [value];
+  return isFilterList(value) ? value : [value];
 }
 
 function includesFilter<T>(value: T, filter: T | readonly T[] | undefined): boolean {

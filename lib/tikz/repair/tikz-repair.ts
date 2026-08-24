@@ -1,6 +1,7 @@
 import { analyze } from '../analyze';
 import { snapshotScene } from './scene-snapshot';
 import { canonicalizeTikz } from '../normalize';
+import { parseManagedConstructionBlocks } from '../semantics/managed-construction';
 
 const FULLWIDTH: Array<[RegExp, string]> = [
   [/，/g, ','],
@@ -41,6 +42,41 @@ function errorMessages(code: string): string[] {
     .map((issue) => issue.message);
 }
 
+function repairCandidatePreservesSource(previous: string, candidate: string): boolean {
+  if (!candidate.trim()) return false;
+  if (
+    previous.includes('\\begin{tikzpicture}')
+    && !candidate.includes('\\begin{tikzpicture}')
+  ) return false;
+  const previousManagedIds = new Set(
+    parseManagedConstructionBlocks(previous).map((block) => block.id),
+  );
+  const candidateManagedIds = new Set(
+    parseManagedConstructionBlocks(candidate).map((block) => block.id),
+  );
+  if (![...previousManagedIds].every((id) => candidateManagedIds.has(id))) {
+    return false;
+  }
+  const previousAnalysis = analyze(previous);
+  const candidateAnalysis = analyze(candidate);
+  const previousStatements = previousAnalysis.cst.statements.length;
+  const candidateStatements = candidateAnalysis.cst.statements.length;
+  if (previousStatements > 0 && candidateStatements === 0) return false;
+  if (
+    previousStatements >= 2
+    && candidateStatements < Math.ceil(previousStatements * 0.6)
+  ) return false;
+  const previousNames = new Set(
+    [...(previousAnalysis.scene?.points.values() ?? [])]
+      .map((point) => point.name),
+  );
+  const candidateNames = new Set(
+    [...(candidateAnalysis.scene?.points.values() ?? [])]
+      .map((point) => point.name),
+  );
+  return [...previousNames].every((name) => candidateNames.has(name));
+}
+
 async function readRepairCode(response: Response): Promise<string | null> {
   if (!response.ok || !response.body) {
     const payload = await response.json().catch(() => ({})) as { error?: string };
@@ -50,24 +86,29 @@ async function readRepairCode(response: Response): Promise<string | null> {
   const decoder = new TextDecoder();
   let buffer = '';
   let repaired: string | null = null;
-  for (;;) {
-    const { done, value } = await reader.read();
-    buffer += decoder.decode(value, { stream: !done });
-    const frames = buffer.split(/\r?\n\r?\n/);
-    buffer = frames.pop() ?? '';
-    for (const frame of frames) {
-      const line = frame.split(/\r?\n/).find((item) => item.startsWith('data: '));
-      if (!line || line.slice(6) === '[DONE]') continue;
-      try {
-        const event = JSON.parse(line.slice(6)) as { tikzCode?: unknown; error?: unknown };
-        if (typeof event.error === 'string') throw new Error(event.error);
-        if (typeof event.tikzCode === 'string') repaired = event.tikzCode;
-      } catch (error) {
-        if (error instanceof SyntaxError) continue;
-        throw error;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() ?? '';
+      for (const frame of frames) {
+        const line = frame.split(/\r?\n/).find((item) => item.startsWith('data: '));
+        if (!line || line.slice(6) === '[DONE]') continue;
+        try {
+          const event = JSON.parse(line.slice(6)) as { tikzCode?: unknown; error?: unknown };
+          if (typeof event.error === 'string') throw new Error(event.error);
+          if (typeof event.tikzCode === 'string') repaired = event.tikzCode;
+        } catch (error) {
+          if (error instanceof SyntaxError) continue;
+          throw error;
+        }
       }
+      if (done) return repaired;
     }
-    if (done) return repaired;
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
 }
 
@@ -77,6 +118,7 @@ export interface TikzRepairOptions {
   model?: string;
   maxRounds?: number;
   request?: typeof fetch;
+  signal?: AbortSignal;
 }
 
 export interface TikzRepairResult {
@@ -114,11 +156,13 @@ export async function runTikzRepair(options: TikzRepairOptions): Promise<TikzRep
         provider: options.provider,
         model: options.model || undefined,
       }),
+      signal: options.signal,
     });
     llmRounds += 1;
     const candidate = await readRepairCode(response);
     if (!candidate) break;
     const cleaned = localRepairTikz(candidate);
+    if (!repairCandidatePreservesSource(bestCode, cleaned.code)) break;
     const candidateErrors = errorMessages(cleaned.code);
     if (candidateErrors.length >= bestErrors.length) break;
     bestCode = cleaned.code;

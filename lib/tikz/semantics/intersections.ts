@@ -1,7 +1,11 @@
 import type { Pt } from './calc-eval';
+import { flattenCubicBezier, type CubicBezierGeometry } from '../geometry/cubic-bezier';
+import { flattenCircularArc, type CircularArcGeometry } from '../geometry/circular-arc';
 
 export type GeomPath =
   | { type: 'poly'; points: Pt[]; closed: boolean }
+  | ({ type: 'cubic-bezier' } & CubicBezierGeometry)
+  | ({ type: 'circular-arc' } & CircularArcGeometry)
   | { type: 'circle'; center: Pt; radius: number };
 
 const EPS = 1e-9;
@@ -72,16 +76,27 @@ function polySegments(p: { points: Pt[]; closed: boolean }): Array<[Pt, Pt]> {
   return segs;
 }
 
+function asPolyline(path: Exclude<GeomPath, { type: 'circle' }>): { points: Pt[]; closed: boolean } {
+  return path.type === 'poly'
+    ? path
+    : {
+      points: [...(path.type === 'cubic-bezier'
+        ? flattenCubicBezier(path, 0.005)
+        : flattenCircularArc(path, 1))],
+      closed: false,
+    };
+}
+
 export function intersectPaths(first: GeomPath, second: GeomPath): Pt[] {
   const annotated: Annotated[] = [];
 
-  if (first.type === 'poly') {
-    const segs = polySegments(first);
+  if (first.type !== 'circle') {
+    const segs = polySegments(asPolyline(first));
     segs.forEach(([a, b], segIdx) => {
       const segLen = Math.hypot(b.x - a.x, b.y - a.y);
       const base = segs.slice(0, segIdx).reduce((s, [p, q]) => s + Math.hypot(q.x - p.x, q.y - p.y), 0);
-      if (second.type === 'poly') {
-        const segs2 = polySegments(second);
+      if (second.type !== 'circle') {
+        const segs2 = polySegments(asPolyline(second));
         for (const [c, d] of segs2) {
           const hit = segSeg(a, b, c, d);
           if (hit) annotated.push({ pt: hit.pt, t: base + hit.t * segLen });
@@ -94,8 +109,8 @@ export function intersectPaths(first: GeomPath, second: GeomPath): Pt[] {
     });
   } else {
     const circ1 = first;
-    if (second.type === 'poly') {
-      for (const [a, b] of polySegments(second)) {
+    if (second.type !== 'circle') {
+      for (const [a, b] of polySegments(asPolyline(second))) {
         for (const x of segCircle(a, b, circ1.center, circ1.radius)) {
           annotated.push({ pt: x.pt, t: Math.atan2(x.pt.y - circ1.center.y, x.pt.x - circ1.center.x) });
         }

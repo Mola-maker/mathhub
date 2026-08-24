@@ -60,6 +60,7 @@ function targetKey(target: SelectionTarget): string {
     case 'entity':
       return [
         'entity',
+        target.sourceRevision,
         target.stableId,
         target.semanticEntityId ?? '-',
         target.renderPrimitiveId ?? '-',
@@ -68,6 +69,7 @@ function targetKey(target: SelectionTarget): string {
     case 'statement':
       return [
         'statement',
+        target.sourceRevision,
         target.stmtIndex,
         target.semanticEntityId ?? '-',
         target.renderPrimitiveId ?? '-',
@@ -348,7 +350,8 @@ export function resolveInspectorSelection({
 
   const target = targets[0]!;
   const refs = selectionRefsOf(targets);
-  const currentTruth = sameCurrentBasis(truth, currentBasis) ? truth : null;
+  const targetIsCurrent = target.sourceRevision === sourceRevision;
+  const currentTruth = targetIsCurrent && sameCurrentBasis(truth, currentBasis) ? truth : null;
   const primitives = currentTruth?.rendering.flatMap(
     (rendering) => rendering.primitives,
   ) ?? [];
@@ -404,16 +407,17 @@ export function resolveInspectorSelection({
         : undefined;
     }
     if (target.kind === 'entity' || target.kind === 'statement') {
-      // Entity/statement ranges are not revision tagged. Once the current
-      // primitive cannot be re-attested, retaining an old range could point at
-      // a different statement after a managed whole-block replacement.
+      // A range is writable only after the revision-bound target has been
+      // re-attested to one current render primitive.
       return renderPrimitive?.sourceRange;
     }
     return undefined;
   })();
   const requestedStatementIndex = (() => {
     if (target.kind === 'entity' || target.kind === 'statement') {
-      return metadataStatementIndex(renderPrimitive) ?? target.stmtIndex;
+      return targetIsCurrent
+        ? metadataStatementIndex(renderPrimitive) ?? target.stmtIndex
+        : null;
     }
     if (
       target.kind === 'source-block'
@@ -441,7 +445,7 @@ export function resolveInspectorSelection({
       ? currentBindingIds
       : (
         target.kind === 'entity' || target.kind === 'statement'
-          ? target.sourceBindingIds ?? []
+          ? (targetIsCurrent ? target.sourceBindingIds ?? [] : [])
           : []
       ),
   )];

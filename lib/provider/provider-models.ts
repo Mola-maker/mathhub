@@ -1,4 +1,9 @@
 import type { EffectiveProvider, ProviderName } from '@/lib/provider/settings';
+import {
+  providerTransportGate,
+  recordProviderTransportFailure,
+  recordProviderTransportSuccess,
+} from '@/lib/provider/transport-health';
 
 export type ProviderModelEntry = {
   id: string;
@@ -6,7 +11,12 @@ export type ProviderModelEntry = {
   ownedBy?: string;
 };
 
-export type ProviderModelSource = 'api' | 'cache' | 'stale-cache' | 'unavailable';
+export type ProviderModelSource =
+  | 'api'
+  | 'cache'
+  | 'stale-cache'
+  | 'configured-fallback'
+  | 'unavailable';
 
 type CatalogCacheEntry = {
   models: ProviderModelEntry[];
@@ -45,13 +55,24 @@ function modelsListUrl(baseUrl: string): string {
 }
 
 async function fetchRelayModels(cfg: EffectiveProvider): Promise<ProviderModelEntry[]> {
-  const response = await fetch(modelsListUrl(cfg.baseUrl), {
-    headers: {
-      Authorization: `Bearer ${cfg.apiKey}`,
-      Accept: 'application/json',
-    },
-    signal: AbortSignal.timeout(15_000),
-  });
+  const gate = providerTransportGate(cfg.baseUrl);
+  if (gate.status === 'open') {
+    throw new Error(`relay transport cooling down for ${gate.retryAfterMs}ms`);
+  }
+  let response: Response;
+  try {
+    response = await fetch(modelsListUrl(cfg.baseUrl), {
+      headers: {
+        Authorization: `Bearer ${cfg.apiKey}`,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    recordProviderTransportFailure(cfg.baseUrl);
+    throw error;
+  }
+  recordProviderTransportSuccess(cfg.baseUrl);
   if (!response.ok) throw new Error(`models HTTP ${response.status}`);
 
   const body = await response.json() as {
@@ -77,6 +98,30 @@ function dedupeModels(models: ProviderModelEntry[]): ProviderModelEntry[] {
 
 function cloneModels(models: ProviderModelEntry[]): ProviderModelEntry[] {
   return models.map((model) => ({ ...model }));
+}
+
+function configuredFallbackModel(cfg: EffectiveProvider): ProviderModelEntry[] {
+  const id = cfg.model.trim();
+  if (!isSafeModelId(id)) return [];
+  return [{ id, label: `${id} (配置默认)` }];
+}
+
+function unavailableCatalogResult(
+  cfg: EffectiveProvider,
+): { models: ProviderModelEntry[]; source: ProviderModelSource; error: string } {
+  const fallback = configuredFallbackModel(cfg);
+  if (fallback.length) {
+    return {
+      models: fallback,
+      source: 'configured-fallback',
+      error: '暂时无法刷新完整模型目录；正在使用 .env.local 中明确配置的默认模型',
+    };
+  }
+  return {
+    models: [],
+    source: 'unavailable',
+    error: '上游模型目录暂不可用，请稍后重试',
+  };
 }
 
 function fetchCatalog(cacheKey: string, cfg: EffectiveProvider): Promise<ProviderModelEntry[]> {
@@ -124,11 +169,7 @@ export async function listProviderModels(
         error: '上游模型目录暂不可用，正在使用最近一次成功目录',
       };
     }
-    return {
-      models: [],
-      source: 'unavailable',
-      error: '上游模型目录暂不可用，请稍后重试',
-    };
+    return unavailableCatalogResult(cfg);
   } catch {
     if (cached && now - cached.fetchedAt < CATALOG_STALE_TTL_MS) {
       return {
@@ -137,11 +178,7 @@ export async function listProviderModels(
         error: '上游模型目录暂不可用，正在使用最近一次成功目录',
       };
     }
-    return {
-      models: [],
-      source: 'unavailable',
-      error: '上游模型目录暂不可用，请稍后重试',
-    };
+    return unavailableCatalogResult(cfg);
   }
 }
 

@@ -18,16 +18,35 @@ describe('tikz prompt', () => {
     const prompt = buildTikzSystemPrompt('作垂心', {});
     expect(prompt).toContain('```tikz');
     expect(prompt).toContain('$(A)!0.5!(B)$');
-    expect(prompt).toContain('Tectonic + dvisvgm');
-    expect(prompt).toContain('\\input/\\include');
+    // The dual-lane rule is now stated as the interactive projection versus the
+    // isolated exact-TeX renderer; the renderer's toolchain names are an
+    // implementation detail the prompt deliberately no longer leaks.
+    expect(prompt).toContain('isolated exact-TeX renderer');
+    expect(prompt).toContain('interactive projection');
+    expect(prompt).toContain('\\input');
+    expect(prompt).toContain('\\write18');
+  });
+
+  it('system prompt 将复杂依赖构造约束为一个 host-resolved DAG', () => {
+    const prompt = buildTikzSystemPrompt('先作三个中点，再作它们的外接圆', {});
+    expect(prompt).toContain('"kind": "construct-dag"');
+    expect(prompt).toContain('outputKey');
+    expect(prompt).toContain('outputSlots');
+    expect(prompt).toContain('source-ordered acyclic steps');
+    expect(prompt).toContain('all-or-none');
   });
 
   it('九点圆命中完整的九个派生点配方', () => {
     const context = buildTikzContextForProblem('画一个九点圆');
     expect(context).toContain('九点圆');
-    expect(context).toContain('coordinate (Ha)');
-    expect(context).toContain('coordinate (Jc)');
-    expect(context).toContain('circle through=(D)');
+    expect(context).toContain('GeometryIntent/v2');
+    expect(context).toContain('toolId "nine-point-circle"');
+    expect(context).toContain('"kind": "transform"');
+    expect(context).toContain('"kind": "delete"');
+    expect(context).toContain('never emit target coordinates');
+    expect(context).toContain('AI deletion is block-only');
+    expect(context).toContain('atomically');
+    expect(context).not.toContain('coordinate (Ha)');
   });
 
   it('previousCode 只在提供时注入', () => {

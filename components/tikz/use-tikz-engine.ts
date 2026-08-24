@@ -25,10 +25,12 @@ import {
 import { CM_TO_PX, type Viewport } from '@/lib/tikz/render/viewport';
 import type { Scene } from '@/lib/tikz/semantics/scene';
 import type { SourceRange, Statement } from '@/lib/tikz/subset/ast';
+import type { TikzCoordinateTransform } from '@/lib/tikz/subset/coordinate-transform';
+import type { DeleteMode } from '@/lib/tikz/authoring/delete-transaction';
 import {
-  planDeletion,
-  type DeleteMode,
-} from '@/lib/tikz/authoring/delete-transaction';
+  planGeometryDocDeletion,
+  type GeometryDeleteTarget,
+} from '@/lib/tikz/authoring/geometry-delete-plan';
 import {
   selectionRefsOf,
   sourceRangesOverlap,
@@ -38,19 +40,34 @@ import {
   resolveInspectorSelection,
   type InspectorSelectionResolution,
 } from '@/lib/tikz/authoring/selection-resolution';
-import { managedStyleRecompilePatches } from '@/lib/tikz/authoring/managed-construction-recompile';
 import {
   buildGeometrySourceMap,
   computeGeometryInvalidation,
+  createGeometryDoc,
+  compileCanvasConstructionBatchProposal,
+  compileCanvasDeleteProposal,
+  compileCanvasDragPatchesProposal,
+  compileCanvasPointMoveProposal,
+  compileCanvasSelectionTransformProposal,
+  compileInspectorDirectProposal,
+  compileManagedInspectorStyleProposal,
   projectTikzAnalysisToGeometryTruth,
-  TIKZ_SEMANTIC_ADAPTER_ID,
-  TIKZ_SEMANTIC_ADAPTER_VERSION,
+  TIKZ_PLUGIN_SET_DIGEST,
   type GeometryInvalidationResult,
+  type GeometryDoc,
+  type GeometryDocReadonly,
   type GeometrySourceMap,
   type GeometryTransactionRequest,
   type GeometryTruthSet,
   type GeometryUtf16SourceChange,
+  type CanvasCircleAdoptionIntent,
 } from '@/lib/tikz/ir';
+import type { ConstructionPlan } from '@/lib/tikz/authoring/construction-ir';
+import {
+  analyzeSelectionTransformCapability,
+  type SelectionTransformCapability,
+  type SelectionTransform,
+} from '@/lib/tikz/authoring/selection-transform';
 import { hashSource } from '@/lib/tikz/semantics/scene-manifest';
 import {
   TikzTransactionBroker,
@@ -59,12 +76,12 @@ import {
 } from '@/lib/tikz/transactions';
 
 const EMPTY_EPHEMERAL_STYLES: Readonly<Record<string, never>> = Object.freeze({});
-const LOCAL_SEMANTIC_PLUGIN_DIGEST =
-  `${TIKZ_SEMANTIC_ADAPTER_ID}@${TIKZ_SEMANTIC_ADAPTER_VERSION}`;
+const LOCAL_SEMANTIC_PLUGIN_DIGEST = TIKZ_PLUGIN_SET_DIGEST;
 
 interface LocalGeometryProjection {
   truths: GeometryTruthSet;
   sourceMap: GeometrySourceMap;
+  doc: GeometryDoc;
 }
 
 export interface InspectorSourcePatchResult {
@@ -93,6 +110,7 @@ export interface TikzEngine {
   stmts: Statement[] | null;
   issues: AnalysisIssue[];
   freePointRanges: Map<string, SourceRange>;
+  freePointTransforms: Map<string, TikzCoordinateTransform>;
   /** Stable deletion/edit identity. `selection` below is display-only refs. */
   selectionTargets: readonly SelectionTarget[];
   selection: string[];
@@ -103,9 +121,12 @@ export interface TikzEngine {
   activeTool: string;
   viewport: Viewport;
   ephemeralStyles: Readonly<Record<string, never>>;
-  /** Current usable revision-bound semantic/construction/render truth set. */
-  geometryTruth: GeometryTruthSet | null;
-  geometrySourceMap: GeometrySourceMap | null;
+  /** Legacy read-only display projection; may retain the last usable revision. */
+  geometryTruth: GeometryDocReadonly<GeometryTruthSet> | null;
+  /** Legacy source-map alias paired with geometryTruth; never use for writes. */
+  geometrySourceMap: GeometryDocReadonly<GeometrySourceMap> | null;
+  /** Current-revision unified read model; never falls back to a stale revision. */
+  geometryDoc: GeometryDoc | null;
   /**
    * Conservative changed-range → dependency-subgraph plan. `fullReproject`
    * remains authoritative when opaque syntax or revision gaps are present.
@@ -124,6 +145,43 @@ export interface TikzEngine {
     origin: SourceEditOrigin,
     expectedRevision?: number,
   ): boolean;
+  commitCanvasPointMove(
+    sourceStableId: string,
+    pointName: string,
+    target: { readonly x: number; readonly y: number },
+    expectedRevision: number,
+  ): { readonly handled: boolean; readonly committed: boolean; readonly message?: string };
+  commitCanvasDragPatches(
+    mode: 'path-angle' | 'derived-coordinates' | 'selection-transform',
+    sourceStableId: string,
+    pointName: string,
+    patches: readonly TextPatch[],
+    expectedRevision: number,
+    selectedEntityIds?: readonly string[],
+    selectionTransform?: SelectionTransform,
+    acknowledgedExternalImpactedEntityIds?: readonly string[],
+  ): { readonly handled: true; readonly committed: boolean; readonly message?: string };
+  transformSelection(
+    transform: SelectionTransform,
+    acknowledgedExternalImpactedEntityIds?: readonly string[],
+  ): {
+    readonly handled: true;
+    readonly committed: boolean;
+    readonly message?: string;
+  };
+  selectionTransformCapability(transform: SelectionTransform): SelectionTransformCapability;
+  selectAllGeometry(): void;
+  commitCanvasConstructionBatch(
+    plans: readonly ConstructionPlan[],
+    primaryConstructionId: string,
+    adoptions: readonly CanvasCircleAdoptionIntent[],
+    expectedRevision: number,
+  ): {
+    readonly handled: true;
+    readonly committed: boolean;
+    readonly message?: string;
+    readonly insertedRange?: { readonly start: number; readonly end: number };
+  };
   applyInspectorSourcePatch(
     patch: TextPatch,
     propertyKind: 'style' | 'semantic',
@@ -165,12 +223,13 @@ export function useTikzEngine(
     () => initialFocus.stmtIndex !== null && initialFocus.stmtIndex !== undefined
       ? [{
         kind: 'statement',
+        sourceRevision: snapshot.revision,
         stmtIndex: initialFocus.stmtIndex,
         refs: [...(initialFocus.selectionRefs ?? [])],
       }]
       : [...(initialFocus.selectionRefs ?? [])].map((ref) => ({
         kind: 'pending-ref' as const,
-        sourceRevision: 0,
+        sourceRevision: snapshot.revision,
         ref,
       })),
   );
@@ -181,12 +240,21 @@ export function useTikzEngine(
     offsetX: 260,
     offsetY: 220,
   });
+  // The source projection is the replayable semantic identity lane. It must
+  // remain a pure function of source + revision because the Broker rebuilds
+  // it independently. EntityIdentityRegistry is UI-only continuity state and
+  // may never influence GeometryDoc IDs, bindings, or guarded hashes.
+  const sourceProjection = useMemo(() => analyze(
+    snapshot.source,
+    snapshot.revision,
+    snapshot.cstTree ?? undefined,
+  ), [
+    snapshot.revision,
+    snapshot.source,
+    snapshot.cstTree,
+  ]);
   const projection = useMemo(() => {
-    const next = analyze(
-      snapshot.source,
-      snapshot.revision,
-      snapshot.cstTree ?? undefined,
-    );
+    const next = sourceProjection;
     if (!next.scene || !next.stmts) return next;
     return {
       ...next,
@@ -201,9 +269,9 @@ export function useTikzEngine(
   }, [
     document,
     identityRegistry,
+    sourceProjection,
     snapshot.revision,
     snapshot.source,
-    snapshot.cstTree,
   ]);
   const projectionGate = resolveProjectionGate(
     projection,
@@ -219,9 +287,9 @@ export function useTikzEngine(
     [snapshot.source],
   );
   const currentGeometryProjection = useMemo<LocalGeometryProjection | null>(() => {
-    if (!isUsableSemanticProjection(projection)) return null;
+    if (!isUsableSemanticProjection(sourceProjection)) return null;
     const truths = projectTikzAnalysisToGeometryTruth({
-      analysis: projection,
+      analysis: sourceProjection,
       source: snapshot.source,
       hashAlgorithm: 'fnv1a64-utf8',
       basis: {
@@ -233,12 +301,14 @@ export function useTikzEngine(
         pluginSetDigest: LOCAL_SEMANTIC_PLUGIN_DIGEST,
       },
     });
+    const sourceMap = buildGeometrySourceMap(truths);
     return {
       truths,
-      sourceMap: buildGeometrySourceMap(truths),
+      sourceMap,
+      doc: createGeometryDoc(truths, sourceMap),
     };
   }, [
-    projection,
+    sourceProjection,
     currentSourceHash,
     snapshot.documentId,
     snapshot.epoch,
@@ -394,12 +464,64 @@ export function useTikzEngine(
     setSelectionTargetsState((current) => {
       let changed = false;
       const next = current.flatMap<SelectionTarget>((target) => {
+        if (
+          (target.kind === 'entity' || target.kind === 'statement')
+          && target.sourceRevision !== snapshot.revision
+        ) {
+          const geometryDoc = currentGeometryProjection?.doc;
+          if (geometryDoc?.basis.revision !== snapshot.revision) return [target];
+          const matches = geometryDoc.semantic.ir.entities.filter((entity) => (
+            entity.id === target.semanticEntityId
+            || (target.kind === 'entity' && entity.id === target.stableId)
+            || (entity.name !== undefined && target.refs.includes(entity.name))
+          ));
+          changed = true;
+          if (matches.length !== 1) return [];
+          const entity = matches[0]!;
+          const primitive = geometryDoc.rendering.flatMap((truth) => (
+            truth.status === 'complete' ? [...truth.primitives] : []
+          )).find((candidate) => candidate.entityIds.includes(entity.id));
+          const primitiveSourceStableId = primitive?.metadata?.sourceStableId;
+          const statementIndex = primitive?.metadata?.statementIndex;
+          const binding = (entity.sourceBindingIds ?? []).flatMap((bindingId) => {
+            const candidate = geometryDoc.construction.bindings.find((row) => row.id === bindingId);
+            return candidate ? [candidate] : [];
+          })[0];
+          const shared = {
+            sourceRevision: snapshot.revision,
+            stmtIndex: typeof statementIndex === 'number'
+              && Number.isSafeInteger(statementIndex)
+              && statementIndex >= 0
+              ? statementIndex
+              : target.stmtIndex,
+            refs: entity.name ? [entity.name] : [...target.refs],
+            semanticEntityId: entity.id,
+            ...(primitive ? { renderPrimitiveId: primitive.id } : {}),
+            sourceBindingIds: [...(entity.sourceBindingIds ?? [])],
+            ...(binding
+              ? { sourceRange: { ...binding.source.range } }
+              : primitive?.sourceRange
+                ? { sourceRange: { ...primitive.sourceRange } }
+                : {}),
+          };
+          return target.kind === 'entity'
+            ? [{
+              kind: 'entity' as const,
+              stableId: typeof primitiveSourceStableId === 'string'
+                ? primitiveSourceStableId
+                : entity.id,
+              entityKind: entity.kind === 'point' ? 'point' as const : 'element' as const,
+              ...shared,
+            }]
+            : [{ kind: 'statement' as const, ...shared }];
+        }
         if (target.kind === 'pending-ref') {
           const point = scene.points.get(target.ref);
           if (!point) return [target];
           changed = true;
           return [{
             kind: 'entity',
+            sourceRevision: snapshot.revision,
             stableId: point.stableId,
             stmtIndex: point.stmtIndex,
             entityKind: 'point',
@@ -410,6 +532,36 @@ export function useTikzEngine(
           target.kind !== 'source-block'
           || target.sourceRevision !== snapshot.revision
         ) return [target];
+        const geometryDoc = currentGeometryProjection?.doc;
+        if (geometryDoc?.basis.revision === snapshot.revision) {
+          const bindings = new Map(
+            geometryDoc.construction.bindings.map((binding) => [binding.id, binding]),
+          );
+          const canonicalEntities = geometryDoc.semantic.ir.entities.flatMap((entity) => {
+            const owningBinding = (entity.sourceBindingIds ?? []).flatMap((bindingId) => {
+              const binding = bindings.get(bindingId);
+              return binding && sourceRangesOverlap(target.range, binding.source.range)
+                ? [binding]
+                : [];
+            })[0];
+            if (!owningBinding) return [];
+            return [{
+              kind: 'entity' as const,
+              sourceRevision: snapshot.revision,
+              stableId: entity.id,
+              stmtIndex: 0,
+              entityKind: entity.kind === 'point' ? 'point' as const : 'element' as const,
+              refs: entity.name ? [entity.name] : [],
+              semanticEntityId: entity.id,
+              sourceBindingIds: [...(entity.sourceBindingIds ?? [])],
+              sourceRange: { ...owningBinding.source.range },
+            }];
+          });
+          if (canonicalEntities.length > 0) {
+            changed = true;
+            return canonicalEntities;
+          }
+        }
         const entities: SelectionTarget[] = [];
         for (const point of scene.points.values()) {
           if (point.internal) continue;
@@ -417,6 +569,7 @@ export function useTikzEngine(
           if (statement && sourceRangesOverlap(target.range, statement.range)) {
             entities.push({
               kind: 'entity',
+              sourceRevision: snapshot.revision,
               stableId: point.stableId,
               stmtIndex: point.stmtIndex,
               entityKind: 'point',
@@ -429,6 +582,7 @@ export function useTikzEngine(
           if (statement && sourceRangesOverlap(target.range, statement.range)) {
             entities.push({
               kind: 'entity',
+              sourceRevision: snapshot.revision,
               stableId: element.stableId,
               stmtIndex: element.stmtIndex,
               entityKind: 'element',
@@ -442,6 +596,7 @@ export function useTikzEngine(
           sourceRangesOverlap(target.range, statement.range)
             ? [{
               kind: 'statement' as const,
+              sourceRevision: snapshot.revision,
               stmtIndex,
               refs: target.refs,
             }]
@@ -450,7 +605,12 @@ export function useTikzEngine(
       });
       return changed ? next : current;
     });
-  }, [semanticProjection, snapshot.revision]);
+  }, [
+    currentGeometryProjection,
+    selectionTargets,
+    semanticProjection,
+    snapshot.revision,
+  ]);
 
   useEffect(() => {
     const origin = snapshot.lastTransaction?.origin;
@@ -487,7 +647,9 @@ export function useTikzEngine(
   }, [replaceCode]);
 
   const applyPatch = useCallback((next: string) => {
-    replaceCode(next, 'canvas');
+    // Compatibility source replacement is not a Canvas semantic gesture.
+    // Real Canvas writes enter through typed proposal compilers below.
+    replaceCode(next, 'external');
   }, [replaceCode]);
 
   const applySourcePatch = useCallback((
@@ -520,6 +682,321 @@ export function useTikzEngine(
       expectedRevision,
     }).ok;
   }, [projectionGate.writebackAllowed, transactionBroker]);
+  const commitCanvasPointMove = useCallback((
+    sourceStableId: string,
+    pointName: string,
+    target: { readonly x: number; readonly y: number },
+    expectedRevision: number,
+  ) => {
+    const geometryDoc = currentGeometryProjection?.doc;
+    const basis = geometryDoc?.basis;
+    if (
+      !geometryDoc
+      || !basis
+      || basis.revision !== expectedRevision
+      || expectedRevision !== snapshot.revision
+      || !projectionGate.writebackAllowed
+    ) {
+      return {
+        handled: true,
+        committed: false,
+        message: 'Point drag requires the current GeometryDoc revision.',
+      } as const;
+    }
+    try {
+      const proposal = compileCanvasPointMoveProposal({
+        source: snapshot.source,
+        geometryDoc,
+        sourceStableId,
+        pointName,
+        target,
+      });
+      if (!proposal) {
+        return {
+          handled: true,
+          committed: false,
+          message: 'Point selection could not be decoded by the current writer.',
+        } as const;
+      }
+      const result = transactionBroker.commit(proposal.transaction, {
+        hash: basis.sourceHash,
+        algorithm: 'fnv1a64-utf8',
+        source: snapshot.source,
+        ...(basis.kernelHash ? { kernelHash: basis.kernelHash } : {}),
+        ...(basis.pluginSetDigest
+          ? { pluginSetDigest: basis.pluginSetDigest }
+          : {}),
+      });
+      return {
+        handled: true,
+        committed: result.ok,
+        ...(!result.ok ? { message: result.message } : {}),
+      };
+    } catch (error) {
+      return {
+        handled: true,
+        committed: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }, [
+    currentGeometryProjection,
+    projectionGate.writebackAllowed,
+    snapshot.revision,
+    snapshot.source,
+    transactionBroker,
+  ]);
+  const commitCanvasConstructionBatch = useCallback((
+    plans: readonly ConstructionPlan[],
+    primaryConstructionId: string,
+    adoptions: readonly CanvasCircleAdoptionIntent[],
+    expectedRevision: number,
+  ) => {
+    const geometryDoc = currentGeometryProjection?.doc;
+    if (
+      !geometryDoc
+      || geometryDoc.basis.revision !== expectedRevision
+      || expectedRevision !== snapshot.revision
+      || !projectionGate.writebackAllowed
+    ) {
+      return {
+        handled: true,
+        committed: false,
+        message: 'Canvas construction requires the current complete GeometryDoc revision.',
+      } as const;
+    }
+    try {
+      const proposal = compileCanvasConstructionBatchProposal({
+        source: snapshot.source,
+        geometryDoc,
+        plans,
+        primaryConstructionId,
+        adoptions,
+      });
+      const result = transactionBroker.commit(proposal.transaction, {
+        hash: geometryDoc.basis.sourceHash,
+        algorithm: 'fnv1a64-utf8',
+        source: snapshot.source,
+        ...(geometryDoc.basis.kernelHash
+          ? { kernelHash: geometryDoc.basis.kernelHash }
+          : {}),
+        ...(geometryDoc.basis.pluginSetDigest
+          ? { pluginSetDigest: geometryDoc.basis.pluginSetDigest }
+          : {}),
+      });
+      return result.ok
+        ? {
+          handled: true,
+          committed: true,
+          insertedRange: proposal.insertedRange,
+        } as const
+        : {
+          handled: true,
+          committed: false,
+          message: result.message,
+        } as const;
+    } catch (error) {
+      return {
+        handled: true,
+        committed: false,
+        message: error instanceof Error
+          ? error.message
+          : 'Canvas construction proposal could not be compiled.',
+      } as const;
+    }
+  }, [
+    currentGeometryProjection,
+    projectionGate.writebackAllowed,
+    snapshot.revision,
+    snapshot.source,
+    transactionBroker,
+  ]);
+  const commitCanvasDragPatches = useCallback((
+    mode: 'path-angle' | 'derived-coordinates' | 'selection-transform',
+    sourceStableId: string,
+    pointName: string,
+    patches: readonly TextPatch[],
+    expectedRevision: number,
+    selectedEntityIds?: readonly string[],
+    selectionTransform?: SelectionTransform,
+    acknowledgedExternalImpactedEntityIds?: readonly string[],
+  ) => {
+    const geometryDoc = currentGeometryProjection?.doc;
+    if (
+      !geometryDoc
+      || geometryDoc.basis.revision !== expectedRevision
+      || expectedRevision !== snapshot.revision
+      || !projectionGate.writebackAllowed
+    ) {
+      return {
+        handled: true,
+        committed: false,
+        message: 'Canvas drag requires the current complete GeometryDoc revision.',
+      } as const;
+    }
+    try {
+      const proposal = compileCanvasDragPatchesProposal({
+        source: snapshot.source,
+        geometryDoc,
+        sourceStableId,
+        pointName,
+        mode,
+        patches,
+        ...(selectedEntityIds ? { selectedEntityIds } : {}),
+        ...(selectionTransform ? { selectionTransform } : {}),
+        ...(acknowledgedExternalImpactedEntityIds
+          ? { acknowledgedExternalImpactedEntityIds }
+          : {}),
+      });
+      const result = transactionBroker.commit(proposal.transaction, {
+        hash: geometryDoc.basis.sourceHash,
+        algorithm: 'fnv1a64-utf8',
+        source: snapshot.source,
+        ...(geometryDoc.basis.kernelHash
+          ? { kernelHash: geometryDoc.basis.kernelHash }
+          : {}),
+        ...(geometryDoc.basis.pluginSetDigest
+          ? { pluginSetDigest: geometryDoc.basis.pluginSetDigest }
+          : {}),
+      });
+      return {
+        handled: true,
+        committed: result.ok,
+        ...(!result.ok ? { message: result.message } : {}),
+      } as const;
+    } catch (error) {
+      return {
+        handled: true,
+        committed: false,
+        message: error instanceof Error ? error.message : String(error),
+      } as const;
+    }
+  }, [
+    currentGeometryProjection,
+    projectionGate.writebackAllowed,
+    snapshot.revision,
+    snapshot.source,
+    transactionBroker,
+  ]);
+  const transformSelection = useCallback((
+    transform: SelectionTransform,
+    acknowledgedExternalImpactedEntityIds?: readonly string[],
+  ) => {
+    const geometryDoc = currentGeometryProjection?.doc;
+    const selectedEntityIds = selectionTargets.flatMap((target) => (
+      target.kind !== 'pending-ref'
+      && target.kind !== 'source-block'
+      && target.sourceRevision === geometryDoc?.basis.revision
+      && target.semanticEntityId
+        ? [target.semanticEntityId]
+        : []
+    ));
+    if (!geometryDoc || !projectionGate.writebackAllowed) {
+      return { handled: true, committed: false, message: '当前语义投影不可写。' } as const;
+    }
+    try {
+      const proposal = compileCanvasSelectionTransformProposal({
+        source: snapshot.source,
+        geometryDoc,
+        selectedEntityIds,
+        transform,
+        ...(acknowledgedExternalImpactedEntityIds
+          ? { acknowledgedExternalImpactedEntityIds }
+          : {}),
+      });
+      const result = transactionBroker.commit(proposal.transaction, {
+        hash: geometryDoc.basis.sourceHash,
+        algorithm: 'fnv1a64-utf8',
+        source: snapshot.source,
+        ...(geometryDoc.basis.kernelHash
+          ? { kernelHash: geometryDoc.basis.kernelHash }
+          : {}),
+        ...(geometryDoc.basis.pluginSetDigest
+          ? { pluginSetDigest: geometryDoc.basis.pluginSetDigest }
+          : {}),
+      });
+      return {
+        handled: true,
+        committed: result.ok,
+        ...(!result.ok ? { message: result.message } : {}),
+      } as const;
+    } catch (error) {
+      return {
+        handled: true,
+        committed: false,
+        message: error instanceof Error ? error.message : String(error),
+      } as const;
+    }
+  }, [
+    currentGeometryProjection,
+    projectionGate.writebackAllowed,
+    selectionTargets,
+    snapshot.source,
+    transactionBroker,
+  ]);
+  const selectionTransformCapability = useCallback((transform: SelectionTransform) => {
+    const geometryDoc = currentGeometryProjection?.doc;
+    const selectedEntityIds = selectionTargets.flatMap((target) => (
+      target.kind !== 'pending-ref'
+      && target.kind !== 'source-block'
+      && target.sourceRevision === geometryDoc?.basis.revision
+      && target.semanticEntityId
+        ? [target.semanticEntityId]
+        : []
+    ));
+    if (!geometryDoc || !projectionGate.writebackAllowed) {
+      return {
+        status: 'blocked',
+        selectedEntityIds: [...new Set(selectedEntityIds)].sort(),
+        variableEntityIds: [],
+        impactedEntityIds: [],
+        externalImpactedEntityIds: [],
+        patchCount: 0,
+        reason: '当前语义投影不可写。',
+      } satisfies SelectionTransformCapability;
+    }
+    return analyzeSelectionTransformCapability(
+      snapshot.source,
+      geometryDoc,
+      selectedEntityIds,
+      transform,
+    );
+  }, [
+    currentGeometryProjection,
+    projectionGate.writebackAllowed,
+    selectionTargets,
+    snapshot.source,
+  ]);
+  const selectAllGeometry = useCallback(() => {
+    const geometryDoc = currentGeometryProjection?.doc;
+    if (!geometryDoc) return;
+    const renderedEntityIds = new Set(
+      geometryDoc.rendering.flatMap((truth) => (
+        truth.status === 'complete'
+          ? truth.primitives.flatMap((primitive) => primitive.entityIds)
+          : []
+      )),
+    );
+    const targets: SelectionTarget[] = geometryDoc.semantic.ir.entities.flatMap((entity) => {
+      if (!renderedEntityIds.has(entity.id)) return [];
+      const binding = (entity.sourceBindingIds ?? []).flatMap((bindingId) => {
+        const candidate = geometryDoc.construction.bindings.find((row) => row.id === bindingId);
+        return candidate ? [candidate] : [];
+      })[0];
+      return [{
+        kind: 'entity' as const,
+        sourceRevision: geometryDoc.basis.revision,
+        stableId: entity.id,
+        stmtIndex: 0,
+        entityKind: entity.kind === 'point' ? 'point' as const : 'element' as const,
+        refs: entity.name ? [entity.name] : [],
+        semanticEntityId: entity.id,
+        sourceBindingIds: [...(entity.sourceBindingIds ?? [])],
+        ...(binding ? { sourceRange: { ...binding.source.range } } : {}),
+      }];
+    });
+    setSelectionTargetsState(targets);
+  }, [currentGeometryProjection]);
   const applyInspectorSourcePatch = useCallback((
     patch: TextPatch,
     propertyKind: 'style' | 'semantic',
@@ -538,16 +1015,46 @@ export function useTikzEngine(
     }
     const capability = inspectorSelection.writeCapability;
     if (capability.mode === 'direct') {
-      const result = transactionBroker.commitPatches({
-        patches: [patch],
-        origin,
-        expectedRevision,
-      });
-      return {
-        ok: result.ok,
-        code: result.ok ? 'committed' : 'direct-commit-rejected',
-        ...(!result.ok ? { message: result.message } : {}),
-      } satisfies InspectorSourcePatchResult;
+      try {
+        const geometryDoc = currentGeometryProjection?.doc;
+        if (
+          !geometryDoc
+          || geometryDoc.basis.revision !== expectedRevision
+          || !inspectorSelection.semanticEntityId
+        ) {
+          throw new TypeError('Direct Inspector edit requires the current GeometryDoc selection.');
+        }
+        const proposal = compileInspectorDirectProposal({
+          source: snapshot.source,
+          geometryDoc,
+          semanticEntityId: inspectorSelection.semanticEntityId,
+          bindingIds: capability.bindingIds,
+          patch,
+          propertyKind,
+        });
+        const result = transactionBroker.commit(proposal.transaction, {
+          hash: geometryDoc.basis.sourceHash,
+          algorithm: 'fnv1a64-utf8',
+          source: snapshot.source,
+          ...(geometryDoc.basis.kernelHash
+            ? { kernelHash: geometryDoc.basis.kernelHash }
+            : {}),
+          ...(geometryDoc.basis.pluginSetDigest
+            ? { pluginSetDigest: geometryDoc.basis.pluginSetDigest }
+            : {}),
+        });
+        return {
+          ok: result.ok,
+          code: result.ok ? 'committed' : 'direct-commit-rejected',
+          ...(!result.ok ? { message: result.message } : {}),
+        } satisfies InspectorSourcePatchResult;
+      } catch (error) {
+        return {
+          ok: false,
+          code: 'direct-commit-rejected',
+          message: error instanceof Error ? error.message : String(error),
+        } satisfies InspectorSourcePatchResult;
+      }
     }
     if (
       capability.mode !== 'managed-recompile'
@@ -569,15 +1076,30 @@ export function useTikzEngine(
       } satisfies InspectorSourcePatchResult;
     }
     try {
-      const patches = managedStyleRecompilePatches(
-        snapshot.source,
-        capability.managedConstructionId,
-        patch,
-      );
-      const result = transactionBroker.commitPatches({
-        patches,
-        origin,
-        expectedRevision,
+      const geometryDoc = currentGeometryProjection?.doc;
+      const basis = geometryDoc?.basis;
+      if (!geometryDoc || !basis || basis.revision !== expectedRevision) {
+        return {
+          ok: false,
+          code: 'managed-recompile-rejected',
+          message: 'Managed style edit requires the current GeometryDoc revision.',
+        } satisfies InspectorSourcePatchResult;
+      }
+      const proposal = compileManagedInspectorStyleProposal({
+        source: snapshot.source,
+        geometryDoc,
+        constructionId: capability.managedConstructionId,
+        bindingIds: capability.bindingIds,
+        bodyPatch: patch,
+      });
+      const result = transactionBroker.commit(proposal.transaction, {
+        hash: basis.sourceHash,
+        algorithm: 'fnv1a64-utf8',
+        source: snapshot.source,
+        ...(basis.kernelHash ? { kernelHash: basis.kernelHash } : {}),
+        ...(basis.pluginSetDigest
+          ? { pluginSetDigest: basis.pluginSetDigest }
+          : {}),
       });
       return {
         ok: result.ok,
@@ -593,6 +1115,8 @@ export function useTikzEngine(
     }
   }, [
     inspectorSelection.writeCapability,
+    inspectorSelection.semanticEntityId,
+    currentGeometryProjection,
     projectionGate.writebackAllowed,
     snapshot.revision,
     snapshot.source,
@@ -622,8 +1146,14 @@ export function useTikzEngine(
   }, [document, projectionGate.writebackAllowed, transactionBroker]);
 
   const selectTargets = useCallback((targets: readonly SelectionTarget[]) => {
-    setSelectionTargetsState(targets.map((target) => ({ ...target })));
-  }, []);
+    // Construction commits can advance the document synchronously before React
+    // publishes a new hook snapshot. Read the store here so the new block's
+    // revision is not mistaken for a stale selection by an old render closure.
+    const currentRevision = document.getSnapshot().revision;
+    setSelectionTargetsState(targets
+      .filter((target) => target.sourceRevision === currentRevision)
+      .map((target) => ({ ...target })));
+  }, [document]);
 
   const select = useCallback((refs: string[], stmtIndex: number | null = null) => {
     if (refs.length === 0) {
@@ -636,6 +1166,7 @@ export function useTikzEngine(
       if (point?.stmtIndex === stmtIndex) {
         setSelectionTargetsState([{
           kind: 'entity',
+          sourceRevision: snapshot.revision,
           stableId: point.stableId,
           stmtIndex,
           entityKind: 'point',
@@ -650,6 +1181,7 @@ export function useTikzEngine(
       if (element) {
         setSelectionTargetsState([{
           kind: 'entity',
+          sourceRevision: snapshot.revision,
           stableId: element.stableId,
           stmtIndex,
           entityKind: 'element',
@@ -659,9 +1191,53 @@ export function useTikzEngine(
       }
       setSelectionTargetsState([{
         kind: 'statement',
+        sourceRevision: snapshot.revision,
         stmtIndex,
         refs,
       }]);
+      return;
+    }
+    const geometryDoc = currentGeometryProjection?.doc;
+    const canonicalTargets = refs.flatMap((ref): SelectionTarget[] => {
+      if (!geometryDoc) return [];
+      const matches = geometryDoc.semantic.ir.entities.filter((entity) => (
+        entity.id === ref || entity.name === ref
+      ));
+      if (matches.length !== 1) return [];
+      const entity = matches[0]!;
+      const primitive = geometryDoc.rendering.flatMap((truth) => (
+        truth.status === 'complete' ? [...truth.primitives] : []
+      )).find((candidate) => candidate.entityIds.includes(entity.id));
+      const statementIndex = primitive?.metadata?.statementIndex;
+      if (
+        !primitive
+        || typeof statementIndex !== 'number'
+        || !Number.isSafeInteger(statementIndex)
+        || statementIndex < 0
+      ) return [];
+      const references = entity.parameters?.references;
+      const semanticRefs = [
+        ...(entity.name ? [entity.name] : []),
+        ...(Array.isArray(references)
+          ? references.filter((value): value is string => typeof value === 'string')
+          : []),
+      ];
+      const sourceStableId = primitive.metadata?.sourceStableId;
+      return [{
+        kind: 'entity',
+        sourceRevision: snapshot.revision,
+        stableId: typeof sourceStableId === 'string' ? sourceStableId : entity.id,
+        stmtIndex: statementIndex,
+        entityKind: entity.kind === 'point' ? 'point' : 'element',
+        refs: [...new Set(semanticRefs.length > 0 ? semanticRefs : [entity.id])],
+        semanticEntityId: entity.id,
+        renderPrimitiveId: primitive.id,
+        sourceBindingIds: entity.sourceBindingIds ?? primitive.sourceBindingIds,
+        ...(primitive.sourceRange ? { sourceRange: { ...primitive.sourceRange } } : {}),
+      }];
+    });
+    if (canonicalTargets.length === refs.length) {
+      setSelectionTargetsState(canonicalTargets);
       return;
     }
     setSelectionTargetsState(refs.map((ref) => {
@@ -669,6 +1245,7 @@ export function useTikzEngine(
       return point
         ? {
           kind: 'entity' as const,
+          sourceRevision: snapshot.revision,
           stableId: point.stableId,
           stmtIndex: point.stmtIndex,
           entityKind: 'point' as const,
@@ -680,7 +1257,7 @@ export function useTikzEngine(
           ref,
         };
     }));
-  }, [semanticProjection, snapshot.revision]);
+  }, [currentGeometryProjection, semanticProjection, snapshot.revision]);
 
   // Destructive callers must opt into cascade explicitly. The engine boundary
   // itself defaults to the recoverable managed-block policy so a future UI or
@@ -691,14 +1268,27 @@ export function useTikzEngine(
       || !semanticProjection?.scene
       || !semanticProjection.stmts
     ) return false;
-    const targets = selectionTargets.flatMap((target) => {
+    const geometryDoc = currentGeometryProjection?.doc;
+    if (!geometryDoc || geometryDoc.basis.revision !== snapshot.revision) {
+      return false;
+    }
+    // Annotate the element type: the branches below return structurally
+    // different subsets of GeometryDeleteTarget, which would otherwise infer as
+    // a union of array types rather than one array.
+    const targets = selectionTargets.flatMap((target): GeometryDeleteTarget[] => {
       if (target.kind === 'entity') {
         return [{
-          stableId: (
+          semanticEntityId: (
             selectionTargets.length === 1
-              ? inspectorSelection.sourceStableId
+              ? inspectorSelection.semanticEntityId
               : undefined
-          ) ?? target.stableId,
+          ) ?? target.semanticEntityId ?? target.stableId,
+          sourceBindingIds: selectionTargets.length === 1
+            ? inspectorSelection.sourceBindingIds
+            : target.sourceBindingIds,
+          sourceRange: selectionTargets.length === 1
+            ? inspectorSelection.sourceRange
+            : target.sourceRange,
           stmtIndex: (
             selectionTargets.length === 1
               ? inspectorSelection.statementIndex
@@ -708,6 +1298,15 @@ export function useTikzEngine(
       }
       if (target.kind === 'statement') {
         return [{
+          semanticEntityId: selectionTargets.length === 1
+            ? inspectorSelection.semanticEntityId
+            : target.semanticEntityId,
+          sourceBindingIds: selectionTargets.length === 1
+            ? inspectorSelection.sourceBindingIds
+            : target.sourceBindingIds,
+          sourceRange: selectionTargets.length === 1
+            ? inspectorSelection.sourceRange
+            : target.sourceRange,
           stmtIndex: (
             selectionTargets.length === 1
               ? inspectorSelection.statementIndex
@@ -719,42 +1318,51 @@ export function useTikzEngine(
         target.kind === 'source-block'
         && target.sourceRevision === snapshot.revision
       ) {
-        return semanticProjection.stmts.flatMap((statement, stmtIndex) => (
-          sourceRangesOverlap(target.range, statement.range)
-            ? [{ stmtIndex }]
-            : []
-        ));
+        return [{ sourceRange: target.range }];
       }
       return [];
     });
-    const uniqueTargets = [...new Map(
-      targets.map((target) => [
-        `${'stableId' in target ? target.stableId : ''}:${target.stmtIndex ?? ''}`,
-        target,
-      ]),
-    ).values()];
-    if (uniqueTargets.length === 0) return false;
-    const plan = planDeletion({
-      source: snapshot.source,
-      scene: semanticProjection.scene,
-      statements: semanticProjection.stmts,
-      targets: uniqueTargets,
-      mode,
-    });
-    if (!plan.canApply || plan.patches.length === 0) return false;
-    const committed = transactionBroker.commitPatches({
-      patches: plan.patches,
-      origin: 'canvas',
-      expectedRevision: snapshot.revision,
-    }).ok;
+    if (targets.length === 0) return false;
+    let committed = false;
+    try {
+      const plan = planGeometryDocDeletion({
+        source: snapshot.source,
+        geometryDoc,
+        statements: semanticProjection.stmts,
+        targets,
+        mode,
+      });
+      const proposal = compileCanvasDeleteProposal({
+        source: snapshot.source,
+        geometryDoc,
+        plan,
+      });
+      const result = transactionBroker.commit(proposal.transaction, {
+        hash: geometryDoc.basis.sourceHash,
+        algorithm: 'fnv1a64-utf8',
+        source: snapshot.source,
+        ...(geometryDoc.basis.kernelHash
+          ? { kernelHash: geometryDoc.basis.kernelHash }
+          : {}),
+        ...(geometryDoc.basis.pluginSetDigest
+          ? { pluginSetDigest: geometryDoc.basis.pluginSetDigest }
+          : {}),
+      });
+      committed = result.ok;
+    } catch {
+      return false;
+    }
     if (committed) {
       setSelectionTargetsState([]);
     }
     return committed;
   }, [
     projectionGate.writebackAllowed,
+    currentGeometryProjection,
     semanticProjection,
-    inspectorSelection.sourceStableId,
+    inspectorSelection.semanticEntityId,
+    inspectorSelection.sourceBindingIds,
+    inspectorSelection.sourceRange,
     inspectorSelection.statementIndex,
     selectionTargets,
     snapshot.revision,
@@ -776,6 +1384,7 @@ export function useTikzEngine(
     stmts: semanticProjection?.stmts ?? null,
     issues: projection.issues,
     freePointRanges: semanticProjection?.freePointRanges ?? new Map(),
+    freePointTransforms: semanticProjection?.freePointTransforms ?? new Map(),
     selectionTargets,
     selection,
     inspectorSelection,
@@ -786,12 +1395,19 @@ export function useTikzEngine(
     ephemeralStyles: EMPTY_EPHEMERAL_STYLES,
     geometryTruth: activeGeometryProjection?.truths ?? null,
     geometrySourceMap: activeGeometryProjection?.sourceMap ?? null,
+    geometryDoc: currentGeometryProjection?.doc ?? null,
     geometryInvalidation,
     setCode,
     replaceCode,
     applyPatch,
     applySourcePatch,
     applySourcePatches,
+    commitCanvasPointMove,
+    commitCanvasDragPatches,
+    transformSelection,
+    selectionTransformCapability,
+    selectAllGeometry,
+    commitCanvasConstructionBatch,
     applyInspectorSourcePatch,
     commitSourceTransaction,
     deleteSelection,

@@ -33,6 +33,9 @@ export type ConstructionPlanKind =
   | 'perpendicular-bisector'
   | 'angle-bisector'
   | 'circumcircle'
+  | 'nine-point-circle'
+  | 'simson-line'
+  | 'fermat-point'
   | 'tangent-at-point'
   | 'reflect-point'
   | 'reflect-line'
@@ -268,6 +271,12 @@ export type ConstructionConstraint =
   | {
     readonly recordType: 'constraint';
     readonly id: string;
+    readonly kind: 'collinear';
+    readonly points: readonly [string, string, string];
+  }
+  | {
+    readonly recordType: 'constraint';
+    readonly id: string;
     readonly kind: 'complete-quadrilateral';
     readonly points: readonly [string, string, string, string];
   };
@@ -337,6 +346,34 @@ export interface SourceCircleAdoptionRequest {
   readonly circle:
     | { readonly center: string; readonly through: string }
     | { readonly center: string; readonly radius: number };
+}
+
+export type SourceCircleDefinition =
+  | {
+    readonly kind: 'center-through';
+    readonly centerName: string;
+    readonly throughName: string;
+  }
+  | {
+    readonly kind: 'center-radius';
+    readonly centerName: string;
+    readonly radius: number;
+  };
+
+/**
+ * Revision-bound request to promote one directly writable raw TikZ circle
+ * into a managed semantic entity. Callers may select the source binding, but
+ * the Broker must rederive every field from the current GeometryDoc before
+ * commit; raw geometric signatures are never durable identities.
+ */
+export interface SourceCircleAdoptionIntent {
+  readonly constructionId: string;
+  readonly sourceEntityId: string;
+  readonly sourceBindingId: string;
+  readonly managedEntityId: 'circle';
+  readonly sourceStableId: string;
+  readonly range: { readonly start: number; readonly end: number };
+  readonly definition: SourceCircleDefinition;
 }
 
 export interface ConstructionPlanBase<K extends ConstructionPlanKind> {
@@ -419,6 +456,59 @@ export type CircumcircleConstructionPlan = ConstructionPlanBase<'circumcircle'> 
   readonly c: string;
   readonly center: string;
   readonly circle: string;
+};
+
+export type NinePointCircleConstructionPlan = ConstructionPlanBase<'nine-point-circle'> & {
+  readonly a: string;
+  readonly b: string;
+  readonly c: string;
+  readonly midpointBC: string;
+  readonly midpointCA: string;
+  readonly midpointAB: string;
+  readonly footA: string;
+  readonly footB: string;
+  readonly footC: string;
+  readonly orthocenter: string;
+  readonly vertexMidpointA: string;
+  readonly vertexMidpointB: string;
+  readonly vertexMidpointC: string;
+  readonly center: string;
+  readonly circle: string;
+};
+
+export type SimsonLineConstructionPlan = ConstructionPlanBase<'simson-line'> & {
+  readonly a: string;
+  readonly b: string;
+  readonly c: string;
+  readonly center: string;
+  readonly circle: string;
+  readonly point: string;
+  readonly footAB: string;
+  readonly footBC: string;
+  readonly footCA: string;
+  readonly line: string;
+  readonly angleDegrees: number;
+};
+
+export type FermatPointConstructionPlan = ConstructionPlanBase<'fermat-point'> & {
+  readonly a: string;
+  readonly b: string;
+  readonly c: string;
+  readonly equilateralAB: string;
+  readonly equilateralAC: string;
+  readonly torricelli: string;
+  readonly result: string;
+  readonly line1: string;
+  readonly line2: string;
+  readonly triangleAB: string;
+  readonly triangleAC: string;
+  readonly rayA: string;
+  readonly rayB: string;
+  readonly rayC: string;
+  readonly rotationABDegrees: number;
+  readonly rotationACDegrees: number;
+  /** Torricelli for the interior branch, otherwise the >=120-degree vertex. */
+  readonly resultSource: string;
 };
 
 export type TangentAtPointConstructionPlan = ConstructionPlanBase<'tangent-at-point'> & {
@@ -508,6 +598,9 @@ export type ConstructionPlan =
   | PerpendicularBisectorConstructionPlan
   | AngleBisectorConstructionPlan
   | CircumcircleConstructionPlan
+  | NinePointCircleConstructionPlan
+  | SimsonLineConstructionPlan
+  | FermatPointConstructionPlan
   | TangentAtPointConstructionPlan
   | ReflectPointConstructionPlan
   | ReflectLineConstructionPlan
@@ -537,6 +630,7 @@ export const CONSTRUCTION_WRITER_REVISION = 1 as const;
 export interface ConstructionWriterSlot {
   /** Stable per-construction semantic role; never derived from source layout. */
   readonly id: string;
+  readonly role: string;
   readonly kind: 'tikz-statement' | 'tikz-fragment';
   /** Stable semantic record identities responsible for this source slot. */
   readonly owners: readonly string[];
@@ -553,6 +647,8 @@ export interface ConstructionWriterArtifact {
   readonly writerId: typeof CONSTRUCTION_WRITER_ID;
   readonly writerRevision: typeof CONSTRUCTION_WRITER_REVISION;
   readonly planKind: ConstructionPlanKind;
+  /** Source-neutral fingerprint of this writer ABI and ordered slot contract. */
+  readonly semanticFingerprint: string;
   readonly referenceSurface: readonly string[];
   readonly slots: readonly ConstructionWriterSlot[];
 }
@@ -793,6 +889,10 @@ function constraintReferenceEntries(constraint: Record<string, unknown>, path: s
       return Array.isArray(constraint.points)
         ? constraint.points.map((value, index) => referenceEntry(`${path}.points[${index}]`, value))
         : [];
+    case 'collinear':
+      return Array.isArray(constraint.points)
+        ? constraint.points.map((value, index) => referenceEntry(`${path}.points[${index}]`, value))
+        : [];
     default:
       return [];
   }
@@ -848,6 +948,24 @@ function planReferenceEntries(plan: Record<string, unknown>): readonly Reference
       return ['armA', 'vertex', 'armB', 'result', 'line'].map(ref);
     case 'circumcircle':
       return ['a', 'b', 'c', 'center', 'circle'].map(ref);
+    case 'nine-point-circle':
+      return [
+        'a', 'b', 'c', 'midpointBC', 'midpointCA', 'midpointAB',
+        'footA', 'footB', 'footC', 'orthocenter',
+        'vertexMidpointA', 'vertexMidpointB', 'vertexMidpointC',
+        'center', 'circle',
+      ].map(ref);
+    case 'simson-line':
+      return [
+        'a', 'b', 'c', 'center', 'circle', 'point',
+        'footAB', 'footBC', 'footCA', 'line',
+      ].map(ref);
+    case 'fermat-point':
+      return [
+        'a', 'b', 'c', 'equilateralAB', 'equilateralAC', 'torricelli',
+        'result', 'line1', 'line2', 'triangleAB', 'triangleAC',
+        'rayA', 'rayB', 'rayC', 'resultSource',
+      ].map(ref);
     case 'reflect-point':
     case 'rotate-90':
     case 'homothety-2':
@@ -1048,11 +1166,18 @@ function validateBase(plan: Record<string, unknown>, issues: ConstructionValidat
   if (Array.isArray(plan.outputs)) {
     const ids: string[] = [];
     const refs: string[] = [];
+    // An output may address its entity by name (points, which are referenced by
+    // their TikZ name) or by record id (composite primitives, whose name is the
+    // construction id and whose canonical reference is `entity-<name>`). Index
+    // both so a declared entity resolves under either alias.
     const entitiesByAlias = new Map<string, Record<string, unknown>>();
     if (Array.isArray(plan.entities)) {
       for (const entity of plan.entities) {
         if (!isRecord(entity)) continue;
         if (validReference(entity.name)) entitiesByAlias.set(entity.name, entity);
+        if (validReference(entity.id) && !entitiesByAlias.has(entity.id)) {
+          entitiesByAlias.set(entity.id, entity);
+        }
       }
     }
     const supportedKinds = new Set([
@@ -1221,6 +1346,20 @@ function validateBase(plan: Record<string, unknown>, issues: ConstructionValidat
             constraint.points.forEach((value, pointIndex) => (
               refIssue(`${path}.points[${pointIndex}]`, value, issues)
             ));
+          }
+          break;
+        case 'collinear':
+          if (!Array.isArray(constraint.points) || constraint.points.length !== 3) {
+            issues.push({ path: `${path}.points`, message: 'collinear requires exactly three points' });
+          } else {
+            constraint.points.forEach((value, pointIndex) => (
+              refIssue(`${path}.points[${pointIndex}]`, value, issues)
+            ));
+            uniqueIssue(
+              constraint.points.filter((value): value is string => typeof value === 'string'),
+              `${path}.points`,
+              issues,
+            );
           }
           break;
         default:
@@ -1413,6 +1552,59 @@ function validatePlanDefinition(plan: Record<string, unknown>, issues: Construct
   if (plan.kind === 'circumcircle') {
     for (const field of ['a', 'b', 'c', 'center', 'circle'] as const) refIssue(field, plan[field], issues);
     uniqueIssue([plan.a, plan.b, plan.c].filter((value): value is string => typeof value === 'string'), 'vertices', issues);
+    return;
+  }
+  if (plan.kind === 'nine-point-circle') {
+    const fields = [
+      'a', 'b', 'c', 'midpointBC', 'midpointCA', 'midpointAB',
+      'footA', 'footB', 'footC', 'orthocenter',
+      'vertexMidpointA', 'vertexMidpointB', 'vertexMidpointC',
+      'center', 'circle',
+    ] as const;
+    for (const field of fields) refIssue(field, plan[field], issues);
+    uniqueIssue(
+      [plan.a, plan.b, plan.c].filter((value): value is string => typeof value === 'string'),
+      'vertices',
+      issues,
+    );
+    return;
+  }
+  if (plan.kind === 'simson-line') {
+    const fields = [
+      'a', 'b', 'c', 'center', 'circle', 'point',
+      'footAB', 'footBC', 'footCA', 'line',
+    ] as const;
+    for (const field of fields) refIssue(field, plan[field], issues);
+    uniqueIssue(
+      [plan.a, plan.b, plan.c].filter((value): value is string => typeof value === 'string'),
+      'vertices',
+      issues,
+    );
+    if (!Number.isFinite(plan.angleDegrees)) {
+      issues.push({ path: 'angleDegrees', message: 'circle parameter angle must be finite' });
+    }
+    return;
+  }
+  if (plan.kind === 'fermat-point') {
+    const fields = [
+      'a', 'b', 'c', 'equilateralAB', 'equilateralAC', 'torricelli',
+      'result', 'line1', 'line2', 'triangleAB', 'triangleAC',
+      'rayA', 'rayB', 'rayC', 'resultSource',
+    ] as const;
+    for (const field of fields) refIssue(field, plan[field], issues);
+    uniqueIssue(
+      [plan.a, plan.b, plan.c].filter((value): value is string => typeof value === 'string'),
+      'vertices',
+      issues,
+    );
+    for (const field of ['rotationABDegrees', 'rotationACDegrees'] as const) {
+      if (!Number.isFinite(plan[field])) {
+        issues.push({ path: field, message: 'rotation angle must be finite' });
+      }
+    }
+    if (![plan.torricelli, plan.a, plan.b, plan.c].includes(plan.resultSource)) {
+      issues.push({ path: 'resultSource', message: 'result source must be the Torricelli point or a triangle vertex' });
+    }
     return;
   }
   if (plan.kind === 'tangent-at-point') {
@@ -1724,6 +1916,7 @@ function constructionWriterSlot(
   const kind = 'tikz-statement' as const;
   const slotIdentity = {
     id,
+    role,
     kind,
     owners: stableOwners,
     optionSites,
@@ -1746,7 +1939,12 @@ function constructionWriterReferenceSurface(
   plan: ConstructionPlan,
 ): readonly string[] {
   const references = plan.entities.flatMap((entity) => [entity.id, entity.name]);
-  if (plan.kind === 'circumcircle' || plan.kind === 'cyclic-quadrilateral') {
+  if (
+    plan.kind === 'circumcircle'
+    || plan.kind === 'nine-point-circle'
+    || plan.kind === 'simson-line'
+    || plan.kind === 'cyclic-quadrilateral'
+  ) {
     const seed = safeName(plan.id, 'id');
     references.push(
       `mg-${seed}-m1`,
@@ -1754,6 +1952,16 @@ function constructionWriterReferenceSurface(
       `mg-${seed}-q1`,
       `mg-${seed}-q2`,
     );
+    if (plan.kind === 'nine-point-circle') {
+      const orthocenterSeed = `${seed}-orthocenter`;
+      references.push(
+        `mg-${orthocenterSeed}-o`,
+        `mg-${orthocenterSeed}-m1`,
+        `mg-${orthocenterSeed}-m2`,
+        `mg-${orthocenterSeed}-q1`,
+        `mg-${orthocenterSeed}-q2`,
+      );
+    }
   }
   return [...new Set(references)].sort();
 }
@@ -1766,11 +1974,28 @@ function constructionWriterArtifact(
   if (slotIds.size !== slots.length) {
     throw new TypeError(`Construction writer emitted duplicate slots for ${plan.kind}.`);
   }
+  const referenceSurface = constructionWriterReferenceSurface(plan);
+  const semanticFingerprint = hashSource(canonicalJson({
+    domain: 'mathgeo/tikz-construction-writer-artifact/v1',
+    writerId: CONSTRUCTION_WRITER_ID,
+    writerRevision: CONSTRUCTION_WRITER_REVISION,
+    planKind: plan.kind,
+    referenceSurface,
+    slots: slots.map((slot) => ({
+      id: slot.id,
+      role: slot.role,
+      kind: slot.kind,
+      owners: slot.owners,
+      semanticFingerprint: slot.semanticFingerprint,
+      optionSites: slot.optionSites,
+    })),
+  }));
   return {
     writerId: CONSTRUCTION_WRITER_ID,
     writerRevision: CONSTRUCTION_WRITER_REVISION,
     planKind: plan.kind,
-    referenceSurface: constructionWriterReferenceSurface(plan),
+    semanticFingerprint,
+    referenceSurface,
     slots,
   };
 }
@@ -2148,6 +2373,189 @@ export function compileConstructionWriterArtifact(
         ),
       ]);
     }
+    case 'nine-point-circle': {
+      const a = safeName(plan.a, 'a');
+      const b = safeName(plan.b, 'b');
+      const c = safeName(plan.c, 'c');
+      const midpointBC = safeName(plan.midpointBC, 'midpointBC');
+      const midpointCA = safeName(plan.midpointCA, 'midpointCA');
+      const midpointAB = safeName(plan.midpointAB, 'midpointAB');
+      const footA = safeName(plan.footA, 'footA');
+      const footB = safeName(plan.footB, 'footB');
+      const footC = safeName(plan.footC, 'footC');
+      const orthocenter = safeName(plan.orthocenter, 'orthocenter');
+      const vertexMidpointA = safeName(plan.vertexMidpointA, 'vertexMidpointA');
+      const vertexMidpointB = safeName(plan.vertexMidpointB, 'vertexMidpointB');
+      const vertexMidpointC = safeName(plan.vertexMidpointC, 'vertexMidpointC');
+      const center = safeName(plan.center, 'center');
+      const seed = safeName(plan.id, 'id');
+      const orthocenterSeed = `${seed}-orthocenter`;
+      const orthocenterSourceCenter = `mg-${orthocenterSeed}-o`;
+      const orthocenterBody = circumcenterBody(
+        orthocenterSourceCenter,
+        a,
+        b,
+        c,
+        orthocenterSeed,
+      );
+      const orthocenterOwners = [semanticEntityOwner(plan, orthocenter)];
+      const centerOwners = [semanticEntityOwner(plan, center)];
+      const centerBody = circumcenterBody(
+        center,
+        midpointBC,
+        midpointCA,
+        midpointAB,
+        seed,
+      );
+      return constructionWriterArtifact(plan, [
+        constructionWriterSlot(plan, 'side-midpoint-bc-definition', [semanticEntityOwner(plan, midpointBC)], `\\coordinate (${midpointBC}) at ${calcInterpolateCoordinate(b, 0.5, c)};`),
+        constructionWriterSlot(plan, 'side-midpoint-ca-definition', [semanticEntityOwner(plan, midpointCA)], `\\coordinate (${midpointCA}) at ${calcInterpolateCoordinate(c, 0.5, a)};`),
+        constructionWriterSlot(plan, 'side-midpoint-ab-definition', [semanticEntityOwner(plan, midpointAB)], `\\coordinate (${midpointAB}) at ${calcInterpolateCoordinate(a, 0.5, b)};`),
+        constructionWriterSlot(plan, 'altitude-foot-a-definition', [semanticEntityOwner(plan, footA)], `\\coordinate (${footA}) at ${calcProjectionCoordinate(b, a, c)};`),
+        constructionWriterSlot(plan, 'altitude-foot-b-definition', [semanticEntityOwner(plan, footB)], `\\coordinate (${footB}) at ${calcProjectionCoordinate(c, b, a)};`),
+        constructionWriterSlot(plan, 'altitude-foot-c-definition', [semanticEntityOwner(plan, footC)], `\\coordinate (${footC}) at ${calcProjectionCoordinate(a, c, b)};`),
+        constructionWriterSlot(plan, 'orthocenter-circumcenter-midpoint-ab-definition', orthocenterOwners, orthocenterBody.midpointAB),
+        constructionWriterSlot(plan, 'orthocenter-circumcenter-normal-ab-definition', orthocenterOwners, orthocenterBody.perpendicularAB),
+        constructionWriterSlot(plan, 'orthocenter-circumcenter-midpoint-ac-definition', orthocenterOwners, orthocenterBody.midpointAC),
+        constructionWriterSlot(plan, 'orthocenter-circumcenter-normal-ac-definition', orthocenterOwners, orthocenterBody.perpendicularAC),
+        constructionWriterSlot(plan, 'orthocenter-circumcenter-definition', orthocenterOwners, orthocenterBody.centerIntersection),
+        constructionWriterSlot(
+          plan,
+          'orthocenter-definition',
+          orthocenterOwners,
+          `\\path let \\p1=(${a}), \\p2=(${b}), \\p3=(${c}), \\p4=(${orthocenterSourceCenter}) in coordinate (${orthocenter}) at ({\\x1+\\x2+\\x3-2*\\x4},{\\y1+\\y2+\\y3-2*\\y4});`,
+        ),
+        constructionWriterSlot(plan, 'vertex-orthocenter-midpoint-a-definition', [semanticEntityOwner(plan, vertexMidpointA)], `\\coordinate (${vertexMidpointA}) at ${calcInterpolateCoordinate(a, 0.5, orthocenter)};`),
+        constructionWriterSlot(plan, 'vertex-orthocenter-midpoint-b-definition', [semanticEntityOwner(plan, vertexMidpointB)], `\\coordinate (${vertexMidpointB}) at ${calcInterpolateCoordinate(b, 0.5, orthocenter)};`),
+        constructionWriterSlot(plan, 'vertex-orthocenter-midpoint-c-definition', [semanticEntityOwner(plan, vertexMidpointC)], `\\coordinate (${vertexMidpointC}) at ${calcInterpolateCoordinate(c, 0.5, orthocenter)};`),
+        constructionWriterSlot(plan, 'nine-point-center-midpoint-1-definition', centerOwners, centerBody.midpointAB),
+        constructionWriterSlot(plan, 'nine-point-center-normal-1-definition', centerOwners, centerBody.perpendicularAB),
+        constructionWriterSlot(plan, 'nine-point-center-midpoint-2-definition', centerOwners, centerBody.midpointAC),
+        constructionWriterSlot(plan, 'nine-point-center-normal-2-definition', centerOwners, centerBody.perpendicularAC),
+        constructionWriterSlot(plan, 'nine-point-center-definition', centerOwners, centerBody.centerIntersection),
+        constructionWriterSlot(
+          plan,
+          'nine-point-circle-render',
+          [semanticEntityOwner(plan, plan.circle)],
+          `\\node[draw,circle through=(${midpointBC})] at (${center}) {};`,
+          COMMAND_OPTION_SITE,
+        ),
+      ]);
+    }
+    case 'simson-line': {
+      const a = safeName(plan.a, 'a');
+      const b = safeName(plan.b, 'b');
+      const c = safeName(plan.c, 'c');
+      const center = safeName(plan.center, 'center');
+      const point = safeName(plan.point, 'point');
+      const footAB = safeName(plan.footAB, 'footAB');
+      const footBC = safeName(plan.footBC, 'footBC');
+      const footCA = safeName(plan.footCA, 'footCA');
+      const seed = safeName(plan.id, 'id');
+      const centerOwners = [semanticEntityOwner(plan, center)];
+      const body = circumcenterBody(center, a, b, c, seed);
+      return constructionWriterArtifact(plan, [
+        constructionWriterSlot(plan, 'circumcenter-midpoint-ab-definition', centerOwners, body.midpointAB),
+        constructionWriterSlot(plan, 'circumcenter-normal-ab-definition', centerOwners, body.perpendicularAB),
+        constructionWriterSlot(plan, 'circumcenter-midpoint-ac-definition', centerOwners, body.midpointAC),
+        constructionWriterSlot(plan, 'circumcenter-normal-ac-definition', centerOwners, body.perpendicularAC),
+        constructionWriterSlot(plan, 'circumcenter-definition', centerOwners, body.centerIntersection),
+        constructionWriterSlot(
+          plan,
+          'circumcircle-render',
+          [semanticEntityOwner(plan, plan.circle)],
+          `\\node[draw,dashed,circle through=(${a})] at (${center}) {};`,
+          COMMAND_OPTION_SITE,
+        ),
+        constructionWriterSlot(
+          plan,
+          'simson-point-definition',
+          [semanticEntityOwner(plan, point)],
+          `\\coordinate (${point}) at ${calcInterpolateCoordinate(center, 1, a, plan.angleDegrees)};`,
+        ),
+        constructionWriterSlot(plan, 'pedal-foot-ab-definition', [semanticEntityOwner(plan, footAB)], `\\coordinate (${footAB}) at ${calcProjectionCoordinate(a, point, b)};`),
+        constructionWriterSlot(plan, 'pedal-foot-bc-definition', [semanticEntityOwner(plan, footBC)], `\\coordinate (${footBC}) at ${calcProjectionCoordinate(b, point, c)};`),
+        constructionWriterSlot(plan, 'pedal-foot-ca-definition', [semanticEntityOwner(plan, footCA)], `\\coordinate (${footCA}) at ${calcProjectionCoordinate(c, point, a)};`),
+        constructionWriterSlot(
+          plan,
+          'simson-line-render',
+          [semanticEntityOwner(plan, plan.line)],
+          `\\draw[blue] ${extendedLine(footAB, footCA)};`,
+          COMMAND_OPTION_SITE,
+        ),
+      ]);
+    }
+    case 'fermat-point': {
+      const a = safeName(plan.a, 'a');
+      const b = safeName(plan.b, 'b');
+      const c = safeName(plan.c, 'c');
+      const equilateralAB = safeName(plan.equilateralAB, 'equilateralAB');
+      const equilateralAC = safeName(plan.equilateralAC, 'equilateralAC');
+      const torricelli = safeName(plan.torricelli, 'torricelli');
+      const result = safeName(plan.result, 'result');
+      const resultSource = safeName(plan.resultSource, 'resultSource');
+      return constructionWriterArtifact(plan, [
+        constructionWriterSlot(
+          plan,
+          'equilateral-vertex-ab-definition',
+          [semanticEntityOwner(plan, equilateralAB)],
+          `\\coordinate (${equilateralAB}) at ${calcInterpolateCoordinate(a, 1, b, plan.rotationABDegrees)};`,
+        ),
+        constructionWriterSlot(
+          plan,
+          'equilateral-vertex-ac-definition',
+          [semanticEntityOwner(plan, equilateralAC)],
+          `\\coordinate (${equilateralAC}) at ${calcInterpolateCoordinate(a, 1, c, plan.rotationACDegrees)};`,
+        ),
+        constructionWriterSlot(
+          plan,
+          'torricelli-candidate-definition',
+          [semanticEntityOwner(plan, torricelli)],
+          lineLineIntersection(torricelli, c, equilateralAB, b, equilateralAC),
+        ),
+        constructionWriterSlot(
+          plan,
+          'fermat-point-definition',
+          [semanticEntityOwner(plan, result)],
+          `\\coordinate (${result}) at (${resultSource});`,
+        ),
+        constructionWriterSlot(
+          plan,
+          'equilateral-triangle-ab-render',
+          [semanticEntityOwner(plan, plan.triangleAB)],
+          `\\draw[gray,dashed] (${a}) -- (${b}) -- (${equilateralAB}) -- cycle;`,
+          COMMAND_OPTION_SITE,
+        ),
+        constructionWriterSlot(
+          plan,
+          'equilateral-triangle-ac-render',
+          [semanticEntityOwner(plan, plan.triangleAC)],
+          `\\draw[gray,dashed] (${a}) -- (${c}) -- (${equilateralAC}) -- cycle;`,
+          COMMAND_OPTION_SITE,
+        ),
+        constructionWriterSlot(
+          plan,
+          'fermat-ray-a-render',
+          [semanticEntityOwner(plan, plan.rayA)],
+          `\\draw[blue] (${result}) -- (${a});`,
+          COMMAND_OPTION_SITE,
+        ),
+        constructionWriterSlot(
+          plan,
+          'fermat-ray-b-render',
+          [semanticEntityOwner(plan, plan.rayB)],
+          `\\draw[blue] (${result}) -- (${b});`,
+          COMMAND_OPTION_SITE,
+        ),
+        constructionWriterSlot(
+          plan,
+          'fermat-ray-c-render',
+          [semanticEntityOwner(plan, plan.rayC)],
+          `\\draw[blue] (${result}) -- (${c});`,
+          COMMAND_OPTION_SITE,
+        ),
+      ]);
+    }
     case 'tangent-at-point': {
       const touch = safeName(plan.touch, 'touch');
       const center = safeName(plan.circle.center, 'circle.center');
@@ -2431,7 +2839,10 @@ function planDirectiveInputs(plan: ConstructionPlan): readonly string[] {
       if (primitive.kind === 'rectangle') return primitive.corners;
       if (primitive.kind === 'circle') return [primitive.center, primitive.through];
       if (primitive.kind === 'label') return [primitive.at];
-      return primitive.points;
+      if (primitive.kind === 'angle' || primitive.kind === 'right-angle') {
+        return primitive.points;
+      }
+      return [];
     }
     case 'rectangle-by-opposite-corners': return [plan.first, plan.opposite];
     case 'midpoint': return [plan.a, plan.b];
@@ -2442,6 +2853,9 @@ function planDirectiveInputs(plan: ConstructionPlan): readonly string[] {
     case 'perpendicular-bisector': return [plan.a, plan.b];
     case 'angle-bisector': return [plan.armA, plan.vertex, plan.armB];
     case 'circumcircle': return [plan.a, plan.b, plan.c];
+    case 'nine-point-circle': return [plan.a, plan.b, plan.c];
+    case 'simson-line': return [plan.a, plan.b, plan.c];
+    case 'fermat-point': return [plan.a, plan.b, plan.c];
     case 'tangent-at-point': {
       const circleInput = plan.circle.id ?? plan.circle.center;
       return circleInput === plan.circle.center
@@ -2479,6 +2893,9 @@ function planDirectiveOutputs(plan: ConstructionPlan): readonly string[] {
     case 'rotate-90':
     case 'homothety-2': return [plan.result];
     case 'circumcircle': return [plan.center, plan.circle];
+    case 'nine-point-circle': return plan.outputs.map((output) => output.ref);
+    case 'simson-line': return plan.outputs.map((output) => output.ref);
+    case 'fermat-point': return plan.outputs.map((output) => output.ref);
     case 'tangent-at-point': return [plan.touch, plan.result, plan.line];
     case 'reflect-line': return [plan.foot, plan.result];
     case 'radical-axis': return [plan.result, plan.direction, plan.line];

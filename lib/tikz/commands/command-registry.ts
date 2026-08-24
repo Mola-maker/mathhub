@@ -729,23 +729,28 @@ export class CommandRegistry<Context = Record<string, unknown>> {
     if (resolution.status === 'ambiguous' || !resolution.command || !resolution.binding) {
       return { handled: false, reason: 'ambiguous', resolution };
     }
-    const event = typeof optionsOrShortcut === 'string'
-      ? options.event
-      : optionsOrShortcut.event ?? options.event;
-    const platform = typeof optionsOrShortcut === 'string'
-      ? effectivePlatform(options.platform)
-      : effectivePlatform(optionsOrShortcut.platform);
-    const editable = typeof optionsOrShortcut === 'string'
-      ? options.editable ?? (event ? editableTarget(event.target) : false)
-      : optionsOrShortcut.editable ?? (event ? editableTarget(event.target) : false);
+    // Discriminate exactly as resolve() does. A bare KeyboardShortcutEventLike
+    // is also a non-string, so `typeof === 'string'` would treat the event
+    // itself as ResolveOptions and drop its event/platform/context.
+    const invoked: ResolveOptions<Context> = typeof optionsOrShortcut === 'object'
+      && optionsOrShortcut !== null
+      && ('shortcut' in optionsOrShortcut)
+      ? optionsOrShortcut
+      : { ...options, shortcut: optionsOrShortcut as ShortcutInput };
+    // A shortcut passed as an event object is itself the originating event.
+    const shortcutEvent = typeof invoked.shortcut === 'object' && invoked.shortcut !== null
+      ? invoked.shortcut
+      : undefined;
+    const event = invoked.event ?? shortcutEvent;
+    const platform = effectivePlatform(invoked.platform);
+    const editable = invoked.editable
+      ?? (event ? editableTarget(event.target) : false);
     event?.preventDefault?.();
-    const context = (typeof optionsOrShortcut === 'string'
-      ? options.context
-      : optionsOrShortcut.context) as Context ?? ({} as Context);
+    const context = invoked.context as Context ?? ({} as Context);
     const invocation: CommandInvocation<Context> = {
       commandId: resolution.command.id,
       shortcut: resolution.normalizedShortcut,
-      scope: typeof optionsOrShortcut === 'string' ? options.scope : optionsOrShortcut.scope,
+      scope: invoked.scope,
       platform,
       editable,
       event,

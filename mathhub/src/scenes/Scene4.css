@@ -1,0 +1,353 @@
+/* ============================================================
+   SCENE 4 — "Unified source of truth"  (journey 4, ivory #EDECE2)
+   Ivory-blueprint: cobalt ink on ivory via the semantic theme
+   vars (--fg / --fg-dim / --fg-hi / --line-ui — defined in
+   tokens.css, journeys 3–4 carry cobalt-on-ivory values). Every
+   semantic use keeps a pre-theme fallback so the scene renders
+   unchanged until the journey tokens land.
+   ============================================================ */
+
+.scene-4 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ---- Recessed living geometry behind everything ---- */
+
+.scene-4__geo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72vmin;
+  height: 72vmin;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.scene-4__geo-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Ink flip — the shared GeometryCanvas strokes read --paper /
+   --mist / --line-faint / --line-strong / --soft, so scoped
+   overrides turn its ivory-on-cobalt strokes into cobalt
+   blueprint ink on the ivory field. #16367F / #4965AA are the
+   --deep / --soft token values; fainter marks derive from the
+   ink via color-mix. */
+.scene-4 .geometry-canvas {
+  --paper: #16367F;
+  --mist: color-mix(in srgb, #16367F 58%, transparent);
+  --line-faint: color-mix(in srgb, #16367F 14%, transparent);
+  --line-strong: color-mix(in srgb, #16367F 30%, transparent);
+  --soft: #4965AA;
+}
+
+/* ---- Blueprint leader lines (dashed, converging) ---- */
+
+.scene-4__lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.scene-4__line {
+  stroke: var(--line-ui, var(--line-strong));
+  stroke-width: 1px;
+  /* pathLength=1 on the element → dash pitch is a fraction of each
+     leader's length (≈ 5.5px dash / 3.8px gap at desktop stages).
+     The draw-on lives on the per-leader mask line, so this pattern
+     stays put while the leader reveals through it. */
+  stroke-dasharray: 0.016 0.011;
+}
+
+/* ---- Scattered entry-point echoes — blueprint parts ---- */
+
+.scene-4__echo {
+  z-index: 3;
+  pointer-events: none;
+}
+
+.scene-4__echo-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Cobalt index tag — hairline box, blueprint part number */
+.scene-4__tag {
+  align-self: flex-start;
+  margin-bottom: 4px;
+  padding: 1px 5px 2px;
+  border: 1px solid var(--line-ui, var(--line-strong));
+  border-radius: var(--radius);
+  font-family: var(--font-code);
+  font-size: 9.5px;
+  line-height: 1.4;
+  letter-spacing: 0.1em;
+  color: var(--fg, var(--paper));
+  white-space: nowrap;
+}
+
+.scene-4__row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Canvas echo: tiny midpoint sketch (segment AB + midpoint M) */
+.scene-4__mini-sketch {
+  display: block;
+  width: 34px;
+  height: 22px;
+}
+
+/* ---- Scene-local semantic aliases for the shared fragment
+       classes. fragments.css is themed by its own owner; these
+       scoped overrides pin Scene 4's cobalt-on-ivory reading
+       regardless of landing order (two-class specificity beats
+       the base single-class rules). ---- */
+
+.scene-4 .frag--edge-top,
+.scene-4 .frag--edge-bottom,
+.scene-4 .frag--edge-left,
+.scene-4 .frag--edge-right {
+  border-color: var(--line-ui, var(--line-strong));
+}
+
+.scene-4 .tinylabel {
+  color: var(--fg-dim, var(--mist));
+}
+
+.scene-4 .tinylabel--active {
+  color: var(--fg-hi, var(--paper));
+}
+
+.scene-4 .sourceline {
+  color: var(--fg, var(--paper));
+}
+
+.scene-4 .sourceline--dim {
+  color: var(--fg-dim, var(--mist));
+}
+
+.scene-4 .keyhint {
+  color: var(--fg-dim, var(--mist));
+}
+
+.scene-4 .keyhint__key {
+  border-color: var(--line-ui, var(--line-strong));
+  color: var(--fg, var(--paper));
+}
+
+/* ---- The single managed source transaction — blueprint
+       title block. The frame (double rule) resolves first,
+       then the source lines assemble one by one inside it. ---- */
+
+.scene-4__tx {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line-ui, var(--line-strong));
+  border-bottom: 1px solid var(--line-ui, var(--line-strong));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Title-block double rule — a second, fainter hairline 3px inside
+   the top and bottom frame rules (fainter line via color-mix). */
+.scene-4__tx::before,
+.scene-4__tx::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.scene-4__tx::before {
+  top: 3px;
+  border-top: 1px solid
+    color-mix(in srgb, var(--line-ui, var(--line-strong)) 55%, transparent);
+}
+
+.scene-4__tx::after {
+  bottom: 3px;
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--line-ui, var(--line-strong)) 55%, transparent);
+}
+
+/* The managed block — three mono source lines, left-aligned inside
+   the centered title block; lines rise in one by one (inline
+   transform/opacity, driven by scroll progress). */
+.scene-4__tx-block {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+}
+
+.scene-4__tx-line {
+  font-family: var(--font-code);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+.scene-4__tx-line--dir {
+  color: var(--fg-dim, var(--mist));
+}
+
+.scene-4__tx-line--code {
+  font-size: 12.5px;
+  color: var(--fg-hi, var(--paper));
+}
+
+/* Hairline rules drawn outward by the begin/end directive lines —
+   scaleX from center (inline transform, scroll-driven). */
+.scene-4__tx-rule {
+  height: 0;
+  border-top: 1px solid
+    color-mix(in srgb, var(--line-ui, var(--line-strong)) 70%, transparent);
+  transform-origin: center;
+  will-change: transform;
+}
+
+/* Content-fingerprint validation chip — lands at the block's top
+   corner once the block has assembled. Hairline only, no fill. */
+.scene-4__chip {
+  position: absolute;
+  top: -8px;
+  right: -16px;
+  padding: 1px 5px 2px;
+  border: 1px solid var(--line-ui, var(--line-strong));
+  border-radius: var(--radius);
+  font-family: var(--font-code);
+  font-size: 9px;
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+  color: var(--fg-dim, var(--mist));
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+/* ---- Blueprint annotation leader — "single source of truth".
+       Hangs left of the title block; its underline is collinear
+       with the block's top rule (an extended frame line) and ends
+       in a small ink dot at the frame corner. ---- */
+
+.scene-4__annot {
+  position: absolute;
+  right: 100%;
+  bottom: 100%;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line-ui, var(--line-strong));
+  white-space: nowrap;
+}
+
+.scene-4__annot::after {
+  content: "";
+  position: absolute;
+  right: -1.5px;
+  bottom: -2px;
+  width: 3px;
+  height: 3px;
+  background: var(--fg, var(--paper));
+}
+
+.scene-4__annot-text {
+  font-family: var(--font-code);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--fg-dim, var(--mist));
+}
+
+/* ---- Final quiet line ---- */
+
+.scene-4__quiet {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  transform: translateX(-50%);
+  z-index: 4;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim, var(--mist));
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* zh mode: generous letter-spacing, re-centered by compensating
+   the trailing letter-space with equal left padding. */
+.scene-4__quiet--zh {
+  letter-spacing: 0.22em;
+  padding-left: 0.22em;
+}
+
+/* ---- Mobile: keep three echoes — command / canvas / source
+       still tell the convergence story (their leaders stay; the
+       ai / keys leaders hide with their parts). The transaction
+       stays the single focal point; its annotation moves below
+       the title block. ---- */
+
+@media (max-width: 720px) {
+  .scene-4__echo--ai,
+  .scene-4__echo--keys,
+  .scene-4__leader--ai,
+  .scene-4__leader--keys {
+    display: none;
+  }
+
+  .scene-4__geo {
+    width: 92vmin;
+    height: 92vmin;
+  }
+
+  .scene-4__tx-line {
+    font-size: 9px;
+  }
+
+  .scene-4__tx-line--code {
+    font-size: 9.5px;
+  }
+
+  .scene-4__chip {
+    right: -8px;
+  }
+
+  /* Annotation leader below the block — collinear with the bottom
+     rule, ink dot centered on it. */
+  .scene-4__annot {
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    padding: 5px 0 0;
+    border-bottom: none;
+    border-top: 1px solid var(--line-ui, var(--line-strong));
+  }
+
+  .scene-4__annot::after {
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    top: -2px;
+    margin-left: -1.5px;
+  }
+}

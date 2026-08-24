@@ -1,6 +1,7 @@
 node_modules/
 .next/
 dist/
+/public/mathhub/
 coverage/
 .wrangler/
 output/
@@ -18,3 +19,7 @@ next-env.d.ts
 .omo
 .claude
 .openai
+/.tsc-errors.txt
+/.vitest-*.txt
+/texput.log
+/tmp/*.log

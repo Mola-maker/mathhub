@@ -207,6 +207,17 @@ function refsOfStatement(statement: Statement): StatementRefs {
     for (const spec of statement.specs) {
       if (spec.type === 'polyline') {
         for (const point of spec.points) addCoordRefs(refs.points, point);
+      } else if (spec.type === 'rectangle') {
+        addCoordRefs(refs.points, spec.first);
+        addCoordRefs(refs.points, spec.opposite);
+      } else if (spec.type === 'cubic-bezier') {
+        for (const point of [spec.start, spec.control1, spec.control2, spec.end]) {
+          addCoordRefs(refs.points, point);
+        }
+      } else if (spec.type === 'circular-arc') {
+        addCoordRefs(refs.points, spec.start);
+      } else if (spec.type === 'ellipse') {
+        addCoordRefs(refs.points, spec.center);
       } else {
         addCoordRefs(refs.points, spec.center);
         if (spec.radius.kind === 'through') addCoordRefs(refs.points, spec.radius.point);
@@ -427,7 +438,7 @@ export function buildDeletionDependencyGraph(
   }
 
   const elementOrdinal = new Map<number, number>();
-  scene.elements.forEach((element, index) => {
+  scene.elements.forEach((element) => {
     const ordinal = elementOrdinal.get(element.stmtIndex) ?? 0;
     elementOrdinal.set(element.stmtIndex, ordinal + 1);
     const id = elementNodeId(element.stableId, element.stmtIndex, ordinal);
@@ -643,6 +654,17 @@ function buildDetachPatches(
           for (const point of spec.points) {
             pushCoordDetachPatch(patches, point, removedPoints, points, stmtIndex, unsupported);
           }
+        } else if (spec.type === 'rectangle') {
+          pushCoordDetachPatch(patches, spec.first, removedPoints, points, stmtIndex, unsupported);
+          pushCoordDetachPatch(patches, spec.opposite, removedPoints, points, stmtIndex, unsupported);
+        } else if (spec.type === 'cubic-bezier') {
+          for (const point of [spec.start, spec.control1, spec.control2, spec.end]) {
+            pushCoordDetachPatch(patches, point, removedPoints, points, stmtIndex, unsupported);
+          }
+        } else if (spec.type === 'circular-arc') {
+          pushCoordDetachPatch(patches, spec.start, removedPoints, points, stmtIndex, unsupported);
+        } else if (spec.type === 'ellipse') {
+          pushCoordDetachPatch(patches, spec.center, removedPoints, points, stmtIndex, unsupported);
         } else {
           pushCoordDetachPatch(patches, spec.center, removedPoints, points, stmtIndex, unsupported);
           if (spec.radius.kind === 'through') {
@@ -713,6 +735,19 @@ function statementPatches(
     }
   }
   return { patches: ordered, diagnostics };
+}
+
+/**
+ * Source-only deletion adapter. Dependency closure must be decided by the
+ * caller; this helper only turns already-authorized statement indices into
+ * validated minimal patches.
+ */
+export function statementDeletionPatches(
+  source: string,
+  statements: readonly Statement[],
+  stmtIndices: readonly number[],
+): { patches: TextPatch[]; diagnostics: DeleteDiagnostic[] } {
+  return statementPatches(source, statements, stmtIndices);
 }
 
 function mergePatches(
@@ -799,8 +834,8 @@ function previewFor(
   }));
 }
 
-function planDeletion(input: DeletePlanInput): DeletePlan;
-function planDeletion(
+export function planDeletion(input: DeletePlanInput): DeletePlan;
+export function planDeletion(
   source: string,
   scene: Scene,
   statements: readonly Statement[],

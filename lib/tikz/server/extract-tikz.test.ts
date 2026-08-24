@@ -14,6 +14,12 @@ describe('extractTikzBlock', () => {
       .toContain('\\end{tikzpicture}');
   });
 
+  it('从无标签围栏中只提取含 TikZ/TeX 命令的代码', () => {
+    expect(extractTikzBlock('说明\n```\n\\draw (0,0)--(1,1);\n```\n结束'))
+      .toBe('\\draw (0,0)--(1,1);');
+    expect(extractTikzBlock('说明\n```\n普通 Markdown\n```\n结束')).toBeNull();
+  });
+
   it('找不到返回 null', () => {
     expect(extractTikzBlock('没有代码')).toBeNull();
   });

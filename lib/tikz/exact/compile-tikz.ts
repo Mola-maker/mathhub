@@ -1,13 +1,19 @@
 import { createHash } from 'node:crypto';
+import {
+  isTikzExactCompilerProfileId,
+  selectTikzExactCompilerProfile,
+  tikzExactCompilerProfile,
+  type TikzExactCompilerProfile,
+  type TikzExactCompilerProfileId,
+} from './compiler-profile';
 
 const MAX_SOURCE_BYTES = 128 * 1024;
+const MAX_COMPILER_JSON_BYTES = 256 * 1024;
 const REQUEST_TIMEOUT_MS = 12_000;
 const JOB_ID = /^j_[a-f0-9]{64}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
-const CACHE_KEY_VERSION = 'tikz-cache-key/v2' as const;
-const COMPILER_PROFILE = 'tikz-standard-v1' as const;
+const CACHE_KEY_VERSION = 'tikz-cache-key/v3' as const;
 const SOURCE_POLICY = 'tikz-untrusted-no-io/v1' as const;
-const WRAPPER_ID = 'tikz-standalone-dvisvgm/v1' as const;
 
 export interface CompilerPolicyDiagnostic {
   type: 'source-policy';
@@ -29,11 +35,12 @@ export interface CompilerArtifactAttestation {
   executedDocumentDigest: string;
   cacheKeyDigest: string;
   artifactDigest: string;
-  profile: typeof COMPILER_PROFILE;
+  profile: TikzExactCompilerProfileId;
   sourcePolicy: typeof SOURCE_POLICY;
-  wrapperId: typeof WRAPPER_ID;
+  wrapperId: string;
   wrapperDigest: string;
   bundleIdentity: string;
+  profileManifestDigest: string;
   visibility: 'public' | 'private';
   renderer: string;
   compilerImageDigest: string;
@@ -52,11 +59,12 @@ export interface CompilerJob {
   submittedSourceDigest?: string;
   executedSourceDigest?: string;
   executedDocumentDigest?: string;
-  profile?: typeof COMPILER_PROFILE;
+  profile?: TikzExactCompilerProfileId;
   sourcePolicy?: typeof SOURCE_POLICY;
-  wrapperId?: typeof WRAPPER_ID;
+  wrapperId?: string;
   wrapperDigest?: string;
   bundleIdentity?: string;
+  profileManifestDigest?: string;
   visibility?: 'public' | 'private';
   renderer?: string;
   artifactUrl?: string | null;
@@ -174,17 +182,37 @@ function validateSource(source: string): string {
   return source;
 }
 
-function compilerConfig(): { url: string; token: string } {
-  const configuredUrl = process.env.TIKZ_COMPILER_URL?.trim();
-  const configuredToken = process.env.TIKZ_COMPILER_TOKEN?.trim();
+function compilerConfig(
+  profile: TikzExactCompilerProfileId,
+): { url: string; token: string } {
+  const graphDrawing = profile === 'tikz-luatex-graphdrawing-v1';
+  const urlVariable = graphDrawing
+    ? 'TIKZ_GRAPHDRAWING_COMPILER_URL'
+    : 'TIKZ_COMPILER_URL';
+  const tokenVariable = graphDrawing
+    ? 'TIKZ_GRAPHDRAWING_COMPILER_TOKEN'
+    : 'TIKZ_COMPILER_TOKEN';
+  const configuredUrl = process.env[urlVariable]?.trim();
+  const configuredToken = process.env[tokenVariable]?.trim();
   const isProduction = process.env.NODE_ENV === 'production';
-  const url = configuredUrl || (isProduction ? '' : 'http://127.0.0.1:8787');
+  // The native development compiler is intentionally the standard Tectonic
+  // profile. Never route Lua graph drawing to it implicitly.
+  const url = configuredUrl || (
+    !graphDrawing && !isProduction ? 'http://127.0.0.1:8787' : ''
+  );
   const token = (
     configuredToken
-    || (isProduction ? '' : 'local-tikz-compiler-token')
+    || (!graphDrawing && !isProduction ? 'local-tikz-compiler-token' : '')
   );
 
   if (!url || !token) {
+    if (graphDrawing) {
+      throw new TikzCompileError(
+        '当前源码需要 LuaTeX graph drawing 编译通道；请配置独立的 TIKZ_GRAPHDRAWING_COMPILER_URL 和 TIKZ_GRAPHDRAWING_COMPILER_TOKEN',
+        503,
+        'GRAPHDRAWING_COMPILER_NOT_CONFIGURED',
+      );
+    }
     throw new TikzCompileError(
       'TikZ 精确编译服务未配置，请设置 TIKZ_COMPILER_URL 和 TIKZ_COMPILER_TOKEN',
       503,
@@ -197,14 +225,14 @@ function compilerConfig(): { url: string; token: string } {
     parsed = new URL(url);
   } catch {
     throw new TikzCompileError(
-      'TIKZ_COMPILER_URL 不是合法 URL',
+      `${urlVariable} 不是合法 URL`,
       500,
       'COMPILER_CONFIG_INVALID',
     );
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new TikzCompileError(
-      'TIKZ_COMPILER_URL 只允许 http 或 https',
+      `${urlVariable} 只允许 http 或 https`,
       500,
       'COMPILER_CONFIG_INVALID',
     );
@@ -244,9 +272,59 @@ export function sanitizeCompiledSvg(svg: string): string {
     .replace(/url\(\s*(['"]?)(?!#)[^)]+\1\s*\)/gi, 'none');
 }
 
-async function readPayload(response: Response): Promise<CompilerResponse> {
+async function readResponseBytes(
+  response: Response,
+  maxBytes: number,
+  errorCode: string,
+): Promise<Buffer> {
+  const declaredLength = Number(response.headers.get('Content-Length'));
+  if (
+    Number.isFinite(declaredLength)
+    && declaredLength >= 0
+    && declaredLength > maxBytes
+  ) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new TikzCompileError(
+      `Compiler response exceeds ${maxBytes} byte limit`,
+      502,
+      errorCode,
+    );
+  }
+
+  if (!response.body) return Buffer.alloc(0);
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
   try {
-    return await response.json() as CompilerResponse;
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+      const chunk = Buffer.from(result.value);
+      total += chunk.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new TikzCompileError(
+          `Compiler response exceeds ${maxBytes} byte limit`,
+          502,
+          errorCode,
+        );
+      }
+      chunks.push(chunk);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total);
+}
+
+async function readPayload(response: Response): Promise<CompilerResponse> {
+  const bytes = await readResponseBytes(
+    response,
+    MAX_COMPILER_JSON_BYTES,
+    'COMPILER_RESPONSE_TOO_LARGE',
+  );
+  try {
+    return JSON.parse(bytes.toString('utf8')) as CompilerResponse;
   } catch {
     return {};
   }
@@ -288,23 +366,31 @@ type CacheIdentity = Pick<
   | 'wrapperId'
   | 'wrapperDigest'
   | 'bundleIdentity'
+  | 'profileManifestDigest'
 >;
 
-function expectedBundleIdentity(compilerImageDigest: string): string {
-  return `tectonic-only-cached@${compilerImageDigest}`;
+function expectedBundleIdentity(
+  profile: TikzExactCompilerProfile,
+  compilerImageDigest: string,
+): string {
+  return `${profile.bundleIdentityPrefix}@${compilerImageDigest}`;
 }
 
-function recomputeCacheKey(value: Partial<CacheIdentity>): string {
+function recomputeCacheKey(
+  value: Partial<CacheIdentity>,
+  expectedProfile: TikzExactCompilerProfile,
+): string {
   if (
     value.cacheKeyVersion !== CACHE_KEY_VERSION
     || typeof value.compilerImageDigest !== 'string'
-    || value.profile !== COMPILER_PROFILE
+    || value.profile !== expectedProfile.id
     || (value.visibility !== 'public' && value.visibility !== 'private')
     || typeof value.submittedSourceDigest !== 'string'
     || value.sourcePolicy !== SOURCE_POLICY
-    || value.wrapperId !== WRAPPER_ID
+    || value.wrapperId !== expectedProfile.wrapperId
     || typeof value.wrapperDigest !== 'string'
     || typeof value.bundleIdentity !== 'string'
+    || value.profileManifestDigest !== expectedProfile.manifestDigest
   ) return '';
   return createHash('sha256')
     .update([
@@ -317,18 +403,21 @@ function recomputeCacheKey(value: Partial<CacheIdentity>): string {
       value.wrapperId,
       value.wrapperDigest,
       value.bundleIdentity,
+      value.profileManifestDigest,
     ].join('\0'), 'utf8')
     .digest('hex');
 }
 
 function validJobIdentity(
   value: unknown,
+  expectedProfileId: TikzExactCompilerProfileId,
   expectedJobId?: string,
   expectedSubmittedSourceDigest?: string,
 ): value is CompilerJob {
   if (!value || typeof value !== 'object') return false;
   const job = value as Partial<CompilerJob>;
-  const recomputedCacheKey = recomputeCacheKey(job);
+  const expectedProfile = tikzExactCompilerProfile(expectedProfileId);
+  const recomputedCacheKey = recomputeCacheKey(job, expectedProfile);
   return typeof job.id === 'string'
     && JOB_ID.test(job.id)
     && (expectedJobId === undefined || job.id === expectedJobId)
@@ -355,12 +444,13 @@ function validJobIdentity(
     && typeof job.compilerImageDigest === 'string'
     && job.compilerImageDigest.length > 0
     && job.bundleIdentity
-      === expectedBundleIdentity(job.compilerImageDigest)
+      === expectedBundleIdentity(expectedProfile, job.compilerImageDigest)
+    && job.profileManifestDigest === expectedProfile.manifestDigest
     && job.cacheKeyVersion === CACHE_KEY_VERSION
-    && job.profile === COMPILER_PROFILE
+    && job.profile === expectedProfile.id
     && (job.visibility === 'public' || job.visibility === 'private')
     && job.sourcePolicy === SOURCE_POLICY
-    && job.wrapperId === WRAPPER_ID
+    && job.wrapperId === expectedProfile.wrapperId
     && typeof job.wrapperDigest === 'string'
     && SHA256.test(job.wrapperDigest);
 }
@@ -368,10 +458,12 @@ function validJobIdentity(
 function validAttestation(
   value: unknown,
   expectedJobId: string,
+  expectedProfileId: TikzExactCompilerProfileId,
 ): value is CompilerArtifactAttestation {
   if (!value || typeof value !== 'object') return false;
   const attestation = value as Partial<CompilerArtifactAttestation>;
-  const recomputedCacheKey = recomputeCacheKey(attestation);
+  const expectedProfile = tikzExactCompilerProfile(expectedProfileId);
+  const recomputedCacheKey = recomputeCacheKey(attestation, expectedProfile);
   return (
     attestation.schemaVersion === 'tikz-artifact-attestation/v1'
     && attestation.jobId === expectedJobId
@@ -390,23 +482,25 @@ function validAttestation(
     && expectedJobId === `j_${attestation.cacheKeyDigest}`
     && typeof attestation.artifactDigest === 'string'
     && SHA256.test(attestation.artifactDigest)
-    && attestation.profile === COMPILER_PROFILE
+    && attestation.profile === expectedProfile.id
     && (attestation.visibility === 'public' || attestation.visibility === 'private')
     && attestation.sourcePolicy === SOURCE_POLICY
-    && attestation.wrapperId === WRAPPER_ID
+    && attestation.wrapperId === expectedProfile.wrapperId
     && typeof attestation.wrapperDigest === 'string'
     && SHA256.test(attestation.wrapperDigest)
     && typeof attestation.bundleIdentity === 'string'
+    && attestation.profileManifestDigest === expectedProfile.manifestDigest
     && typeof attestation.renderer === 'string'
     && attestation.renderer.length > 0
     && typeof attestation.compilerImageDigest === 'string'
     && attestation.compilerImageDigest.length > 0
     && attestation.bundleIdentity
-      === expectedBundleIdentity(attestation.compilerImageDigest)
+      === expectedBundleIdentity(expectedProfile, attestation.compilerImageDigest)
     && attestation.mediaType === 'image/svg+xml'
     && typeof attestation.svgBytes === 'number'
     && Number.isSafeInteger(attestation.svgBytes)
     && attestation.svgBytes > 0
+    && attestation.svgBytes <= expectedProfile.maxSvgBytes
     && typeof attestation.completedAt === 'number'
     && Number.isSafeInteger(attestation.completedAt)
     && attestation.completedAt > 0
@@ -414,10 +508,17 @@ function validAttestation(
 }
 
 function assertAttestedSuccess(job: CompilerJob): CompilerArtifactAttestation {
+  if (!isTikzExactCompilerProfileId(job.profile)) {
+    throw new TikzCompileError(
+      '精确编译任务没有受支持的 profile',
+      502,
+      'INVALID_ARTIFACT_ATTESTATION',
+    );
+  }
   if (
     job.status !== 'succeeded'
-    || !validJobIdentity(job, job.id)
-    || !validAttestation(job.attestation, job.id)
+    || !validJobIdentity(job, job.profile, job.id)
+    || !validAttestation(job.attestation, job.id, job.profile)
     || job.sourceDigest !== job.attestation.sourceDigest
     || job.submittedSourceDigest !== job.attestation.submittedSourceDigest
     || job.executedSourceDigest !== job.attestation.executedSourceDigest
@@ -430,6 +531,7 @@ function assertAttestedSuccess(job: CompilerJob): CompilerArtifactAttestation {
     || job.wrapperId !== job.attestation.wrapperId
     || job.wrapperDigest !== job.attestation.wrapperDigest
     || job.bundleIdentity !== job.attestation.bundleIdentity
+    || job.profileManifestDigest !== job.attestation.profileManifestDigest
   ) {
     throw new TikzCompileError(
       '精确编译任务缺少可验证的产物证明',
@@ -441,12 +543,21 @@ function assertAttestedSuccess(job: CompilerJob): CompilerArtifactAttestation {
 }
 
 async function compilerFetch(
+  profile: TikzExactCompilerProfileId,
   path: string,
   init: RequestInit,
 ): Promise<Response> {
-  const { url, token } = compilerConfig();
+  const { url, token } = compilerConfig(profile);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  const callerSignal = init.signal ?? undefined;
+  const abortFromCaller = () => controller.abort();
+  if (callerSignal?.aborted) {
+    controller.abort();
+  } else {
+    callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
+  }
 
   try {
     return await fetch(`${url}${path}`, {
@@ -459,7 +570,22 @@ async function compilerFetch(
       signal: controller.signal,
     });
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (
+      error instanceof Error && error.name === 'AbortError'
+      || (
+        typeof error === 'object'
+        && error !== null
+        && 'name' in error
+        && error.name === 'AbortError'
+      )
+    ) {
+      if (callerSignal?.aborted) {
+        throw new TikzCompileError(
+          'TikZ exact compile request was cancelled',
+          499,
+          'COMPILER_REQUEST_ABORTED',
+        );
+      }
       throw new TikzCompileError(
         'TikZ 精确编译请求超时，请稍后重试',
         504,
@@ -473,6 +599,7 @@ async function compilerFetch(
     );
   } finally {
     clearTimeout(timeout);
+    callerSignal?.removeEventListener('abort', abortFromCaller);
   }
 }
 
@@ -496,49 +623,73 @@ function compilerError(
 
 export async function createTikzCompileJob(
   source: string,
+  signal?: AbortSignal,
 ): Promise<CompilerJob> {
   const submittedSource = validateSource(source);
+  const selection = selectTikzExactCompilerProfile(submittedSource);
+  const profile = selection.profile;
   const expectedSubmittedSourceDigest = createHash('sha256')
     .update(submittedSource, 'utf8')
     .digest('hex');
-  const response = await compilerFetch('/v1/jobs', {
+  const response = await compilerFetch(profile, '/v1/jobs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       source: submittedSource,
-      profile: COMPILER_PROFILE,
+      profile,
       visibility: 'private',
     }),
+    signal,
   });
   const payload = await readPayload(response);
+  if (!response.ok) {
+    throw compilerError(response, payload);
+  }
   if (
-    !response.ok
-    || !validJobIdentity(
+    !validJobIdentity(
       payload,
+      profile,
       undefined,
       expectedSubmittedSourceDigest,
     )
     || !['queued', 'running', 'succeeded', 'failed'].includes(payload.status ?? '')
   ) {
-    throw compilerError(response, payload);
+    throw new TikzCompileError(
+      '精确编译任务身份与当前编译 profile 不一致，请重启或更新 compiler 服务',
+      502,
+      'INVALID_JOB_IDENTITY',
+    );
   }
   const job = payload as CompilerJob;
   if (job.status === 'succeeded') assertAttestedSuccess(job);
   return job;
 }
 
-export async function getTikzCompileJob(jobId: string): Promise<CompilerJob> {
+export async function getTikzCompileJob(
+  jobId: string,
+  signal?: AbortSignal,
+  profile: TikzExactCompilerProfileId = 'tikz-standard-v1',
+): Promise<CompilerJob> {
   if (!JOB_ID.test(jobId)) {
     throw new TikzCompileError('非法编译任务 ID', 400, 'INVALID_JOB_ID');
   }
-  const response = await compilerFetch(`/v1/jobs/${jobId}`, { method: 'GET' });
+  const response = await compilerFetch(profile, `/v1/jobs/${jobId}`, {
+    method: 'GET',
+    signal,
+  });
   const payload = await readPayload(response);
+  if (!response.ok) {
+    throw compilerError(response, payload);
+  }
   if (
-    !response.ok
-    || !validJobIdentity(payload, jobId)
+    !validJobIdentity(payload, profile, jobId)
     || !['queued', 'running', 'succeeded', 'failed'].includes(payload.status ?? '')
   ) {
-    throw compilerError(response, payload);
+    throw new TikzCompileError(
+      '精确编译任务身份与当前编译 profile 不一致，请重启或更新 compiler 服务',
+      502,
+      'INVALID_JOB_IDENTITY',
+    );
   }
   const job = payload as CompilerJob;
   if (job.status === 'succeeded') assertAttestedSuccess(job);
@@ -548,11 +699,15 @@ export async function getTikzCompileJob(jobId: string): Promise<CompilerJob> {
 export async function fetchTikzCompileArtifact(
   jobId: string,
   attestation: CompilerArtifactAttestation,
+  signal?: AbortSignal,
 ): Promise<string> {
   if (!JOB_ID.test(jobId)) {
     throw new TikzCompileError('非法编译任务 ID', 400, 'INVALID_JOB_ID');
   }
-  if (!validAttestation(attestation, jobId)) {
+  if (
+    !isTikzExactCompilerProfileId(attestation.profile)
+    || !validAttestation(attestation, jobId, attestation.profile)
+  ) {
     throw new TikzCompileError(
       '精确编译产物证明无效',
       502,
@@ -560,8 +715,9 @@ export async function fetchTikzCompileArtifact(
     );
   }
   const response = await compilerFetch(
+    attestation.profile,
     `/v1/jobs/${jobId}/artifact`,
-    { method: 'GET' },
+    { method: 'GET', signal },
   );
   if (!response.ok) {
     throw compilerError(response, await readPayload(response));
@@ -574,7 +730,11 @@ export async function fetchTikzCompileArtifact(
       'ARTIFACT_HEADER_MISMATCH',
     );
   }
-  const artifact = Buffer.from(await response.arrayBuffer());
+  const artifact = await readResponseBytes(
+    response,
+    tikzExactCompilerProfile(attestation.profile).maxSvgBytes,
+    'ARTIFACT_TOO_LARGE',
+  );
   const observedDigest = createHash('sha256').update(artifact).digest('hex');
   if (observedDigest !== attestation.artifactDigest) {
     throw new TikzCompileError(
@@ -608,8 +768,11 @@ export async function fetchTikzCompileArtifact(
   return decoded;
 }
 
-export async function compileTikzToSvg(source: string): Promise<string> {
-  let job = await createTikzCompileJob(source);
+export async function compileTikzToSvg(
+  source: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  let job = await createTikzCompileJob(source, signal);
   const deadline = Date.now() + REQUEST_TIMEOUT_MS;
   while (job.status === 'queued' || job.status === 'running') {
     if (Date.now() >= deadline) {
@@ -619,8 +782,30 @@ export async function compileTikzToSvg(source: string): Promise<string> {
         'JOB_TIMEOUT',
       );
     }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    job = await getTikzCompileJob(job.id);
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => {
+        clearTimeout(timer);
+        reject(new TikzCompileError(
+          'TikZ exact compile request was cancelled',
+          499,
+          'COMPILER_REQUEST_ABORTED',
+        ));
+      };
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', abort);
+        resolve();
+      }, 250);
+      if (signal?.aborted) {
+        abort();
+      } else {
+        signal?.addEventListener('abort', abort, { once: true });
+      }
+    });
+    job = await getTikzCompileJob(
+      job.id,
+      signal,
+      job.profile ?? 'tikz-standard-v1',
+    );
   }
   if (job.status === 'failed') {
     throw new TikzCompileError(
@@ -629,5 +814,5 @@ export async function compileTikzToSvg(source: string): Promise<string> {
       job.errorCode || 'COMPILE_FAILED',
     );
   }
-  return fetchTikzCompileArtifact(job.id, assertAttestedSuccess(job));
+  return fetchTikzCompileArtifact(job.id, assertAttestedSuccess(job), signal);
 }

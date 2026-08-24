@@ -54,10 +54,10 @@ function applyInspectorPatch(
       engine.revision,
     );
   }
-  const ok = engine.applySourcePatch(patch, 'style', engine.revision);
   return {
-    ok,
-    code: ok ? 'committed' : 'direct-commit-rejected',
+    ok: false,
+    code: 'direct-commit-rejected',
+    message: 'Inspector 缺少 typed proposal 入口，已拒绝直接修改源码。',
   };
 }
 
@@ -133,10 +133,16 @@ function PointCoordinateEditor({
     : null;
   const [x, setX] = useState(literal ? String(literal.x) : '');
   const [y, setY] = useState(literal ? String(literal.y) : '');
+  // Resync on the coordinates themselves, not on `literal`'s identity: the
+  // statement is re-projected on every revision, so depending on the object
+  // would overwrite in-progress typing with each keystroke elsewhere. Both
+  // fields are guaranteed numbers above, so undefined means "not a literal".
+  const literalX = literal?.x;
+  const literalY = literal?.y;
   useEffect(() => {
-    setX(literal ? String(literal.x) : '');
-    setY(literal ? String(literal.y) : '');
-  }, [literal?.x, literal?.y]);
+    setX(literalX === undefined ? '' : String(literalX));
+    setY(literalY === undefined ? '' : String(literalY));
+  }, [literalX, literalY]);
 
   if (!literal) {
     return (
@@ -315,6 +321,11 @@ function GeometryPanel({
     ? statement.specs.flatMap((spec) => (
       spec.type === 'polyline'
         ? spec.points.flatMap((point) => point.kind === 'ref' ? [point.name] : [])
+        : spec.type === 'cubic-bezier'
+          ? [spec.start, spec.control1, spec.control2, spec.end]
+            .flatMap((point) => point.kind === 'ref' ? [point.name] : [])
+        : spec.type === 'circular-arc'
+          ? (spec.start.kind === 'ref' ? [spec.start.name] : [])
         : []
     ))
     : statement?.kind === 'pic'
@@ -848,7 +859,6 @@ function RelationsPanel({ engine }: { engine: TikzEngine }) {
   }, [
     engine.geometryTruth,
     engine.inspectorSelection,
-    engine.revision,
     engine.scene,
     engine.selection,
   ]);
@@ -1046,64 +1056,51 @@ export function TikzStylePanel({ engine }: { engine: TikzEngine }) {
               type="button"
               onClick={() => {
                 setSecondaryDeleteArmed(false);
-                const deleted = engine.deleteSelection(
-                  managedConstructionDelete ? 'block' : 'cascade',
-                );
+                const deleted = engine.deleteSelection('block');
                 setDeleteStatus(
                   deleted
                     ? managedConstructionDelete
                       ? `已原子删除受管构造 ${managedConstructionDeleteId ?? ''}`.trim()
-                      : '已删除所选对象及依赖对象'
+                      : '已安全删除所选对象'
                     : managedConstructionDelete
                       ? '该受管构造仍有外部下游；请使用“删除构造及外部下游”并确认'
-                      : '无法安全删除当前选择',
+                      : '当前对象仍有下游；如果确实需要，请使用二次确认级联删除',
                 );
               }}
             >
-              {managedConstructionDelete ? '删除整个受管构造' : '删除对象及下游'}
+              {managedConstructionDelete ? '删除整个受管构造' : '安全删除对象'}
             </button>
             <button
               type="button"
               title={managedConstructionDelete
                 ? '二次确认后删除整个受管构造，以及源码图中位于该构造之外的全部下游。'
-                : undefined}
+                : '二次确认后删除所选对象和依赖它的全部下游。'}
               onClick={() => {
-                if (managedConstructionDelete) {
-                  if (!secondaryDeleteArmed) {
-                    setSecondaryDeleteArmed(true);
-                    setDeleteStatus('再次点击将级联删除整个受管构造及其外部下游');
-                    return;
-                  }
-                  const cascaded = engine.deleteSelection('cascade');
-                  setSecondaryDeleteArmed(false);
+                if (!secondaryDeleteArmed) {
+                  setSecondaryDeleteArmed(true);
                   setDeleteStatus(
-                    cascaded
-                      ? '已删除整个受管构造及其外部下游'
-                      : '无法安全级联删除当前受管构造',
+                    managedConstructionDelete
+                      ? '再次点击将级联删除整个受管构造及其外部下游'
+                      : '再次点击将删除当前对象及其全部下游',
                   );
                   return;
                 }
-                if (!secondaryDeleteArmed) {
-                  setSecondaryDeleteArmed(true);
-                  setDeleteStatus('再次点击以确认解除约束并删除');
-                  return;
-                }
-                const detached = engine.deleteSelection('detach');
+                const cascaded = engine.deleteSelection('cascade');
                 setSecondaryDeleteArmed(false);
                 setDeleteStatus(
-                  detached
-                    ? '已解除依赖并保留可独立对象'
-                    : '当前构造无法安全解除依赖',
+                  cascaded
+                    ? managedConstructionDelete
+                      ? '已删除整个受管构造及其外部下游'
+                      : '已删除所选对象及其全部下游'
+                    : '无法安全级联删除当前选择',
                 );
               }}
             >
-              {managedConstructionDelete
-                ? secondaryDeleteArmed
-                  ? '确认级联删除'
-                  : '删除构造及外部下游'
-                : secondaryDeleteArmed
-                  ? '确认解除并删除'
-                  : '解除约束后删除'}
+              {secondaryDeleteArmed
+                ? '确认级联删除'
+                : managedConstructionDelete
+                  ? '删除构造及外部下游'
+                  : '级联删除对象及下游'}
             </button>
             <kbd>
               {managedConstructionDelete

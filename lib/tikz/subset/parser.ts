@@ -13,6 +13,8 @@ import {
   type StyleOptions,
   type SourceRange,
 } from './ast';
+import { parseTikzOptionSequence } from '../syntax/option-sequence';
+import { parseStaticGraphBody } from './graph-parser';
 
 // ---------- cursor ----------
 
@@ -62,7 +64,12 @@ function makeCursor(tokens: Token[], src: string): Cursor {
       const closeTok = this.tokens[this.pos - 1];
       const raw = this.src.slice(open.end, closeTok.start);
       const range: SourceRange = { start: open.start, end: closeTok.end };
-      return { raw, range };
+      return {
+        raw,
+        range,
+        // `raw` starts immediately after the opening bracket.
+        sequence: parseTikzOptionSequence(raw, open.end),
+      };
     },
     readBraceRaw() {
       const open = this.expect('lbrace', "'{'");
@@ -119,8 +126,25 @@ function parseCoord(c: Cursor): CoordExpr {
 
   if (t.type === 'name') {
     const name = c.next();
+    let anchor: 'center' | undefined;
+    if (c.peek()?.type === 'dot') {
+      c.next();
+      const anchorToken = c.expect('name', '锚点名称');
+      if (anchorToken.value !== 'center') {
+        c.fail(
+          `交互语义暂只支持命名点的 center 锚点；'${anchorToken.value}' 保留给精准渲染`,
+          anchorToken,
+        );
+      }
+      anchor = 'center';
+    }
     const close = c.expect('rparen', "')'");
-    return { kind: 'ref', name: name.value, range: { start: open.start, end: close.end } };
+    return {
+      kind: 'ref',
+      name: name.value,
+      ...(anchor ? { anchor } : {}),
+      range: { start: open.start, end: close.end },
+    };
   }
 
   c.fail("'(' 内无法识别", t);
@@ -136,6 +160,25 @@ function parseLiteralNumber(c: Cursor): { value: number; range: SourceRange } {
   }
   const n = c.expect('number', '数字');
   return { value: Number(n.value), range: { start: n.start, end: n.end } };
+}
+
+function parseLengthInCentimetres(c: Cursor): { value: number; range: SourceRange } {
+  const number = parseLiteralNumber(c);
+  const maybeUnit = c.peek();
+  if (!maybeUnit || maybeUnit.type !== 'name') return number;
+  const factors: Readonly<Record<string, number>> = {
+    cm: 1,
+    mm: 0.1,
+    in: 2.54,
+    pt: 2.54 / 72.27,
+  };
+  const factor = factors[maybeUnit.value];
+  if (factor === undefined) return number;
+  c.next();
+  return {
+    value: number.value * factor,
+    range: { start: number.range.start, end: maybeUnit.end },
+  };
 }
 
 function offsetNumExprRanges(expr: NumExpr, offset: number): NumExpr {
@@ -413,13 +456,23 @@ function parsePath(c: Cursor, command: 'draw' | 'path' | 'fill' | 'filldraw'): S
     if (!t) c.fail("缺少 ';'");
     if (t.type === 'semi') break;
 
-    // intersections bindings: '(' 'intersection' '-' number ')' 'coordinate' '(' name ')'
+    // intersections bindings: '(' 'intersection-N' ')' 'coordinate' '(' name ')'
+    // The lexer admits '-' inside a name, so 'intersection-1' arrives as one
+    // name token. The split 'intersection' '-' 1 form stays accepted because
+    // whitespace ('intersection - 1') still lexes as three tokens.
     if (intersections && t.type === 'lparen' && c.peekAt(1)?.type === 'name' && c.peekAt(1)?.value?.startsWith('intersection')) {
       c.next(); // '('
       const tag = c.next();
       if (tag.type !== 'name' || !tag.value?.startsWith('intersection')) c.fail("应以 'intersection' 开头", tag);
-      c.expect('minus', "'-'");
-      const idx = c.expect('number', '编号');
+      const inlineIndex = /^intersection-(\d+)$/.exec(tag.value);
+      let idx: Token;
+      if (inlineIndex) {
+        idx = { ...tag, type: 'number', value: inlineIndex[1] };
+      } else {
+        if (tag.value !== 'intersection') c.fail("应为 'intersection-编号'", tag);
+        c.expect('minus', "'-'");
+        idx = c.expect('number', '编号');
+      }
       c.expect('rparen', "')'");
       const coordKw = c.next();
       if (coordKw.type !== 'name' || coordKw.value !== 'coordinate') c.fail("应为 'coordinate'", coordKw);
@@ -433,10 +486,116 @@ function parsePath(c: Cursor, command: 'draw' | 'path' | 'fill' | 'filldraw'): S
     // coord (polyline/circle)
     const coord = parseCoord(c);
     const next = c.peek();
+    if (next?.type === 'name' && next.value === 'rectangle') {
+      c.next();
+      const opposite = parseCoord(c);
+      specs.push({
+        type: 'rectangle',
+        first: coord,
+        opposite,
+        range: { start: coord.range.start, end: opposite.range.end },
+      });
+      continue;
+    }
     if (next && next.type === 'name' && next.value === 'circle') {
       c.next();
       const rad = parseCircleRadius(c);
       specs.push({ type: 'circle', center: coord, radius: rad, range: { start: coord.range.start, end: rad.range.end } });
+      continue;
+    }
+    if (next?.type === 'name' && next.value === 'ellipse') {
+      c.next();
+      c.expect('lparen', "'('");
+      const xRadius = parseLengthInCentimetres(c);
+      const and = c.expect('name', "'and'");
+      if (and.value !== 'and') c.fail("椭圆半径应以 'and' 分隔", and);
+      const yRadius = parseLengthInCentimetres(c);
+      const close = c.expect('rparen', "')'");
+      if (xRadius.value <= 0 || yRadius.value <= 0) c.fail('椭圆半径必须为正数', next);
+      specs.push({
+        type: 'ellipse',
+        center: coord,
+        xRadius: xRadius.value,
+        yRadius: yRadius.value,
+        parameterSources: { xRadius, yRadius },
+        range: { start: coord.range.start, end: close.end },
+      });
+      continue;
+    }
+    if (next?.type === 'name' && next.value === 'arc') {
+      c.next();
+      let startAngle: { value: number; range: SourceRange };
+      let endAngle: { value: number; range: SourceRange };
+      let radiusSource: { value: number; range: SourceRange };
+      let arcEnd: number;
+      if (c.peek()?.type === 'lbracket') {
+        const options = c.readBracketRaw();
+        const numberFor = (key: string): { value: number; range: SourceRange } => {
+          const entry = options.sequence.entries
+            .filter((candidate) => candidate.interpretedKey === key)
+            .at(-1);
+          const raw = entry?.valueRange
+            ? c.src.slice(entry.valueRange.start, entry.valueRange.end)
+            : '';
+          const match = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/iu.exec(raw);
+          if (!match) c.fail(`圆弧缺少 ${key}`, { type: 'unknown', value: key, start: options.range.start, end: options.range.end });
+          return {
+            value: Number(match[0]),
+            range: {
+              start: entry!.valueRange!.start,
+              end: entry!.valueRange!.end,
+            },
+          };
+        };
+        startAngle = numberFor('start angle');
+        endAngle = numberFor('end angle');
+        radiusSource = numberFor('radius');
+        arcEnd = options.range.end;
+      } else {
+        const open = c.expect('lparen', "'('");
+        startAngle = parseLiteralNumber(c);
+        c.expect('colon', "':'");
+        endAngle = parseLiteralNumber(c);
+        c.expect('colon', "':'");
+        radiusSource = parseLiteralNumber(c);
+        const close = c.expect('rparen', "')'");
+        arcEnd = close.end;
+        void open;
+      }
+      const startAngleDeg = startAngle.value;
+      const endAngleDeg = endAngle.value;
+      const radius = radiusSource.value;
+      if (!Number.isFinite(radius) || radius <= 0) c.fail('圆弧半径必须为正数', next);
+      specs.push({
+        type: 'circular-arc', start: coord,
+        startAngleDeg, endAngleDeg, radius,
+        parameterSources: {
+          startAngle,
+          endAngle,
+          radius: radiusSource,
+        },
+        range: { start: coord.range.start, end: arcEnd },
+      });
+      continue;
+    }
+    if (next?.type === 'dotdot') {
+      c.next();
+      const controls = c.expect('name', "'controls'");
+      if (controls.value !== 'controls') c.fail("应为 'controls'", controls);
+      const control1 = parseCoord(c);
+      const and = c.expect('name', "'and'");
+      if (and.value !== 'and') c.fail("应为 'and'", and);
+      const control2 = parseCoord(c);
+      c.expect('dotdot', "'..'");
+      const end = parseCoord(c);
+      specs.push({
+        type: 'cubic-bezier',
+        start: coord,
+        control1,
+        control2,
+        end,
+        range: { start: coord.range.start, end: end.range.end },
+      });
       continue;
     }
     // polyline
@@ -542,6 +701,22 @@ function parsePic(c: Cursor): Statement {
   return { kind: 'pic', picType, points: [m[2], m[3], m[4]], options, range: { start: start.start, end: semi.end } };
 }
 
+function parseGraph(c: Cursor): Statement {
+  const start = c.expectCmd('\\graph');
+  let options: StyleOptions | null = null;
+  if (c.peek()?.type === 'lbracket') options = c.readBracketRaw();
+  const body = c.readBraceRaw();
+  const semi = c.expect('semi', "';'");
+  const parsed = parseStaticGraphBody(body.raw, body.range.start + 1);
+  return {
+    kind: 'graph',
+    options,
+    nodes: parsed.nodes,
+    edges: parsed.edges,
+    range: { start: start.start, end: semi.end },
+  };
+}
+
 // ---------- statement dispatch ----------
 
 function parseStatement(c: Cursor): Statement {
@@ -568,6 +743,7 @@ function parseStatement(c: Cursor): Statement {
   }
   if (t.value === '\\node') return parseNode(c);
   if (t.value === '\\pic') return parsePic(c);
+  if (t.value === '\\graph') return parseGraph(c);
   c.fail(`子集不支持的命令 ${t.value}`, t);
 }
 

@@ -68,6 +68,15 @@ export class BrowserSolverPort implements SolverPort {
         if (!pending) return;
         this.pending.delete(requestId);
         pending.removeAbortListener();
+        // A Worker cannot observe a cancellation message while synchronous
+        // constraint solving is running. When this was its last owned request,
+        // terminate it so a cancelled drag does not retain CPU or heap until
+        // the obsolete solve eventually returns. The next drag lazily creates
+        // a fresh Worker.
+        if (this.pending.size === 0) {
+          worker.terminate();
+          if (this.worker === worker) this.worker = null;
+        }
         reject(new DOMException('Aborted', 'AbortError'));
       };
       signal?.addEventListener('abort', abort, { once: true });

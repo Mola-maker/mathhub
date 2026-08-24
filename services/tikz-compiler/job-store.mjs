@@ -81,6 +81,7 @@ export class RedisJobStore {
     wrapperId,
     wrapperDigest,
     bundleIdentity,
+    profileManifestDigest,
   }) {
     const client = this.requireClient();
     const key = this.jobKey(jobId);
@@ -102,6 +103,7 @@ export class RedisJobStore {
       wrapperId,
       wrapperDigest,
       bundleIdentity,
+      profileManifestDigest,
       status: 'queued',
       attempt: 0,
       createdAt: now,
@@ -331,6 +333,7 @@ export class RedisJobStore {
       || result.wrapperId !== job.wrapperId
       || result.wrapperDigest !== job.wrapperDigest
       || result.bundleIdentity !== job.bundleIdentity
+      || result.profileManifestDigest !== job.profileManifestDigest
       || typeof result.executedDocumentDigest !== 'string'
       || !/^[a-f0-9]{64}$/.test(result.executedDocumentDigest)
     ) {
@@ -357,6 +360,7 @@ export class RedisJobStore {
       wrapperId: job.wrapperId,
       wrapperDigest: job.wrapperDigest,
       bundleIdentity: job.bundleIdentity,
+      profileManifestDigest: job.profileManifestDigest,
       renderer: result.renderer,
       compilerImageDigest: result.compilerImageDigest,
       visibility: job.visibility,

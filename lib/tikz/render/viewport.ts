@@ -6,7 +6,20 @@ export interface Viewport {
   offsetY: number;
 }
 
+/** CSS pixels occupied by one physical centimetre at the browser reference DPI. */
+export const NATURAL_CM_TO_CSS_PX = 96 / 2.54;
 export const CM_TO_PX = 40;
+
+/**
+ * Scale applied by the fitted interactive viewport relative to TeX's natural
+ * physical size. dvisvgm scales line widths, dash patterns and text together
+ * with the picture; the interactive renderer must do the same to avoid a
+ * visual jump when the exact artifact is shown.
+ */
+export function tikzPresentationScale(viewport: Pick<Viewport, 'scale'>): number {
+  const scale = viewport.scale / NATURAL_CM_TO_CSS_PX;
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
 
 export function sceneToScreen(p: Pt, vp: Viewport): Pt {
   return {
@@ -57,4 +70,3 @@ export function fitViewport(
     offsetY: height / 2 + ((minY + maxY) / 2) * scale,
   };
 }
-

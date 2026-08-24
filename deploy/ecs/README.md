@@ -3,6 +3,10 @@
 该目录是正式生产部署骨架。`.openai/hosting.json` 仅保留预览用途，生产运行时是
 Next.js Node standalone + 独立 TikZ compiler API/Worker。
 
+公开站点采用单一来源架构：`mathhub/` 是唯一首页前端源码，根构建先把它输出到
+`public/mathhub/`，再构建 Next.js。浏览器只访问同一个 ECS/CDN 域名：`/` 返回
+MathHub，两个工作区入口分别是 `/math` 与 `/tikz`，不暴露独立的 Vite 生产域名。
+
 ## 生产组件
 
 | 组件 | 暴露方式 | 状态存储 | 扩容信号 |
@@ -21,6 +25,14 @@ Next.js Node standalone + 独立 TikZ compiler API/Worker。
 - 根目录 `Dockerfile`：Next.js standalone Web；
 - `services/tikz-compiler/Dockerfile --target api`：不含 TeX 的 compiler API；
 - `services/tikz-compiler/Dockerfile --target worker`：固定版本 Tectonic/dvisvgm。
+- `services/tikz-compiler/Dockerfile --target api-graphdrawing`：Lua graph drawing
+  专用 API profile；
+- `services/tikz-compiler/Dockerfile --target worker-graphdrawing`：不可变 TeX Live
+  LuaLaTeX/dvisvgm companion Worker。
+
+标准与 graphdrawing 是两个证明域：分别使用独立 Worker image digest、Redis prefix、
+token 和 ECS task/service。Web 端通过源码能力选择 profile；companion 未部署时明确
+报告不可用，绝不把 Lua graph drawing 代码送到标准 Tectonic 队列。
 
 上传 ACR 后，`WEB_IMAGE`、`COMPILER_API_IMAGE` 必须使用不可变 digest。
 `COMPILER_WORKER_IMAGE_REF` 必须是完整的 `repo@sha256:...`；生产 Compose 用同一个
@@ -49,16 +61,20 @@ EnvironmentFile（权限 0600）或同等级 secret manager 注入。
 2. ECS 通过 internal endpoint 或 PrivateLink 访问；
 3. CDN 配置 private bucket 回源鉴权；
 4. `/_next/static/*` 使用一年 immutable；
-5. 仅公开文档的 `/tikz/v1/public/<sha256>.svg` 使用一年 immutable；
+5. `/mathhub/assets/*` 是 Vite 指纹文件，使用一年 immutable；
+6. `/mathhub/fonts/*` 与 `/mathhub/audio/*` 尚未采用内容哈希，只做一天短缓存；
+7. `/` 与 `/mathhub/index.html` 必须重新验证，不能使用 immutable；
+8. 仅公开文档的 `/tikz/v1/public/<sha256>.svg` 使用一年 immutable；
    `/tikz/v1/private/*` 永远不配置公开 CDN behavior；
-6. `/api/*`、HTML/RSC、用户私有产物绕过 CDN 缓存；
-7. CDN cache key 不得丢弃 artifact hash，不得把鉴权 header 纳入公开缓存变体；
-8. 配置 hotlink protection、HTTPS、压缩和访问日志。
+9. `/api/*`、HTML/RSC、用户私有产物绕过 CDN 缓存；
+10. CDN cache key 不得丢弃 artifact hash，不得把鉴权 header 纳入公开缓存变体；
+11. 配置 hotlink protection、HTTPS、压缩和访问日志。
 
 ## 首次部署顺序
 
 1. 准备 ApsaraDB Redis、private OSS、CDN、ACR、TLS 与安全组；
-2. 构建并推送三个镜像，记录 digest；
+2. 在根目录构建 Web；根 `npm run build` 会先构建 MathHub，再构建 Next.js，
+   standalone 镜像必须包含生成的 `public/`；随后构建并推送三个镜像，记录 digest；
 3. 准备只在 ECS 上存在的生产环境文件；
 4. 按 `compose.production.yaml` 启动 compiler API/Worker 与 Web；
 5. Nginx 使用 `nginx/math-geohub.conf`，健康检查 `/healthz`；

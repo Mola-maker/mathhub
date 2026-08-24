@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "geometry-evaluation-expectations/v2",
+  "points": {
+    "A": [0, 0],
+    "B": [6, 0],
+    "C": [1.5, 4],
+    "O": [3, 1.15625],
+    "H": [1.5, 1.6875],
+    "N": [2.25, 1.421875]
+  },
+  "profiles": {
+    "mathnet-nine-point-cyclic": {
+      "schemaVersion": "geometry-evaluation-corpus/v3",
+      "caseId": "mathnet-iran-2025-nine-point-cyclic",
+      "title": "Nine-point circle and cyclic quadrilateral · staged Olympiad construction",
+      "source": {
+        "disposition": "research-reference-only",
+        "source": "mathnet",
+        "recordId": "mathnet:iran-2025-nine-point-cyclic",
+        "sourceUrl": "https://mathnet.mit.edu/explorer.html?source=iran",
+        "admission": "not-admitted",
+        "attributionMode": "gateway-record"
+      },
+      "turns": [
+        {
+          "lane": "answer-only",
+          "instruction": "解释当前图中三条高、垂心 H、九点圆心 N 与九点圆之间的关系，不要修改画板。",
+          "expectedCapabilities": ["semantic-read"],
+          "invariants": [
+            { "kind": "source-unchanged" },
+            { "kind": "agent-terminal", "outcome": "answer", "requiredEventTypes": ["context.read", "run.completed"] },
+            { "kind": "grounding-resolves", "minimumRefs": 6, "recordTypes": ["entity", "constraint", "relation"] }
+          ]
+        },
+        {
+          "lane": "construct",
+          "instruction": "继续构造 EF 与 HD 的垂直平分线交点 P，再按题意构造外接圆上的 L，并标出待证的圆内接四边形 ANDL。",
+          "expectedCapabilities": ["atomic-construction"],
+          "invariants": [
+            { "kind": "single-broker-commit" },
+            { "kind": "proposal-schema", "allowed": ["construction-plan-proposal/v1", "ai-construction-dag-intent/v1", "ai-construction-intent-batch-proposal/v1", "canvas-construction-batch-proposal/v1"] },
+            { "kind": "semantic-entity-delta", "minimum": 3 },
+            { "kind": "post-commit-basis-current" }
+          ]
+        },
+        {
+          "lane": "modify-existing",
+          "instruction": "把待证四边形改为紫色粗线，并给 P、L 和九点圆心 N 添加标签。",
+          "expectedCapabilities": ["binding-scoped-style", "label-intent"],
+          "invariants": [
+            { "kind": "single-broker-commit" },
+            { "kind": "binding-scoped-write" },
+            { "kind": "semantic-style-changed" },
+            { "kind": "label-entity-delta", "minimum": 3 },
+            { "kind": "post-commit-basis-current" }
+          ]
+        },
+        {
+          "lane": "verify-rendering",
+          "instruction": "比较交互画板与精准 TikZ 产物中九点圆、垂足、直角记号和标签的位置，报告偏差但不要写入源码。",
+          "expectedCapabilities": ["interactive-render", "exact-render"],
+          "invariants": [
+            { "kind": "source-unchanged" },
+            { "kind": "render-artifacts-attested", "lanes": ["interactive", "exact"] },
+            { "kind": "render-read-only" }
+          ]
+        }
+      ]
+    }
+  }
+}

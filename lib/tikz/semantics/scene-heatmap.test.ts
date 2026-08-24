@@ -10,6 +10,10 @@ describe('buildSceneHeatmap', () => {
 \draw (A) -- (B);
 \end{tikzpicture}`;
     const { scene } = analyze(source, 1);
+    // A failed projection yields a null scene; assert rather than cast so the
+    // heatmap is never exercised against a scene this test did not produce.
+    expect(scene).not.toBeNull();
+    if (!scene) return;
     const heatmap = buildSceneHeatmap(scene, {
       selection: ['A'],
       selectedStmtIndex: 2,

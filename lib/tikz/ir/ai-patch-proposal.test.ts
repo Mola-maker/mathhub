@@ -149,6 +149,13 @@ describe('binding-scoped AI patch proposal', () => {
     expect(applyTextPatches(source, patches)).toContain(
       '\\coordinate (B) at (2,0);',
     );
+    expect(result.transaction.workspaceEdit).toMatchObject({
+      schemaVersion: 'geometry-workspace-edit/v1',
+      failureHandling: 'atomic',
+      operationAnnotations: [{
+        patchAnnotationIds: ['change-1-patch-1', 'change-1-patch-2'],
+      }],
+    });
   });
 
   it('空源码只接受一个完整 tikzpicture 环境', () => {

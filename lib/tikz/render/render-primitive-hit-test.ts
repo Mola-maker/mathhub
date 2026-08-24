@@ -1,5 +1,9 @@
 import type { SourceRange } from '../ir/model';
 import type { Pt } from '../semantics/calc-eval';
+import { flattenCubicBezier } from '../geometry/cubic-bezier';
+import { flattenCircularArc } from '../geometry/circular-arc';
+import { flattenEllipticalArc } from '../geometry/elliptical-arc';
+import { flattenEllipse } from '../geometry/ellipse';
 import { clipParametricLineToFrame, type ScreenFrame } from './line-clip';
 import { labelScreenBounds } from './label-layout';
 import type {
@@ -10,7 +14,7 @@ import {
   angleMarkGeometry,
   DEFAULT_ANGLE_MARK_RADIUS,
 } from './svg-decoration-primitives';
-import { sceneToScreen, type Viewport } from './viewport';
+import { sceneToScreen, tikzPresentationScale, type Viewport } from './viewport';
 
 export interface RenderPrimitiveHit {
   readonly primitiveId: string;
@@ -21,6 +25,7 @@ export interface RenderPrimitiveHit {
   readonly sourceRange?: SourceRange;
   readonly statementIndex: number;
   readonly kind: DecodedRenderPrimitive['kind'];
+  readonly pointName?: string;
   readonly references: readonly string[];
   readonly distance: number;
   readonly zIndex: number;
@@ -106,10 +111,13 @@ function pathDistance(
 
 function primitiveDistance(
   screen: Pt,
-  primitive: Exclude<DecodedRenderPrimitive, { kind: 'point' }>,
+  primitive: DecodedRenderPrimitive,
   viewport: Viewport,
   frame: ScreenFrame,
 ): number {
+  if (primitive.kind === 'point') {
+    return distance(screen, sceneToScreen(primitive.position, viewport));
+  }
   if (
     primitive.kind === 'segment'
     || primitive.kind === 'vector'
@@ -120,42 +128,98 @@ function primitiveDistance(
   ) {
     return pathDistance(screen, primitive, viewport, frame);
   }
+  if (primitive.kind === 'cubic-bezier') {
+    const screenCurve = {
+      start: sceneToScreen(primitive.start, viewport),
+      control1: sceneToScreen(primitive.control1, viewport),
+      control2: sceneToScreen(primitive.control2, viewport),
+      end: sceneToScreen(primitive.end, viewport),
+    };
+    const points = flattenCubicBezier(screenCurve, 0.75);
+    let closest = Number.POSITIVE_INFINITY;
+    for (let index = 1; index < points.length; index += 1) {
+      closest = Math.min(
+        closest,
+        distanceToSegment(screen, points[index - 1]!, points[index]!),
+      );
+    }
+    return closest;
+  }
+  if (primitive.kind === 'circular-arc') {
+    const points = flattenCircularArc(primitive, 3)
+      .map((point) => sceneToScreen(point, viewport));
+    let closest = Number.POSITIVE_INFINITY;
+    for (let index = 1; index < points.length; index += 1) {
+      closest = Math.min(closest, distanceToSegment(screen, points[index - 1]!, points[index]!));
+    }
+    return closest;
+  }
+  if (primitive.kind === 'elliptical-arc') {
+    const points = flattenEllipticalArc(primitive, 3)
+      .map((point) => sceneToScreen(point, viewport));
+    let closest = Number.POSITIVE_INFINITY;
+    for (let index = 1; index < points.length; index += 1) {
+      closest = Math.min(closest, distanceToSegment(screen, points[index - 1]!, points[index]!));
+    }
+    return closest;
+  }
   if (primitive.kind === 'circle') {
     const center = sceneToScreen(primitive.center, viewport);
     return Math.abs(
       distance(screen, center) - primitive.radius * viewport.scale,
     );
   }
+  if (primitive.kind === 'graph-node') {
+    const center = sceneToScreen(primitive.center, viewport);
+    return Math.max(0, distance(screen, center) - primitive.radius * viewport.scale);
+  }
+  if (primitive.kind === 'ellipse') {
+    const points = flattenEllipse(primitive, 96)
+      .map((point) => sceneToScreen(point, viewport));
+    let closest = Number.POSITIVE_INFINITY;
+    for (let index = 1; index < points.length; index += 1) {
+      closest = Math.min(closest, distanceToSegment(screen, points[index - 1]!, points[index]!));
+    }
+    return closest;
+  }
   if (primitive.kind === 'label') {
     const at = sceneToScreen(primitive.at, viewport);
     return distanceToBounds(
       screen,
-      labelScreenBounds(at, primitive.text, primitive.anchor ?? ''),
-    );
-  }
-  const vertex = sceneToScreen(primitive.vertex, viewport);
-  const from = sceneToScreen(primitive.from, viewport);
-  const to = sceneToScreen(primitive.to, viewport);
-  const angleGeometry = angleMarkGeometry({
-    vertex,
-    from,
-    to,
-    right: primitive.kind === 'right-angle',
-    radius: DEFAULT_ANGLE_MARK_RADIUS,
-  });
-  if (!angleGeometry) return Number.POSITIVE_INFINITY;
-  let closest = Number.POSITIVE_INFINITY;
-  for (let index = 1; index < angleGeometry.points.length; index += 1) {
-    closest = Math.min(
-      closest,
-      distanceToSegment(
-        screen,
-        angleGeometry.points[index - 1]!,
-        angleGeometry.points[index]!,
+      labelScreenBounds(
+        at,
+        primitive.text,
+        primitive.anchor ?? '',
+        tikzPresentationScale(viewport),
       ),
     );
   }
-  return closest;
+  if (primitive.kind === 'angle' || primitive.kind === 'right-angle') {
+    const vertex = sceneToScreen(primitive.vertex, viewport);
+    const from = sceneToScreen(primitive.from, viewport);
+    const to = sceneToScreen(primitive.to, viewport);
+    const angleGeometry = angleMarkGeometry({
+      vertex,
+      from,
+      to,
+      right: primitive.kind === 'right-angle',
+      radius: DEFAULT_ANGLE_MARK_RADIUS * tikzPresentationScale(viewport),
+    });
+    if (!angleGeometry) return Number.POSITIVE_INFINITY;
+    let closest = Number.POSITIVE_INFINITY;
+    for (let index = 1; index < angleGeometry.points.length; index += 1) {
+      closest = Math.min(
+        closest,
+        distanceToSegment(
+          screen,
+          angleGeometry.points[index - 1]!,
+          angleGeometry.points[index]!,
+        ),
+      );
+    }
+    return closest;
+  }
+  return Number.POSITIVE_INFINITY;
 }
 
 export function hitTestRenderPrimitives(
@@ -171,8 +235,7 @@ export function hitTestRenderPrimitives(
   for (let index = rendering.primitives.length - 1; index >= 0; index -= 1) {
     const primitive = rendering.primitives[index]!;
     if (
-      primitive.kind === 'point'
-      || primitive.statementIndex === null
+      primitive.statementIndex === null
       || primitive.entityIds.length === 0
     ) continue;
     const currentDistance = primitiveDistance(
@@ -193,6 +256,9 @@ export function hitTestRenderPrimitives(
       sourceRange: primitive.sourceRange,
       statementIndex: primitive.statementIndex,
       kind: primitive.kind,
+      ...(primitive.kind === 'point' && primitive.pointName
+        ? { pointName: primitive.pointName }
+        : {}),
       references: primitive.references,
       distance: currentDistance,
       zIndex: primitive.zIndex,

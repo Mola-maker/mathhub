@@ -6,6 +6,21 @@ import tseslint from 'typescript-eslint';
 export default defineConfig([
   ...tseslint.configs.recommended,
   {
+    // A leading underscore is this codebase's discard marker. It is load-bearing
+    // for `const { omitted: _omitted, ...rest }`, the only way to drop a key
+    // from an object, so the rule has to recognise it rather than the code
+    // working around it.
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+        ignoreRestSiblings: true,
+      }],
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     plugins: {
       '@next/next': nextPlugin,
@@ -24,7 +39,11 @@ export default defineConfig([
     'coverage/**',
     '.claude/**',
     '.superpowers/**',
-    'Herodeisgn/**',
+    'mathhub/**',
+    // `npm run build:mathhub` emits the bundled MathHub workspace here. Ignoring
+    // only 'mathhub/**' missed it, so every lint run reported thousands of
+    // errors against minified generated output.
+    'public/mathhub/**',
     'next-env.d.ts',
   ]),
 ]);

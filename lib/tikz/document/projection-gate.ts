@@ -16,9 +16,18 @@ export interface ProjectionGateResult {
   writebackReason: ProjectionWritebackBlockedReason | null;
 }
 
+/** An Analysis whose interactive projection is present. */
+export type UsableSemanticProjection = Analysis & {
+  scene: NonNullable<Analysis['scene']>;
+  stmts: NonNullable<Analysis['stmts']>;
+};
+
+// Narrowing to the usable subtype rather than to Analysis itself matters: a
+// predicate of `projection is Analysis` reduces the negative branch to `never`,
+// which silently hides the fields still readable on a failed projection.
 export function isUsableSemanticProjection(
   projection: Analysis | null | undefined,
-): projection is Analysis {
+): projection is UsableSemanticProjection {
   return Boolean(
     projection
     && projection.status !== 'invalid'

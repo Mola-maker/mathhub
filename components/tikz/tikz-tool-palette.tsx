@@ -106,7 +106,7 @@ export function TikzToolPalette({ engine }: { engine: TikzEngine }) {
     () => AUTHORING_TOOLS.filter((tool) => tool.category === category),
     [category],
   );
-  const results = useMemo(() => {
+  const resultSet = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
     const source = normalized
       ? AUTHORING_TOOLS.filter((tool) => searchableText(tool).includes(normalized))
@@ -116,8 +116,12 @@ export function TikzToolPalette({ engine }: { engine: TikzEngine }) {
           .filter((tool): tool is Tool => Boolean(tool)),
         ...AUTHORING_TOOLS.filter((tool) => !recent.includes(tool.id)),
       ];
-    return source.slice(0, 24);
+    return {
+      visible: source.slice(0, 24),
+      total: source.length,
+    };
   }, [query, recent]);
+  const results = resultSet.visible;
 
   const choose = (tool: Tool) => {
     engine.setActiveTool(tool.id);
@@ -222,7 +226,7 @@ export function TikzToolPalette({ engine }: { engine: TikzEngine }) {
               id="tz-command-deck"
               className="tz-command-deck"
               role="dialog"
-              aria-label="竞赛几何命令面板"
+              aria-label="几何命令面板"
               onKeyDown={(event) => {
                 if (event.key !== 'Escape') return;
                 event.preventDefault();
@@ -250,7 +254,11 @@ export function TikzToolPalette({ engine }: { engine: TikzEngine }) {
               <button type="button" onClick={closeDeck} aria-label="关闭命令面板">Esc</button>
             </div>
             <div className="tz-command-deck__meta">
-              {query ? `找到 ${results.length} 个命令` : recent.length > 0 ? '最近使用与全部命令' : '全部构造命令'}
+              {query
+                ? `找到 ${resultSet.total} 个命令${resultSet.total > results.length ? `，显示前 ${results.length} 个` : ''}`
+                : recent.length > 0
+                  ? `最近使用与全部命令 · 显示 ${results.length}/${resultSet.total}`
+                  : `全部构造命令 · 显示 ${results.length}/${resultSet.total}`}
             </div>
             <div className="tz-command-deck__list">
               <AnimatePresence initial={false} mode="popLayout">

@@ -1,0 +1,6580 @@
+{
+  "schema": "pgf-upstream-registry-shard/v1",
+  "id": "static-library-0001",
+  "surface": "library",
+  "status": "static",
+  "entries": [
+    {
+      "id": "pgf-3.1.11a:library:3d:97634f06ab",
+      "title": "3d library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrary3d.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/3d"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{3d} or \\usepgflibrary{3d}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:angles:03789a4ef1",
+      "title": "angles library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryangles.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/angles"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{angles} or \\usepgflibrary{angles}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:animations:0c05153509",
+      "title": "animations library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryanimations.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/animations"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{animations} or \\usepgflibrary{animations}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:arrows.meta:ec1a044255",
+      "title": "arrows.meta library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryarrows.meta.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/arrows.meta"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{arrows.meta} or \\usepgflibrary{arrows.meta}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:arrows.spaced:7b2c2a7dd6",
+      "title": "arrows.spaced library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryarrows.spaced.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/arrows.spaced"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{arrows.spaced} or \\usepgflibrary{arrows.spaced}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:arrows:5aab977173",
+      "title": "arrows library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryarrows.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/arrows"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{arrows} or \\usepgflibrary{arrows}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:arrows:933ec4fa32",
+      "title": "arrows library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryarrows.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/arrows"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{arrows} or \\usepgflibrary{arrows}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:automata:3f8cee73b2",
+      "title": "automata library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryautomata.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/automata"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{automata} or \\usepgflibrary{automata}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:babel:ffcfdfb8f7",
+      "title": "babel library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarybabel.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/babel"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{babel} or \\usepgflibrary{babel}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:backgrounds:a9a3d41922",
+      "title": "backgrounds library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarybackgrounds.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/backgrounds"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{backgrounds} or \\usepgflibrary{backgrounds}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:bending:8ae37e9820",
+      "title": "bending library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarybending.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/bending"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{bending} or \\usepgflibrary{bending}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:calc:3e1b96ed03",
+      "title": "calc library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarycalc.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/calc"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{calc} or \\usepgflibrary{calc}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:calendar:656e03ab87",
+      "title": "calendar library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarycalendar.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/calendar"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{calendar} or \\usepgflibrary{calendar}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:chains:4f0331a5a1",
+      "title": "chains library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarychains.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/chains"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{chains} or \\usepgflibrary{chains}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:circuits.ee.IEC:894c014ba9",
+      "title": "circuits.ee.IEC library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/circuits/tikzlibrarycircuits.ee.IEC.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/circuits.ee.IEC"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{circuits.ee.IEC} or \\usepgflibrary{circuits.ee.IEC}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:circuits.ee:3fa217935b",
+      "title": "circuits.ee library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/circuits/tikzlibrarycircuits.ee.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/circuits.ee"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{circuits.ee} or \\usepgflibrary{circuits.ee}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:circuits.logic.CDH:5c45ffc0c8",
+      "title": "circuits.logic.CDH library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/circuits/tikzlibrarycircuits.logic.CDH.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/circuits.logic.CDH"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{circuits.logic.CDH} or \\usepgflibrary{circuits.logic.CDH}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:circuits.logic.IEC:6067a49013",
+      "title": "circuits.logic.IEC library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/circuits/tikzlibrarycircuits.logic.IEC.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/circuits.logic.IEC"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{circuits.logic.IEC} or \\usepgflibrary{circuits.logic.IEC}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:circuits.logic.US:d2079b2e91",
+      "title": "circuits.logic.US library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/circuits/tikzlibrarycircuits.logic.US.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/circuits.logic.US"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{circuits.logic.US} or \\usepgflibrary{circuits.logic.US}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:circuits.logic:d98d42f786",
+      "title": "circuits.logic library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/circuits/tikzlibrarycircuits.logic.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/circuits.logic"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{circuits.logic} or \\usepgflibrary{circuits.logic}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:circuits:407e2cedce",
+      "title": "circuits library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/circuits/tikzlibrarycircuits.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/circuits"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{circuits} or \\usepgflibrary{circuits}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:curvilinear:eafd2740eb",
+      "title": "curvilinear library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibrarycurvilinear.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/curvilinear"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{curvilinear} or \\usepgflibrary{curvilinear}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:datavisualization.3d:e462b999f1",
+      "title": "datavisualization.3d library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/datavisualization/tikzlibrarydatavisualization.3d.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/datavisualization.3d"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{datavisualization.3d} or \\usepgflibrary{datavisualization.3d}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:datavisualization.barcharts:4469ca22ce",
+      "title": "datavisualization.barcharts library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/datavisualization/pgflibrarydatavisualization.barcharts.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/datavisualization.barcharts"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{datavisualization.barcharts} or \\usepgflibrary{datavisualization.barcharts}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:datavisualization.barcharts:a85e6ecf6f",
+      "title": "datavisualization.barcharts library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/datavisualization/tikzlibrarydatavisualization.barcharts.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/datavisualization.barcharts"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{datavisualization.barcharts} or \\usepgflibrary{datavisualization.barcharts}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:datavisualization.formats.functions:267b14464a",
+      "title": "datavisualization.formats.functions library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/datavisualization/pgflibrarydatavisualization.formats.functions.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/datavisualization.formats.functions"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{datavisualization.formats.functions} or \\usepgflibrary{datavisualization.formats.functions}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:datavisualization.formats.functions:d3be9d505b",
+      "title": "datavisualization.formats.functions library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/datavisualization/tikzlibrarydatavisualization.formats.functions.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/datavisualization.formats.functions"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{datavisualization.formats.functions} or \\usepgflibrary{datavisualization.formats.functions}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:datavisualization.polar:5bff480b17",
+      "title": "datavisualization.polar library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/datavisualization/pgflibrarydatavisualization.polar.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/datavisualization.polar"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{datavisualization.polar} or \\usepgflibrary{datavisualization.polar}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:datavisualization.polar:9d5329cfd2",
+      "title": "datavisualization.polar library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/datavisualization/tikzlibrarydatavisualization.polar.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/datavisualization.polar"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{datavisualization.polar} or \\usepgflibrary{datavisualization.polar}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:datavisualization.sparklines:dde8b74bdc",
+      "title": "datavisualization.sparklines library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/datavisualization/tikzlibrarydatavisualization.sparklines.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/datavisualization.sparklines"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{datavisualization.sparklines} or \\usepgflibrary{datavisualization.sparklines}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:datavisualization:0c6eeb9c16",
+      "title": "datavisualization library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/datavisualization/tikzlibrarydatavisualization.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/datavisualization"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{datavisualization} or \\usepgflibrary{datavisualization}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.footprints:1ce3abc9e9",
+      "title": "decorations.footprints library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarydecorations.footprints.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.footprints"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.footprints} or \\usepgflibrary{decorations.footprints}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.footprints:6ec2e2307d",
+      "title": "decorations.footprints library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/decorations/pgflibrarydecorations.footprints.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.footprints"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.footprints} or \\usepgflibrary{decorations.footprints}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.fractals:177d4ff583",
+      "title": "decorations.fractals library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/decorations/pgflibrarydecorations.fractals.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.fractals"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.fractals} or \\usepgflibrary{decorations.fractals}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.fractals:c633529f09",
+      "title": "decorations.fractals library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarydecorations.fractals.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.fractals"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.fractals} or \\usepgflibrary{decorations.fractals}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.markings:20990590af",
+      "title": "decorations.markings library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/decorations/pgflibrarydecorations.markings.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.markings"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.markings} or \\usepgflibrary{decorations.markings}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.markings:817336e6a8",
+      "title": "decorations.markings library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarydecorations.markings.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.markings"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.markings} or \\usepgflibrary{decorations.markings}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.pathmorphing:1d822aeb8f",
+      "title": "decorations.pathmorphing library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/decorations/pgflibrarydecorations.pathmorphing.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.pathmorphing"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.pathmorphing} or \\usepgflibrary{decorations.pathmorphing}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.pathmorphing:3eddeea4c3",
+      "title": "decorations.pathmorphing library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarydecorations.pathmorphing.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.pathmorphing"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.pathmorphing} or \\usepgflibrary{decorations.pathmorphing}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.pathreplacing:bbd05eabaf",
+      "title": "decorations.pathreplacing library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/decorations/pgflibrarydecorations.pathreplacing.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.pathreplacing"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.pathreplacing} or \\usepgflibrary{decorations.pathreplacing}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.pathreplacing:c41417005b",
+      "title": "decorations.pathreplacing library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarydecorations.pathreplacing.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.pathreplacing"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.pathreplacing} or \\usepgflibrary{decorations.pathreplacing}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.shapes:49d8499029",
+      "title": "decorations.shapes library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/decorations/pgflibrarydecorations.shapes.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.shapes"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.shapes} or \\usepgflibrary{decorations.shapes}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.shapes:d24cfae58f",
+      "title": "decorations.shapes library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarydecorations.shapes.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.shapes"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.shapes} or \\usepgflibrary{decorations.shapes}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.text:0ab51ac14f",
+      "title": "decorations.text library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarydecorations.text.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.text"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.text} or \\usepgflibrary{decorations.text}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations.text:193f4a40c1",
+      "title": "decorations.text library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/decorations/pgflibrarydecorations.text.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations.text"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations.text} or \\usepgflibrary{decorations.text}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:decorations:7db0426f8b",
+      "title": "decorations library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarydecorations.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/decorations"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{decorations} or \\usepgflibrary{decorations}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:er:3b2c60220d",
+      "title": "er library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryer.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/er"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{er} or \\usepgflibrary{er}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:external:aa38b17755",
+      "title": "external library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/latex/pgf/frontendlayer/libraries/tikzlibraryexternal.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/external"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{external} or \\usepgflibrary{external}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:fadings:02a658a716",
+      "title": "fadings library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryfadings.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/fadings"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{fadings} or \\usepgflibrary{fadings}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:fadings:3782c9fb83",
+      "title": "fadings library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryfadings.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/fadings"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{fadings} or \\usepgflibrary{fadings}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:fit:410246c9a0",
+      "title": "fit library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryfit.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/fit"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{fit} or \\usepgflibrary{fit}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:fixedpointarithmetic:459d858dbc",
+      "title": "fixedpointarithmetic library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryfixedpointarithmetic.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/fixedpointarithmetic"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{fixedpointarithmetic} or \\usepgflibrary{fixedpointarithmetic}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:fixedpointarithmetic:e571853e54",
+      "title": "fixedpointarithmetic library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryfixedpointarithmetic.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/fixedpointarithmetic"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{fixedpointarithmetic} or \\usepgflibrary{fixedpointarithmetic}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:folding:55193f4fd7",
+      "title": "folding library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryfolding.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/folding"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{folding} or \\usepgflibrary{folding}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:fpu:03901e3379",
+      "title": "fpu library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryfpu.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/fpu"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{fpu} or \\usepgflibrary{fpu}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:fpu:29a52e1523",
+      "title": "fpu library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryfpu.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/fpu"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{fpu} or \\usepgflibrary{fpu}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:graphdrawing.circular:788ad4f20e",
+      "title": "graphdrawing.circular library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/graphdrawing/tex/pgflibrarygraphdrawing.circular.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/graphdrawing.circular"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{graphdrawing.circular} or \\usepgflibrary{graphdrawing.circular}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:graphdrawing.evolving:fc6727e5c5",
+      "title": "graphdrawing.evolving library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/graphdrawing/tex/experimental/tikzlibrarygraphdrawing.evolving.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/graphdrawing.evolving"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{graphdrawing.evolving} or \\usepgflibrary{graphdrawing.evolving}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:graphdrawing.examples:cd473730a7",
+      "title": "graphdrawing.examples library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/graphdrawing/tex/pgflibrarygraphdrawing.examples.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/graphdrawing.examples"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{graphdrawing.examples} or \\usepgflibrary{graphdrawing.examples}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:graphdrawing.force:87f065c7e3",
+      "title": "graphdrawing.force library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/graphdrawing/tex/pgflibrarygraphdrawing.force.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/graphdrawing.force"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{graphdrawing.force} or \\usepgflibrary{graphdrawing.force}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:graphdrawing.layered:a028655dc7",
+      "title": "graphdrawing.layered library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/graphdrawing/tex/pgflibrarygraphdrawing.layered.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/graphdrawing.layered"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{graphdrawing.layered} or \\usepgflibrary{graphdrawing.layered}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:graphdrawing.trees:3f5fe52c4c",
+      "title": "graphdrawing.trees library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/graphdrawing/tex/pgflibrarygraphdrawing.trees.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/graphdrawing.trees"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{graphdrawing.trees} or \\usepgflibrary{graphdrawing.trees}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:graphdrawing:8dd2127907",
+      "title": "graphdrawing library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/graphdrawing/tex/tikzlibrarygraphdrawing.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/graphdrawing"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{graphdrawing} or \\usepgflibrary{graphdrawing}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:graphdrawing:f14784a389",
+      "title": "graphdrawing library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/graphdrawing/tex/pgflibrarygraphdrawing.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/graphdrawing"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{graphdrawing} or \\usepgflibrary{graphdrawing}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:graphs.standard:2746ae572f",
+      "title": "graphs.standard library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/graphs/tikzlibrarygraphs.standard.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/graphs.standard"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{graphs.standard} or \\usepgflibrary{graphs.standard}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:graphs:5a08b86c38",
+      "title": "graphs library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/graphs/tikzlibrarygraphs.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/graphs"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{graphs} or \\usepgflibrary{graphs}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:intersections:86a180ce5c",
+      "title": "intersections library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryintersections.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/intersections"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{intersections} or \\usepgflibrary{intersections}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:intersections:fc9947f573",
+      "title": "intersections library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryintersections.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/intersections"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{intersections} or \\usepgflibrary{intersections}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:lindenmayersystems:35cc17e0ec",
+      "title": "lindenmayersystems library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibrarylindenmayersystems.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/lindenmayersystems"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{lindenmayersystems} or \\usepgflibrary{lindenmayersystems}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:lindenmayersystems:c014f42d48",
+      "title": "lindenmayersystems library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarylindenmayersystems.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/lindenmayersystems"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{lindenmayersystems} or \\usepgflibrary{lindenmayersystems}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:luamath:613345e40c",
+      "title": "luamath library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/luamath/pgflibraryluamath.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/luamath"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{luamath} or \\usepgflibrary{luamath}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:math:9226a3eacb",
+      "title": "math library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarymath.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/math"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{math} or \\usepgflibrary{math}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:matrix:ddff688306",
+      "title": "matrix library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarymatrix.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/matrix"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{matrix} or \\usepgflibrary{matrix}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:mindmap:8e769a89d2",
+      "title": "mindmap library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarymindmap.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/mindmap"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{mindmap} or \\usepgflibrary{mindmap}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:patterns.meta:1cd891b052",
+      "title": "patterns.meta library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibrarypatterns.meta.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/patterns.meta"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{patterns.meta} or \\usepgflibrary{patterns.meta}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:patterns.meta:ee658b2b0d",
+      "title": "patterns.meta library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarypatterns.meta.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/patterns.meta"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{patterns.meta} or \\usepgflibrary{patterns.meta}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:patterns:0bbd60afdb",
+      "title": "patterns library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarypatterns.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/patterns"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{patterns} or \\usepgflibrary{patterns}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:patterns:141bfc4b2f",
+      "title": "patterns library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibrarypatterns.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/patterns"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{patterns} or \\usepgflibrary{patterns}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:perspective:3b4adc535a",
+      "title": "perspective library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryperspective.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/perspective"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{perspective} or \\usepgflibrary{perspective}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:petri:56e02b9748",
+      "title": "petri library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarypetri.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/petri"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{petri} or \\usepgflibrary{petri}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:plothandlers:6b76d3ee6e",
+      "title": "plothandlers library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryplothandlers.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/plothandlers"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{plothandlers} or \\usepgflibrary{plothandlers}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:plothandlers:b930506ee3",
+      "title": "plothandlers library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryplothandlers.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/plothandlers"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{plothandlers} or \\usepgflibrary{plothandlers}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:plotmarks:6891ff7b4d",
+      "title": "plotmarks library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryplotmarks.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/plotmarks"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{plotmarks} or \\usepgflibrary{plotmarks}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:plotmarks:7ace924737",
+      "title": "plotmarks library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryplotmarks.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/plotmarks"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{plotmarks} or \\usepgflibrary{plotmarks}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:positioning:c38aa35ad8",
+      "title": "positioning library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarypositioning.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/positioning"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{positioning} or \\usepgflibrary{positioning}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:profiler:048d34f775",
+      "title": "profiler library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryprofiler.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/profiler"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{profiler} or \\usepgflibrary{profiler}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:quotes:bd36062e24",
+      "title": "quotes library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryquotes.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/quotes"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{quotes} or \\usepgflibrary{quotes}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:rdf:b461ef0fc8",
+      "title": "rdf library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryrdf.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/rdf"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{rdf} or \\usepgflibrary{rdf}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:scopes:110c42b799",
+      "title": "scopes library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryscopes.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/scopes"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{scopes} or \\usepgflibrary{scopes}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shadings:7d33dc191d",
+      "title": "shadings library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshadings.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shadings"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shadings} or \\usepgflibrary{shadings}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shadings:d0f9711dbf",
+      "title": "shadings library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibraryshadings.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shadings"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shadings} or \\usepgflibrary{shadings}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shadows:9e3457108b",
+      "title": "shadows library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshadows.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shadows"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shadows} or \\usepgflibrary{shadows}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.arrows:7f3c7f4cf6",
+      "title": "shapes.arrows library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/pgflibraryshapes.arrows.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.arrows"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.arrows} or \\usepgflibrary{shapes.arrows}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.arrows:891604ddaf",
+      "title": "shapes.arrows library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.arrows.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.arrows"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.arrows} or \\usepgflibrary{shapes.arrows}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.callouts:01a1ec28df",
+      "title": "shapes.callouts library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/pgflibraryshapes.callouts.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.callouts"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.callouts} or \\usepgflibrary{shapes.callouts}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.callouts:fe64d1241d",
+      "title": "shapes.callouts library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.callouts.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.callouts"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.callouts} or \\usepgflibrary{shapes.callouts}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.gates.ee.IEC:d8d5df79db",
+      "title": "shapes.gates.ee.IEC library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/circuits/pgflibraryshapes.gates.ee.IEC.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.gates.ee.IEC"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.gates.ee.IEC} or \\usepgflibrary{shapes.gates.ee.IEC}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.gates.ee:f2d861ac06",
+      "title": "shapes.gates.ee library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/circuits/pgflibraryshapes.gates.ee.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.gates.ee"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.gates.ee} or \\usepgflibrary{shapes.gates.ee}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.gates.logic.IEC:a8bb3d6cc2",
+      "title": "shapes.gates.logic.IEC library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/circuits/pgflibraryshapes.gates.logic.IEC.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.gates.logic.IEC"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.gates.logic.IEC} or \\usepgflibrary{shapes.gates.logic.IEC}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.gates.logic.IEC:d1e02cd1f4",
+      "title": "shapes.gates.logic.IEC library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.gates.logic.IEC.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.gates.logic.IEC"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.gates.logic.IEC} or \\usepgflibrary{shapes.gates.logic.IEC}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.gates.logic.US:7c2656ac64",
+      "title": "shapes.gates.logic.US library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/circuits/pgflibraryshapes.gates.logic.US.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.gates.logic.US"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.gates.logic.US} or \\usepgflibrary{shapes.gates.logic.US}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.gates.logic.US:b5192e7660",
+      "title": "shapes.gates.logic.US library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.gates.logic.US.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.gates.logic.US"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.gates.logic.US} or \\usepgflibrary{shapes.gates.logic.US}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.gates.logic:a4e4b5885e",
+      "title": "shapes.gates.logic library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/circuits/pgflibraryshapes.gates.logic.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.gates.logic"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.gates.logic} or \\usepgflibrary{shapes.gates.logic}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.geometric:3581fe4f3e",
+      "title": "shapes.geometric library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.geometric.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.geometric"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.geometric} or \\usepgflibrary{shapes.geometric}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.geometric:63fb7df31f",
+      "title": "shapes.geometric library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/pgflibraryshapes.geometric.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.geometric"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.geometric} or \\usepgflibrary{shapes.geometric}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.misc:a4d75b0514",
+      "title": "shapes.misc library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/pgflibraryshapes.misc.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.misc"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.misc} or \\usepgflibrary{shapes.misc}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.misc:dee7a7cd12",
+      "title": "shapes.misc library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.misc.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.misc"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.misc} or \\usepgflibrary{shapes.misc}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.multipart:5336d7d426",
+      "title": "shapes.multipart library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.multipart.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.multipart"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.multipart} or \\usepgflibrary{shapes.multipart}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.multipart:be7372f739",
+      "title": "shapes.multipart library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/pgflibraryshapes.multipart.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.multipart"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.multipart} or \\usepgflibrary{shapes.multipart}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.symbols:6da7416453",
+      "title": "shapes.symbols library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.symbols.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.symbols"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.symbols} or \\usepgflibrary{shapes.symbols}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes.symbols:c488997adb",
+      "title": "shapes.symbols library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/pgflibraryshapes.symbols.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes.symbols"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes.symbols} or \\usepgflibrary{shapes.symbols}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes:07ba093d5b",
+      "title": "shapes library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/shapes/pgflibraryshapes.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes} or \\usepgflibrary{shapes}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:shapes:2a949c93fa",
+      "title": "shapes library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryshapes.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/shapes"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{shapes} or \\usepgflibrary{shapes}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:snakes:4775c64905",
+      "title": "snakes library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibrarysnakes.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/snakes"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{snakes} or \\usepgflibrary{snakes}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:snakes:5954bdb3f4",
+      "title": "snakes library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarysnakes.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/snakes"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{snakes} or \\usepgflibrary{snakes}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:spy:d7babdb7f5",
+      "title": "spy library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryspy.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/spy"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{spy} or \\usepgflibrary{spy}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:svg.path:78ad9bc416",
+      "title": "svg.path library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarysvg.path.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/svg.path"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{svg.path} or \\usepgflibrary{svg.path}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:svg.path:da40c4c177",
+      "title": "svg.path library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibrarysvg.path.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/svg.path"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{svg.path} or \\usepgflibrary{svg.path}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:through:8934cf5b6f",
+      "title": "through library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarythrough.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/through"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{through} or \\usepgflibrary{through}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:timelines:c157542051",
+      "title": "timelines library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/libraries/pgflibrarytimelines.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/timelines"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{timelines} or \\usepgflibrary{timelines}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:topaths:5dbe974055",
+      "title": "topaths library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarytopaths.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/topaths"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{topaths} or \\usepgflibrary{topaths}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:trees:121ba5efe7",
+      "title": "trees library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibrarytrees.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/trees"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{trees} or \\usepgflibrary{trees}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:turtle:2f442a5582",
+      "title": "turtle library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryturtle.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/turtle"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{turtle} or \\usepgflibrary{turtle}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    },
+    {
+      "id": "pgf-3.1.11a:library:views:62fff2128c",
+      "title": "views library",
+      "surface": "library",
+      "status": "static",
+      "upstream": {
+        "repository": "https://github.com/pgf-tikz/pgf",
+        "version": "3.1.11a",
+        "sha": "0a859c80b47a1f3e07b8164aec6de861c4118e2a",
+        "path": "tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibraryviews.code.tex",
+        "line": [
+          1,
+          1
+        ]
+      },
+      "namespaces": [
+        "/tikz/views"
+      ],
+      "valueGrammar": {
+        "kind": "none",
+        "description": "Load source with \\usetikzlibrary{views} or \\usepgflibrary{views}"
+      },
+      "effects": {
+        "scope": "document",
+        "expansion": "macro",
+        "outputs": [
+          {
+            "kind": "library-load",
+            "sourceBound": true
+          }
+        ]
+      },
+      "lanes": {
+        "preserve": true,
+        "parse": "partial",
+        "preview": "opaque",
+        "exact": "server"
+      },
+      "writeback": "transaction-only",
+      "security": {
+        "level": "moderate",
+        "tags": [
+          "untrusted-tex",
+          "macro-expansion",
+          "resource-exhaustion"
+        ],
+        "summary": "Macro or key-handler expansion can consume TeX resources.",
+        "mitigations": [
+          "Bound expansion depth, CPU, memory, and output size.",
+          "Compile outside the Next.js process."
+        ]
+      }
+    }
+  ]
+}

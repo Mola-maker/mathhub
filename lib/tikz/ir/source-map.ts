@@ -35,6 +35,22 @@ export interface GeometrySourceMap {
   entries: readonly GeometrySourceMapEntry[];
 }
 
+/**
+ * Project revision-attested binding ranges for render/inspection adapters.
+ * UI Scene identities may be reconciled for visual continuity, so callers
+ * must never rebuild source binding IDs from Scene.stableId.
+ */
+export function sourceBindingRangeMap(
+  sourceMap: GeometrySourceMap | null | undefined,
+  revision: number,
+): ReadonlyMap<string, { readonly start: number; readonly end: number }> {
+  if (!sourceMap || sourceMap.basis.revision !== revision) return new Map();
+  return new Map(sourceMap.entries.map((entry) => [
+    entry.bindingId,
+    { start: entry.range.start, end: entry.range.end },
+  ]));
+}
+
 function unique(values: readonly string[]): string[] {
   return [...new Set(values)].sort();
 }

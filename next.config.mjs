@@ -2,6 +2,44 @@
 const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
+  async rewrites() {
+    const configuredOrigin = process.env.NODE_ENV === 'production'
+      ? ''
+      : process.env.MATHHUB_DEV_ORIGIN?.trim() || 'http://127.0.0.1:5173';
+    let devOrigin = '';
+    if (configuredOrigin) {
+      try {
+        const parsed = new URL(configuredOrigin);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+          devOrigin = parsed.toString().replace(/\/+$/, '');
+        }
+      } catch {
+        devOrigin = '';
+      }
+    }
+
+    const beforeFiles = [
+      {
+        source: '/',
+        destination: devOrigin
+          ? `${devOrigin}/mathhub/`
+          : '/mathhub/index.html',
+      },
+      {
+        source: '/mathhub',
+        destination: devOrigin
+          ? `${devOrigin}/mathhub/`
+          : '/mathhub/index.html',
+      },
+    ];
+    if (devOrigin) {
+      beforeFiles.push({
+        source: '/mathhub/:path*',
+        destination: `${devOrigin}/mathhub/:path*`,
+      });
+    }
+    return { beforeFiles, afterFiles: [], fallback: [] };
+  },
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';
     const ggbOrigin = (() => {

@@ -41,6 +41,18 @@ export function buildDependencyGraph(stmts: Statement[]): DepGraph {
         const d: string[] = [];
         for (const spec of s.specs) {
           if (spec.type === 'polyline') for (const p of spec.points) d.push(...refsOfCoord(p));
+          else if (spec.type === 'rectangle') {
+            d.push(...refsOfCoord(spec.first));
+            d.push(...refsOfCoord(spec.opposite));
+          }
+          else if (spec.type === 'cubic-bezier') {
+            d.push(...refsOfCoord(spec.start));
+            d.push(...refsOfCoord(spec.control1));
+            d.push(...refsOfCoord(spec.control2));
+            d.push(...refsOfCoord(spec.end));
+          }
+          else if (spec.type === 'circular-arc') d.push(...refsOfCoord(spec.start));
+          else if (spec.type === 'ellipse') d.push(...refsOfCoord(spec.center));
           else if (spec.type === 'circle') {
             d.push(...refsOfCoord(spec.center));
             if (spec.radius.kind === 'through') d.push(...refsOfCoord(spec.radius.point));
@@ -52,6 +64,10 @@ export function buildDependencyGraph(stmts: Statement[]): DepGraph {
         for (const b of s.intersections.bindings) {
           node(b.name, 'point', [`path:${s.intersections.of[0]}`, `path:${s.intersections.of[1]}`]);
         }
+      }
+    } else if (s.kind === 'graph') {
+      for (const graphNode of s.nodes) {
+        node(graphNode.name, 'point', []);
       }
     }
   }

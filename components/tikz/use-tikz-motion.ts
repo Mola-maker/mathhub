@@ -5,6 +5,17 @@ import { useReducedMotion } from 'motion/react';
 import { useEffect, useRef, type RefObject } from 'react';
 import type { Scene } from '@/lib/tikz/semantics/scene';
 
+function retainAnimation(
+  store: Set<AnimationPlaybackControls>,
+  animation: AnimationPlaybackControls,
+): void {
+  store.add(animation);
+  void animation.finished.then(
+    () => store.delete(animation),
+    () => store.delete(animation),
+  );
+}
+
 export function useTikzMotion({
   svgRef,
   scene,
@@ -18,39 +29,49 @@ export function useTikzMotion({
 }) {
   const shouldReduceMotion = useReducedMotion();
   const previousIdsRef = useRef(new Set<string>());
-  const animationsRef = useRef<AnimationPlaybackControls[]>([]);
+  const animationsRef = useRef(new Set<AnimationPlaybackControls>());
 
   useEffect(() => {
-    const currentIds = new Set<string>();
-    for (const point of scene?.points.values() ?? []) {
-      if (!point.internal) currentIds.add(point.stableId);
-    }
-    for (const element of scene?.elements ?? []) currentIds.add(element.stableId);
-    const previousIds = previousIdsRef.current;
-    previousIdsRef.current = currentIds;
-    if (previousIds.size === 0 || shouldReduceMotion) return;
-
-    const addedIds = new Set([...currentIds].filter((id) => !previousIds.has(id)));
-    if (addedIds.size === 0) return;
     const frame = requestAnimationFrame(() => {
       const root = svgRef.current;
       if (!root) return;
-      const targets = [...root.querySelectorAll<SVGGraphicsElement>('[data-tikz-id]')]
-        .filter((node) => addedIds.has(node.dataset.tikzId ?? ''));
+      const rendered = [...root.querySelectorAll<SVGGraphicsElement>('[data-tikz-id]')];
+      const currentIds = new Set(rendered.flatMap((node) => (
+        node.dataset.tikzId ? [node.dataset.tikzId] : []
+      )));
+      const previousIds = previousIdsRef.current;
+      previousIdsRef.current = currentIds;
+      if (previousIds.size === 0 || shouldReduceMotion) return;
+      const addedIds = new Set([...currentIds].filter((id) => !previousIds.has(id)));
+      const targets = rendered.filter((node) => addedIds.has(node.dataset.tikzId ?? ''));
       if (targets.length === 0) return;
-      const animation = animate(
-        targets,
-        {
-          opacity: [0.16, 1],
-          scale: [0.972, 1],
-          filter: ['blur(2px)', 'blur(0px)'],
-        },
-        {
-          duration: 0.32,
-          ease: [0.22, 1, 0.36, 1],
-        },
-      );
-      animationsRef.current.push(animation);
+      const geometryTargets = targets.filter((node): node is SVGGeometryElement => (
+        typeof (node as SVGGeometryElement).getTotalLength === 'function'
+        && node.getAttribute('stroke') !== 'none'
+        && !node.getAttribute('stroke-dasharray')
+      ));
+      for (const target of geometryTargets) {
+        const length = Math.min(12_000, Math.max(1, target.getTotalLength()));
+        target.style.strokeDasharray = String(length);
+        target.style.strokeDashoffset = String(length);
+        const drawing = animate(
+          target,
+          { strokeDashoffset: [length, 0] },
+          { duration: 0.56, ease: [0.22, 1, 0.36, 1] },
+        );
+        retainAnimation(animationsRef.current, drawing);
+        const clearDrawingStyles = () => {
+          target.style.removeProperty('stroke-dasharray');
+          target.style.removeProperty('stroke-dashoffset');
+        };
+        void drawing.finished.then(clearDrawingStyles, clearDrawingStyles);
+      }
+      // Do not animate the semantic SVG nodes with CSS transform, scale,
+      // filter or opacity. CSS transforms override an SVG `transform`
+      // attribute, collapsing affine circles/arcs back into unit geometry;
+      // opacity animation would likewise override source-authored opacity.
+      // Dashed paths, points and labels remain visually stable. Rich entrance
+      // motion belongs on a separate editor overlay/ghost layer.
     });
     return () => cancelAnimationFrame(frame);
   }, [revision, scene, shouldReduceMotion, svgRef]);
@@ -60,7 +81,11 @@ export function useTikzMotion({
     const frame = requestAnimationFrame(() => {
       const root = svgRef.current;
       if (!root) return;
-      const targets = [...root.querySelectorAll<SVGGraphicsElement>('[data-selected="true"]')];
+      // Animate editor chrome, never the semantic document primitives. The
+      // latter must remain pixel-comparable with the exact TeX artifact.
+      const targets = [...root.querySelectorAll<SVGGraphicsElement>(
+        '.tz-selection-halo, .tz-selection-transform-handles',
+      )];
       if (targets.length === 0) return;
       const animation = animate(
         targets,
@@ -73,13 +98,13 @@ export function useTikzMotion({
           ease: [0.2, 0.8, 0.2, 1],
         },
       );
-      animationsRef.current.push(animation);
+      retainAnimation(animationsRef.current, animation);
     });
     return () => cancelAnimationFrame(frame);
   }, [selection, shouldReduceMotion, svgRef]);
 
   useEffect(() => () => {
     for (const animation of animationsRef.current) animation.stop();
-    animationsRef.current = [];
+    animationsRef.current.clear();
   }, []);
 }
