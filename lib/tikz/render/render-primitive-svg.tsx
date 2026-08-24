@@ -91,29 +91,40 @@ function strokeWidthOf(
   return presentationStrokeWidth(primitive.style.strokeWidth, viewport);
 }
 
-function pathPoints(
+/**
+ * The decoded points are the endpoints of the path that TikZ actually wrote.
+ * A managed semantic line/ray can still have an infinite interaction extent,
+ * but expanding that extent in the document layer makes the interactive
+ * picture disagree with the exact compiler artifact.
+ */
+function presentationPathPoints(
   primitive: DecodedRenderPrimitiveOf<'segment' | 'vector' | 'line' | 'ray'>,
+  viewport: Viewport,
+): readonly [Pt, Pt] | null {
+  const first = sceneToScreen(primitive.points[0], viewport);
+  const second = sceneToScreen(primitive.points[1], viewport);
+  return [first, second];
+}
+
+function interactionExtentPoints(
+  primitive: DecodedRenderPrimitiveOf<'line' | 'ray'>,
   viewport: Viewport,
   frame: ScreenFrame,
 ): readonly [Pt, Pt] | null {
   const first = sceneToScreen(primitive.points[0], viewport);
   const second = sceneToScreen(primitive.points[1], viewport);
-  if (primitive.kind === 'line') {
-    return clipParametricLineToFrame(first, second, frame, 'line');
-  }
-  if (primitive.kind === 'ray') {
-    // Keep the positive arrow tip on the visible SVG edge. Outward padding is
-    // useful for an undecorated infinite line, but would place a ray arrow
-    // outside the SVG clipping region.
-    return clipParametricLineToFrame(first, second, frame, 'ray', 0);
-  }
-  return [first, second];
+  return clipParametricLineToFrame(
+    first,
+    second,
+    frame,
+    primitive.kind,
+    primitive.kind === 'ray' ? 0 : 16,
+  );
 }
 
 function PathPrimitiveSvg({
   primitive,
   viewport,
-  frame,
   theme,
   selected,
   hovered,
@@ -122,7 +133,6 @@ function PathPrimitiveSvg({
     'segment' | 'vector' | 'line' | 'ray' | 'polyline' | 'polygon'
   >;
   viewport: Viewport;
-  frame: ScreenFrame;
   theme: RenderTheme;
   selected: boolean;
   hovered: boolean;
@@ -133,7 +143,7 @@ function PathPrimitiveSvg({
     || primitive.kind === 'vector'
     || primitive.kind === 'line'
     || primitive.kind === 'ray'
-    ? pathPoints(primitive, viewport, frame)
+    ? presentationPathPoints(primitive, viewport)
     : primitive.points.map((point) => sceneToScreen(point, viewport));
   if (!screenPoints || screenPoints.length < 2) return null;
 
@@ -178,6 +188,44 @@ function PathPrimitiveSvg({
   );
 }
 
+function InteractionExtentGuideSvg({
+  primitive,
+  viewport,
+  frame,
+  theme,
+  selected,
+  hovered,
+}: {
+  primitive: DecodedRenderPrimitiveOf<'line' | 'ray'>;
+  viewport: Viewport;
+  frame: ScreenFrame;
+  theme: RenderTheme;
+  selected: boolean;
+  hovered: boolean;
+}) {
+  if (!selected && !hovered) return null;
+  const points = interactionExtentPoints(primitive, viewport, frame);
+  if (!points) return null;
+  const dashUnit = Math.max(3, presentationStrokeWidth(3, viewport));
+  return (
+    <polyline
+      className="tz-semantic-extent-guide"
+      data-tikz-interaction-extent={primitive.kind === 'line'
+        ? 'infinite'
+        : 'positive-infinite'}
+      points={points.map((point) => `${point.x},${point.y}`).join(' ')}
+      fill="none"
+      stroke={selected ? theme.selectionColor : theme.hoverColor}
+      strokeWidth={Math.max(1, presentationStrokeWidth(1, viewport))}
+      strokeDasharray={`${dashUnit} ${dashUnit}`}
+      opacity={selected ? 0.42 : 0.28}
+      vectorEffect="non-scaling-stroke"
+      pointerEvents="none"
+      aria-hidden="true"
+    />
+  );
+}
+
 function ElementPrimitiveSvg({
   primitive,
   viewport,
@@ -205,7 +253,6 @@ function ElementPrimitiveSvg({
       <PathPrimitiveSvg
         primitive={primitive}
         viewport={viewport}
-        frame={frame}
         theme={theme}
         selected={selected}
         hovered={hovered}
@@ -588,6 +635,28 @@ export function TikzRenderPrimitiveSvg({
         })}
       </g>
       <g data-layer="overlay" data-render-source="geometry-truth">
+        {elements.map((primitive) => {
+          if (primitive.kind !== 'line' && primitive.kind !== 'ray') return null;
+          const selected = primitiveSelected(
+            primitive,
+            selectedPrimitiveIds,
+            selectedEntityIds,
+            selectedRefs,
+            selectedStmtIndex,
+          );
+          const hovered = hoveredStmtIndex === primitive.statementIndex;
+          return selected || hovered ? (
+            <InteractionExtentGuideSvg
+              key={`extent:${primitive.primitiveId}`}
+              primitive={primitive}
+              viewport={viewport}
+              frame={frame}
+              theme={theme}
+              selected={selected}
+              hovered={hovered}
+            />
+          ) : null;
+        })}
         {points.map((primitive) => {
           const selected = primitiveSelected(
             primitive,

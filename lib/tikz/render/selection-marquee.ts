@@ -49,7 +49,8 @@ export function renderPrimitiveScreenPoints(
   if (primitive.kind === 'point') return [sceneToScreen(primitive.position, viewport)];
   if (primitive.kind === 'line' || primitive.kind === 'ray') {
     if (extent === 'definition') {
-      return primitive.points.map((point) => sceneToScreen(point, viewport));
+      return (primitive.definitionPoints ?? primitive.points)
+        .map((point) => sceneToScreen(point, viewport));
     }
     const clipped = clipParametricLineToFrame(
       sceneToScreen(primitive.points[0], viewport),

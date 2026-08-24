@@ -2001,7 +2001,11 @@ function constructionWriterArtifact(
 }
 
 function extendedLine(a: string, b: string): string {
-  return `${calcInterpolateCoordinate(a, -3, b)} -- ${calcInterpolateCoordinate(a, 4, b)}`;
+  // TikZ has no unbounded page primitive. Keep a modest, deterministic
+  // presentation extension around the two semantic defining points. The
+  // interactive renderer uses these exact parsed endpoints for document
+  // presentation while retaining infinite hit geometry separately.
+  return `${calcInterpolateCoordinate(a, -0.25, b)} -- ${calcInterpolateCoordinate(a, 1.25, b)}`;
 }
 
 function perpendicularDirection(result: string, through: string, lineStart: string, lineEnd: string): string {
@@ -2345,7 +2349,7 @@ export function compileConstructionWriterArtifact(
           plan,
           'line-render',
           [semanticEntityOwner(plan, plan.line)],
-          `\\draw (${vertex}) -- ${calcInterpolateCoordinate(vertex, 4, result)};`,
+          `\\draw ${extendedLine(vertex, result)};`,
           COMMAND_OPTION_SITE,
         ),
       ]);

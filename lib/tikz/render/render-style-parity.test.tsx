@@ -1,16 +1,85 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { analyze } from '../analyze';
+import type { RenderPrimitive } from '../ir/model';
 import { hashSource } from '../semantics/scene-manifest';
 import {
   projectTikzAnalysisToGeometryTruth,
   TIKZ_PLUGIN_SET_DIGEST,
 } from '../ir/tikz-adapter';
-import { decodeRenderPrimitives } from './render-primitive-decoder';
+import {
+  decodeRenderPrimitives,
+  decodedRenderPrimitiveFitPoints,
+} from './render-primitive-decoder';
 import { TikzRenderPrimitiveSvg } from './render-primitive-svg';
+import { DEFAULT_STYLE } from './style-resolver';
 import { NATURAL_CM_TO_CSS_PX } from './viewport';
 
 describe('official TikZ stroke presentation parity', () => {
+  it('separates exact painted endpoints from semantic line definition handles', () => {
+    const primitives = [
+      {
+        id: 'point:A', kind: 'point', entityIds: ['point:A'], sourceBindingIds: [],
+        geometry: { x: 0, y: 0, free: true }, style: {}, interactive: true,
+        metadata: { pointName: 'A' },
+      },
+      {
+        id: 'point:B', kind: 'point', entityIds: ['point:B'], sourceBindingIds: [],
+        geometry: { x: 2, y: 0, free: true }, style: {}, interactive: true,
+        metadata: { pointName: 'B' },
+      },
+      {
+        id: 'line:AB', kind: 'line', entityIds: ['line:AB'], sourceBindingIds: [],
+        geometry: {
+          points: [{ x: -0.5, y: 0 }, { x: 2.5, y: 0 }],
+          references: ['A', 'B'],
+          through: ['A', 'B'],
+          extent: 'infinite',
+        },
+        style: {}, interactive: true,
+      },
+    ] satisfies readonly RenderPrimitive[];
+    const decoded = decodeRenderPrimitives(primitives);
+    const line = decoded.primitives.find((primitive) => primitive.kind === 'line');
+    expect(line).toMatchObject({
+      points: [{ x: -0.5, y: 0 }, { x: 2.5, y: 0 }],
+      definitionPoints: [{ x: 0, y: 0 }, { x: 2, y: 0 }],
+    });
+    expect(decodedRenderPrimitiveFitPoints(decoded.primitives).slice(-2))
+      .toEqual([{ x: -0.5, y: 0 }, { x: 2.5, y: 0 }]);
+  });
+
+  it('keeps exact finite line endpoints in the document layer and infinite extent in the editor overlay', () => {
+    const rendering = {
+      primitives: [{
+        primitiveId: 'line:AB',
+        entityIds: ['entity:line:AB'],
+        sourceBindingIds: ['binding:line:AB'],
+        references: ['A', 'B'],
+        style: DEFAULT_STYLE,
+        zIndex: 0,
+        interactive: true,
+        kind: 'line' as const,
+        points: [{ x: -3, y: 0 }, { x: 4, y: 0 }] as const,
+      }],
+      issues: [],
+    };
+    const { container } = render(
+      <svg>
+        <TikzRenderPrimitiveSvg
+          rendering={rendering}
+          viewport={{ scale: 10, offsetX: 50, offsetY: 80 }}
+          frame={{ width: 200, height: 160 }}
+          selectedSemanticEntityIds={['entity:line:AB']}
+        />
+      </svg>,
+    );
+    expect(container.querySelector('[data-layer="base"] polyline')?.getAttribute('points'))
+      .toBe('20,80 90,80');
+    expect(container.querySelector('[data-layer="overlay"] .tz-semantic-extent-guide')?.getAttribute('points'))
+      .toBe('-16,80 216,80');
+  });
+
   it('projects cap, join, miter, dash pattern, and phase through Code -> IR -> SVG', () => {
     const source = String.raw`\begin{tikzpicture}
 \draw[line width=4pt,line cap=rect,line join=bevel,miter limit=7,dash pattern=on 2pt off 3pt,dash phase=1pt,draw opacity=.4]

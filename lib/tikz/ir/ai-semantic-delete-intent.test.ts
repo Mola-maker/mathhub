@@ -94,7 +94,7 @@ describe('ai-semantic-delete-intent/v1', () => {
       geometryDoc: current.geometryDoc,
       allowedBindingIds: current.allowedBindingIds,
     });
-    expect(compiled).toMatchObject({
+    expect(compiled, JSON.stringify(compiled)).toMatchObject({
       ok: true,
       transaction: {
         origin: 'ai',
@@ -163,7 +163,7 @@ describe('ai-semantic-delete-intent/v1', () => {
       geometryDoc: current.geometryDoc,
       allowedBindingIds: current.allowedBindingIds,
     });
-    if (!compiled.ok) throw new Error('delete fixture compilation failed');
+    if (!compiled.ok) throw new Error(`delete fixture compilation failed: ${JSON.stringify(compiled)}`);
     const forged = {
       ...compiled.transaction,
       metadata: {

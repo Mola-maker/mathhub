@@ -54,7 +54,10 @@ export type DecodedRenderPrimitive =
   })
   | (DecodedRenderPrimitiveBase & {
     readonly kind: 'segment' | 'vector' | 'line' | 'ray';
+    /** Endpoints of the path that TikZ actually paints. */
     readonly points: readonly [Pt, Pt];
+    /** Semantic defining handles, resolved after the whole primitive set decodes. */
+    readonly definitionPoints?: readonly [Pt, Pt];
   })
   | (DecodedRenderPrimitiveBase & {
     readonly kind: 'polyline' | 'polygon';
@@ -560,27 +563,38 @@ export function decodeRenderPrimitives(
       decoded.push(result);
     }
   }
-  return {
-    primitives: decoded.sort((left, right) => left.zIndex - right.zIndex),
-    issues,
-  };
-}
-
-/**
- * Returns semantic definition points for auto-fit. Infinite line/ray primitives
- * prefer their named defining point handles, so neither expanded TikZ helper
- * endpoints nor viewport-clipped endpoints can feed back into the viewport.
- */
-export function decodedRenderPrimitiveFitPoints(
-  decoded: readonly DecodedRenderPrimitive[],
-): readonly Pt[] {
   const namedPoints = new Map<string, Pt>();
   for (const primitive of decoded) {
     if (primitive.kind === 'point' && primitive.pointName) {
       namedPoints.set(primitive.pointName, primitive.position);
     }
   }
+  const withDefinitionPoints = decoded.map((primitive): DecodedRenderPrimitive => {
+    if (primitive.kind !== 'line' && primitive.kind !== 'ray') return primitive;
+    const definitions = primitive.references.flatMap((reference) => {
+      const point = namedPoints.get(reference);
+      return point ? [point] : [];
+    });
+    if (definitions.length < 2) return primitive;
+    return {
+      ...primitive,
+      definitionPoints: [definitions[0]!, definitions[1]!],
+    };
+  });
+  return {
+    primitives: withDefinitionPoints.sort((left, right) => left.zIndex - right.zIndex),
+    issues,
+  };
+}
 
+/**
+ * Returns the exact painted presentation geometry for auto-fit. Semantic
+ * line/ray definition handles remain available separately for transforms and
+ * hit testing, so exact compiler bounds do not have to fight editor behavior.
+ */
+export function decodedRenderPrimitiveFitPoints(
+  decoded: readonly DecodedRenderPrimitive[],
+): readonly Pt[] {
   const points: Pt[] = [];
   for (const primitive of decoded) {
     switch (primitive.kind) {
@@ -588,14 +602,9 @@ export function decodedRenderPrimitiveFitPoints(
         points.push(primitive.position);
         break;
       case 'line':
-      case 'ray': {
-        const definitions = primitive.references.flatMap((reference) => {
-          const point = namedPoints.get(reference);
-          return point ? [point] : [];
-        });
-        points.push(...(definitions.length >= 2 ? definitions : primitive.points));
+      case 'ray':
+        points.push(...primitive.points);
         break;
-      }
       case 'segment':
       case 'vector':
       case 'polyline':

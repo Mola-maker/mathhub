@@ -312,7 +312,7 @@ describe('ai-construction-dag-intent/v1', () => {
         ? operation.patches.map((patch) => patch.insert)
         : []
     )).join('');
-    expect(inserted).toContain('circle through=(A)] at (Ocustom)');
+    expect(inserted).toContain('circle through=(M1)] at (Ocustom)');
     expect(inserted).toContain('\\coordinate (L)');
     expect(inserted).not.toContain('\\coordinate (Ocustom) at ($(A)!0.5!(B)$)');
   });

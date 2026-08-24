@@ -24,6 +24,20 @@ function segmentPlan() {
 }
 
 describe('schema-v3 managed construction activation', () => {
+  it('uses one bounded presentation segment for semantic infinite lines', () => {
+    const plan = createPrimitiveConstructionPlan('line', {
+      anchors: [
+        { name: 'A', position: { x: 0, y: 0 }, existing: true },
+        { name: 'B', position: { x: 2, y: 0 }, existing: true },
+      ],
+      nextName: (prefix) => `${prefix}1`,
+      nextConstructionId: () => 'managed-v3-line',
+    });
+    const source = compileNewManagedConstructionPlan(plan).lines.join('\n');
+    expect(source).toContain('\\draw ($(A)!-0.25!(B)$) -- ($(A)!1.25!(B)$);');
+    expect(source).not.toContain('!4!(B)');
+  });
+
   it('uses double-read/single-write policy for new supported primitives', () => {
     const plan = segmentPlan();
     const compilation = compileNewManagedConstructionPlan(plan);

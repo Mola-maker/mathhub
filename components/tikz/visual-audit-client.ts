@@ -15,6 +15,7 @@ const NON_DOCUMENT_SELECTORS = [
   '.tz-selection-halo',
   '.tz-point-hit-target',
   '.tz-point-handle',
+  '.tz-semantic-extent-guide',
 ].join(',');
 const SHA256 = /^[a-f0-9]{64}$/u;
 

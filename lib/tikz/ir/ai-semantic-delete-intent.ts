@@ -161,6 +161,7 @@ function entityBindingIds(
 
 function patchBindingIds(
   geometryDoc: GeometryDoc,
+  source: string,
   patches: readonly { readonly range: { readonly start: number; readonly end: number } }[],
   allowed: ReadonlySet<string>,
 ): string[] | null {
@@ -169,10 +170,33 @@ function patchBindingIds(
     const owners = geometryDoc.sourceMap.entries.filter((entry) => (
       allowed.has(entry.bindingId)
       && entry.sourceId === geometryDoc.basis.sourceId
-      && entry.range.start <= patch.range.start
-      && entry.range.end >= patch.range.end
+      && entry.range.start < patch.range.end
+      && entry.range.end > patch.range.start
     ));
     if (owners.length === 0) return null;
+
+    // Deletion planning may absorb surrounding line breaks for clean source
+    // formatting. Treat those bytes as part of the authorized edit only when
+    // every non-whitespace byte remains covered by an allowed binding. This is
+    // stricter than range overlap and still rejects crossing comments or an
+    // adjacent statement.
+    const coverage = owners
+      .map((owner) => ({
+        start: Math.max(patch.range.start, owner.range.start),
+        end: Math.min(patch.range.end, owner.range.end),
+      }))
+      .sort((left, right) => left.start - right.start || left.end - right.end);
+    let cursor = patch.range.start;
+    for (const range of coverage) {
+      if (range.start > cursor && source.slice(cursor, range.start).trim() !== '') {
+        return null;
+      }
+      cursor = Math.max(cursor, range.end);
+    }
+    if (
+      cursor < patch.range.end
+      && source.slice(cursor, patch.range.end).trim() !== ''
+    ) return null;
     for (const owner of owners) selected.add(owner.bindingId);
   }
   return [...selected].sort();
@@ -242,7 +266,12 @@ export function compileAiSemanticDeleteIntent(
   if (!sourceOperation || sourceOperation.op !== 'source-patch') {
     return fail('operation-kind', 'AI semantic delete produced no canonical source patch operation.');
   }
-  const patchOwners = patchBindingIds(context.geometryDoc, sourceOperation.patches, allowed);
+  const patchOwners = patchBindingIds(
+    context.geometryDoc,
+    context.source,
+    sourceOperation.patches,
+    new Set(focusBindingIds),
+  );
   if (!patchOwners) {
     return fail('binding-scope', 'The delete would write outside the current authorized source bindings.');
   }
