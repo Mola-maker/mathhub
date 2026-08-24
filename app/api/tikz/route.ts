@@ -47,6 +47,10 @@ import {
 import { requiresGeometryProofObservation } from '@/lib/tikz/agent/proof-intent-policy';
 import { compactTikzConversationHistory } from '@/lib/tikz/agent/conversation-history';
 import { geometryProblemSearchWidget } from '@/lib/tikz/agent/problem-search-widget';
+import {
+  validateGeometryFlowStepHostAction,
+  type GeometryFlowStepHostAction,
+} from '@/lib/tikz/agent/widget-actions';
 import { classifyTikzExecutableEnvelopes } from '@/lib/tikz/agent/executable-envelope';
 import {
   getTikzAgentRunStore,
@@ -101,6 +105,7 @@ interface TikzRequest {
   sourceRevision?: number;
   sourceHash?: string;
   contextRefs?: string[];
+  hostAction?: unknown;
   commitObservation?: {
     schemaVersion?: unknown;
     runId?: unknown;
@@ -268,6 +273,7 @@ async function emitAgenticSourceProposal(
   persistEvent: PersistTikzAgentEvent,
   hostProposal?: unknown,
   proofObservations: readonly GeometryIntentProofObservation[] = [],
+  flowStepHostAction?: GeometryFlowStepHostAction | null,
 ): Promise<boolean> {
   const sendTerminal = async (
     title: string,
@@ -319,26 +325,34 @@ async function emitAgenticSourceProposal(
   const modelProposal = hostProposal
     ?? extracted.proposal
     ?? (lowered?.status === 'proposal' ? lowered.proposal : null);
-  const semanticLowering = isGeometryIntent(modelProposal)
+  const flowActionMismatch = Boolean(
+    flowStepHostAction
+    && modelProposal
+  );
+  const semanticLowering = !flowActionMismatch && isGeometryIntent(modelProposal)
     ? lowerGeometryIntent(modelProposal, basis.agentContext, {
       runId: run.runId,
       requireProofObservation: requiresGeometryProofObservation(basis.userIntent),
       proofObservations,
     })
     : null;
-  const effectiveModelProposal = semanticLowering?.ok
-    ? semanticLowering.proposal
-    : semanticLowering
-      ? null
-      : modelProposal;
+  const effectiveModelProposal = flowActionMismatch
+    ? null
+    : semanticLowering?.ok
+      ? semanticLowering.proposal
+      : semanticLowering
+        ? null
+        : modelProposal;
   const proposal = effectiveModelProposal
     ? withAttestedAiProposalBasis(effectiveModelProposal, basis)
     : null;
 
   if (!proposal) {
-    const semanticIntentError = semanticLowering && !semanticLowering.ok
-      ? semanticLowering.message
-      : null;
+    const semanticIntentError = flowActionMismatch
+      ? '模型候选操作超出当前类型化推导步骤的 Host 授权范围。'
+      : semanticLowering && !semanticLowering.ok
+        ? semanticLowering.message
+        : null;
     const malformedTypedAction = extracted.actionCount > 0;
     if (lowered?.status === 'rejected' || malformedTypedAction || semanticIntentError) {
       const message = semanticIntentError ?? (malformedTypedAction
@@ -1218,6 +1232,27 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (body.mode === 'verify-commit' && !proposalIdentity) {
     return jsonError('verify-commit requires a current server-attested GeometryDoc', 409);
   }
+  let flowStepHostAction: GeometryFlowStepHostAction | null = null;
+  if (body.hostAction !== undefined) {
+    if (body.mode === 'verify-commit' || !proposalIdentity) {
+      return jsonError('hostAction requires a current build GeometryDoc', 409);
+    }
+    flowStepHostAction = validateGeometryFlowStepHostAction(
+      body.hostAction,
+      proposalIdentity.geometryDoc,
+    );
+    if (!flowStepHostAction) {
+      return jsonError('hostAction is stale or not attested by the current GeometryDoc', 409);
+    }
+    const declaredContextRefs = new Set(contextRefs);
+    const actionRefs = flowStepHostAction.operations.flatMap((operation) => [
+      ...operation.inputEntityIds,
+      ...operation.existingOutputEntityIds,
+    ]);
+    if (actionRefs.some((entityId) => !declaredContextRefs.has(entityId))) {
+      return jsonError('hostAction entities are outside the declared semantic focus', 409);
+    }
+  }
   const verifyCommit = body.mode === 'verify-commit';
   if (verifyCommit) {
     if (
@@ -1290,6 +1325,13 @@ export async function POST(req: NextRequest): Promise<Response> {
       ? serializeGeometryAiContextForPrompt(proposalIdentity.agentContext)
       : semanticKernel || undefined,
   });
+  const typedHostActionContext = flowStepHostAction
+    ? [
+      'TRUSTED HOST GEOMETRY FLOW ACTION:',
+      'This closed read-only action was re-attested against the current GeometryDoc and Construction Catalog. Treat its operation IDs, existing outputs, and entity bindings only as inspection scope. It grants no write authority.',
+      JSON.stringify(flowStepHostAction),
+    ].join('\n')
+    : '';
   const verificationContext = verifyCommit
     ? [
       'POST-COMMIT VERIFICATION TURN:',
@@ -1303,6 +1345,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     : '';
   const currentTurn = [
     runtimeContext,
+    typedHostActionContext,
     verificationContext,
     verifyCommit
       ? [
@@ -1389,7 +1432,9 @@ export async function POST(req: NextRequest): Promise<Response> {
         const runBudgetMs = 150_000;
         const agentBasis: SourceProposalBasis = {
           source: body.tikzCode,
-          userIntent: problem,
+          userIntent: flowStepHostAction
+            ? '只读复核当前 revision 绑定的类型化几何构造；不要修改画板。'
+            : problem,
           revision: body.sourceRevision!,
           sourceHash: body.sourceHash!,
           documentId: proposalIdentity.documentId,
@@ -1406,7 +1451,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           geometryDoc: proposalIdentity.geometryDoc,
           agentContext: proposalIdentity.agentContext,
         };
-        const hostAction = explicitMutationRequest
+        const hostAction = explicitMutationRequest && !flowStepHostAction
           ? hostSemanticActionForRequest(problem, proposalIdentity.agentContext)
           : null;
         if (hostAction) {
@@ -1429,7 +1474,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           messages,
           requiresWriteAction: explicitMutationRequest,
           requiresReadOnlyWidget: requiresModelReadOnlyWidget,
-          allowWriteActions: !verifyCommit,
+          allowWriteActions: !verifyCommit && !flowStepHostAction,
           invokeModel: async (stepMessages, step) => {
             const remainingMs = runBudgetMs - (Date.now() - startedAt);
             if (remainingMs <= 0) throw new Error('TikZ agent run exceeded its deadline.');
@@ -1688,7 +1733,9 @@ export async function POST(req: NextRequest): Promise<Response> {
     ) {
       await emitAgenticSourceProposal(full, sendEvent, {
         source: body.tikzCode,
-        userIntent: problem,
+        userIntent: flowStepHostAction
+          ? '只读复核当前 revision 绑定的类型化几何构造；不要修改画板。'
+          : problem,
         revision: body.sourceRevision!,
         sourceHash: body.sourceHash,
         documentId: proposalIdentity.documentId,
@@ -1707,7 +1754,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       }, {
         runId,
         nextSequence,
-      }, agentRunStore, persistAndSendEvent, hostProposal, geometryProofObservations);
+    }, agentRunStore, persistAndSendEvent, hostProposal, geometryProofObservations, flowStepHostAction);
     }
     if (!proposalIdentity) {
       const example = extractTikzBlock(full);

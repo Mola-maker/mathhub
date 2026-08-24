@@ -98,9 +98,20 @@ describe('AgentMessageWidgets v2', () => {
 
   it('focuses semantic entities when a proof-flow tab becomes active', () => {
     const onFocusEntityRefs = vi.fn();
-    render(<AgentMessageWidgets {...callbacks} onFocusEntityRefs={onFocusEntityRefs} widgets={[{
+    const onDraftGeometryStep = vi.fn();
+    render(<AgentMessageWidgets
+      {...callbacks}
+      onFocusEntityRefs={onFocusEntityRefs}
+      onDraftGeometryStep={onDraftGeometryStep}
+      widgets={[{
       kind: 'geometry-flow',
       title: 'Nine-point circle proof',
+      basis: {
+        documentId: 'widget-doc',
+        epoch: 'widget-epoch',
+        revision: 1,
+        sourceHash: '0123456789abcdef',
+      },
       steps: [
         { id: 'given', title: 'Given', explanation: 'Triangle ABC.', state: 'given' },
         {
@@ -108,16 +119,24 @@ describe('AgentMessageWidgets v2', () => {
           title: 'Midpoints',
           explanation: 'Construct the three side midpoints.',
           state: 'construction',
+          constructionToolId: 'midpoint',
           entityRefs: ['point:M_a', 'point:M_b', 'point:M_c'],
         },
       ],
-    }]} />);
+      }]}
+    />);
     fireEvent.click(screen.getByRole('tab', { name: /Midpoints/u }));
     expect(onFocusEntityRefs).toHaveBeenCalledWith([
       'point:M_a',
       'point:M_b',
       'point:M_c',
     ]);
+    fireEvent.click(screen.getByRole('button', { name: '复核本步' }));
+    expect(onDraftGeometryStep).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'geometry-flow' }),
+      expect.objectContaining({ id: 'midpoints', constructionToolId: 'midpoint' }),
+      'inspect',
+    );
   });
 
   it('shows proof-step provenance and compact source identity without expanding TikZ', () => {
@@ -148,8 +167,10 @@ describe('AgentMessageWidgets v2', () => {
     expect(screen.queryByText('\\draw (A) circle (1);')).toBeNull();
   });
 
-  it('renders attributed problem candidates without exposing solutions or write controls', () => {
-    render(<AgentMessageWidgets {...callbacks} widgets={[{
+  it('keeps search-only problem candidates outside the model workflow', () => {
+    render(<AgentMessageWidgets
+      {...callbacks}
+      widgets={[{
       kind: 'problem-search',
       title: '找到 1 道几何题',
       query: 'Simson line',
@@ -182,12 +203,15 @@ describe('AgentMessageWidgets v2', () => {
         sourceMaterialRights: 'review-required',
         detail: 'available',
       }],
-    }]} />);
+      }]}
+    />);
     expect(screen.getByText('Simson line problem')).toBeTruthy();
     expect(screen.getAllByText('OlympiadBench')).toHaveLength(2);
     expect(screen.getByText('含 1 个题图引用')).toBeTruthy();
     expect(screen.getByRole('link', { name: '查看题源' }).getAttribute('href'))
       .toBe('https://huggingface.co/datasets/Hothan/OlympiadBench');
+    expect(screen.getByRole('note').textContent).toContain('需宿主准入回执');
+    expect(screen.queryByRole('button', { name: /分析|构造/u })).toBeNull();
     expect(document.body.textContent).not.toContain('not exposed solution');
     expect(screen.queryByText('应用')).toBeNull();
   });

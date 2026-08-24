@@ -64,6 +64,14 @@ import {
   type GeometryFlowWidget,
 } from '@/lib/tikz/agent/widget-protocol';
 import {
+  buildGeometryFlowStepHostAction,
+  geometryFlowStepActionDraft,
+  geometryFlowStepExplanationDraft,
+  validateGeometryFlowStepHostAction,
+  type GeometryFlowStepMode,
+  type GeometryFlowStepHostAction,
+} from '@/lib/tikz/agent/widget-actions';
+import {
   acknowledgeTikzAgentProposalCommit,
   fetchTikzAgentRunReplay,
   rejectTikzAgentProposal,
@@ -76,6 +84,7 @@ import {
   sameTikzAsyncWorkBasis,
   type TikzAsyncWorkItem,
 } from '@/lib/tikz/runtime/work-item';
+import type { GeometryDoc } from '@/lib/tikz/ir/geometry-doc';
 
 type Provider = 'relay';
 export type TikzStudioMessage = {
@@ -89,6 +98,34 @@ export type TikzStudioMessage = {
   recovery?: AgentRunRecoveryState;
 };
 type Message = TikzStudioMessage;
+export interface PendingGeometryFlowActionDraft {
+  readonly action: GeometryFlowStepHostAction;
+  readonly draft: string;
+}
+
+export type PendingGeometryFlowActionResolution =
+  | { readonly status: 'none'; readonly action: null }
+  | { readonly status: 'ready'; readonly action: GeometryFlowStepHostAction }
+  | { readonly status: 'rejected'; readonly action: null };
+
+/**
+ * Composer edits never silently discard a typed Host receipt.  The next send
+ * must either present the exact draft against the current GeometryDoc or stop
+ * before the request can fall back to ordinary chat authority.
+ */
+export function resolvePendingGeometryFlowActionForSend(
+  pending: PendingGeometryFlowActionDraft | null,
+  problem: string,
+  geometryDoc: GeometryDoc | null | undefined,
+): PendingGeometryFlowActionResolution {
+  if (!pending) return { status: 'none', action: null };
+  if (pending.draft.trim() !== problem) return { status: 'rejected', action: null };
+  const action = validateGeometryFlowStepHostAction(pending.action, geometryDoc);
+  return action
+    ? { status: 'ready', action }
+    : { status: 'rejected', action: null };
+}
+
 export type AgentRunRecoveryState = {
   readonly status: 'replayed' | 'pending-revalidation' | 'terminal' | 'unavailable';
   readonly runId: string;
@@ -673,6 +710,7 @@ export function TikzStudio({
   const [catalogError, setCatalogError] = useState('');
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const pendingFlowActionRef = useRef<PendingGeometryFlowActionDraft | null>(null);
   const studioRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const agentTurnAdmissionRef = useRef<string | null>(null);
@@ -713,6 +751,35 @@ export function TikzStudio({
     }
   }, [activeGeometryFlow]);
 
+  const draftGeometryFlowStep = useCallback((
+    flow: GeometryFlowWidget,
+    step: GeometryFlowWidget['steps'][number],
+    mode: GeometryFlowStepMode,
+  ) => {
+    const current = engineRef.current;
+    if (!geometryFlowBasisMatches(flow, current.geometryDoc?.basis)) {
+      setCatalogError('该推导步骤属于旧版画板；请基于当前 Canvas 重新生成动态推导。');
+      return;
+    }
+    if (mode === 'explain') {
+      pendingFlowActionRef.current = null;
+      setInput(geometryFlowStepExplanationDraft(flow, step));
+      setCatalogError('');
+      requestAnimationFrame(() => composerInputRef.current?.focus());
+      return;
+    }
+    const action = buildGeometryFlowStepHostAction(flow, step, current.geometryDoc);
+    if (!action) {
+      setCatalogError('该步骤没有可由当前 GeometryDoc 复核的已有类型化构造。');
+      return;
+    }
+    const draft = geometryFlowStepActionDraft(action);
+    pendingFlowActionRef.current = { action, draft };
+    setInput(draft);
+    setCatalogError('');
+    requestAnimationFrame(() => composerInputRef.current?.focus());
+  }, []);
+
   useEffect(() => {
     if (!activeGeometryFlow) return;
     if (geometryFlowBasisMatches(activeGeometryFlow, engine.geometryDoc?.basis)) return;
@@ -724,6 +791,7 @@ export function TikzStudio({
   }, [activeGeometryFlow, engine.geometryDoc]);
 
   useEffect(() => {
+    const visualAuditControllers = visualAuditControllersRef.current;
     componentMountedRef.current = true;
     setMounted(true);
     return () => {
@@ -735,16 +803,16 @@ export function TikzStudio({
       recoveryControllerRef.current = null;
       repairControllerRef.current?.abort();
       repairControllerRef.current = null;
-      for (const audit of visualAuditControllersRef.current.values()) {
+      for (const audit of visualAuditControllers.values()) {
         audit.controller.abort(new DOMException('TikZ Studio closed', 'AbortError'));
       }
-      visualAuditControllersRef.current.clear();
+      visualAuditControllers.clear();
     };
   }, []);
 
   useEffect(() => {
     const basis = engine.geometryDoc?.basis;
-    const currentBasis = basis
+    const currentBasis = basis?.sourceId
       ? {
           documentId: basis.documentId,
           epoch: basis.epoch,
@@ -1045,6 +1113,18 @@ export function TikzStudio({
   const sendProblem = useCallback(async () => {
     const problem = input.trim();
     if (!problem || streaming || agentTurnAdmissionRef.current) return;
+    const pendingFlowAction = pendingFlowActionRef.current;
+    const flowActionResolution = resolvePendingGeometryFlowActionForSend(
+      pendingFlowAction,
+      problem,
+      engine.geometryDoc,
+    );
+    const flowStepAction = flowActionResolution.action;
+    if (flowActionResolution.status === 'rejected') {
+      pendingFlowActionRef.current = null;
+      setCatalogError('动态推导动作已过期或被编辑；请从当前步骤重新发起。');
+      return;
+    }
     if (!engine.interactiveWritebackSafe) {
       setCatalogError(
         `${engine.semanticProjectionState === 'stale'
@@ -1101,13 +1181,25 @@ export function TikzStudio({
       engine.inspectorSelection.semanticEntityId,
       inferredContextRefs,
     );
-    const contextRefs = explicitContextRefs.length > 0
+    const actionContextRefs = flowStepAction
+      ? flowStepAction.operations.flatMap((operation) => [
+        ...operation.inputEntityIds,
+        ...operation.existingOutputEntityIds,
+      ])
+      : [];
+    const baseContextRefs = explicitContextRefs.length > 0
       ? explicitContextRefs
       : geometryContextReady && geometryDoc
         ? geometryDoc.semantic.ir.entities
         .map((entity) => entity.id)
         .slice(0, 64)
         : [];
+    // A typed host action is a closed capability. Keep all of its bound
+    // entities in focus before filling the remaining context budget.
+    const contextRefs = [...new Set([
+      ...actionContextRefs,
+      ...baseContextRefs,
+    ])].slice(0, 64);
     const semanticKernel = geometryContextReady && geometryDoc
       ? buildGeometryAiContext(
         geometryDoc,
@@ -1136,6 +1228,7 @@ export function TikzStudio({
       { id: assistantMessageId, role: 'assistant', content: '' } satisfies Message,
     ]).slice(-MAX_CHAT_MESSAGES));
     setInput('');
+    pendingFlowActionRef.current = null;
 
     const controller = new AbortController();
     agentControllerRef.current?.abort();
@@ -1168,6 +1261,7 @@ export function TikzStudio({
           sceneManifest,
           semanticKernel,
           contextRefs,
+          hostAction: flowStepAction ?? undefined,
         }),
       });
       if (!response.ok || !response.body) {
@@ -1611,7 +1705,7 @@ export function TikzStudio({
                       },
                     );
                     const auditSummary = JSON.stringify(verificationKernel).slice(0, 24_000);
-                    if (visualAuditAvailable) {
+                    if (visualAuditAvailable && committedGeometryDoc.basis.sourceId) {
                       const requestedAt = Date.now();
                       const visualAuditWorkItem: TikzAsyncWorkItem<'visual-audit'> = {
                         schemaVersion: 'tikz-async-work-item/v1',
@@ -2120,6 +2214,7 @@ export function TikzStudio({
                     content={message.content}
                     pending={streaming && message.id === messages.at(-1)?.id}
                     onChooseClarification={(choice) => {
+                      pendingFlowActionRef.current = null;
                       setInput(choice.value);
                       requestAnimationFrame(() => composerInputRef.current?.focus());
                     }}
@@ -2137,6 +2232,7 @@ export function TikzStudio({
                       block: 'center',
                     });
                   }}
+                  onDraftGeometryStep={draftGeometryFlowStep}
                 />
               </motion.div>
             ))}
@@ -2148,7 +2244,12 @@ export function TikzStudio({
               value={input}
               aria-label="几何构造描述"
               placeholder="描述一个几何构造，如：作三角形 ABC 的外接圆并标出外心"
-              onChange={(event) => setInput(event.target.value)}
+              onChange={(event) => {
+                // Preserve a pending Host receipt. If the user edits its fixed
+                // draft, sendProblem rejects once instead of silently sending
+                // the text as a broad untyped mutation request.
+                setInput(event.target.value);
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault();
@@ -2209,6 +2310,7 @@ export function TikzStudio({
                 revealUpTo={revealUpTo}
                 onReveal={setRevealUpTo}
                 onFlowFocus={focusGeometryFlowRefs}
+                onDraftFlowStep={draftGeometryFlowStep}
                 onShowSourceSteps={() => setActiveGeometryFlow(null)}
                 onClose={() => {
                   setStepsOpen(false);

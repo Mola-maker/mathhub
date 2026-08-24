@@ -9,6 +9,10 @@ import {
   type TikzReadOnlyAgentWidget,
   type VisualAuditWidget,
 } from '@/lib/tikz/agent/widget-protocol';
+import {
+  canOfferGeometryFlowStepAction,
+  type GeometryFlowStepMode,
+} from '@/lib/tikz/agent/widget-actions';
 import { AssistantMathMarkdown } from './agent-message-content';
 
 export type AgentMessageWidget =
@@ -181,9 +185,15 @@ function geometryStepProofLabel(
 function GeometryFlowCard({
   widget,
   onFocusEntityRefs,
+  onDraftStep,
 }: {
   widget: GeometryFlowWidget;
   onFocusEntityRefs?(refs: readonly string[]): void;
+  onDraftStep?(
+    flow: GeometryFlowWidget,
+    step: GeometryFlowWidget['steps'][number],
+    mode: GeometryFlowStepMode,
+  ): void;
 }) {
   const [activeId, setActiveId] = useState(widget.steps[0]?.id ?? '');
   const active = widget.steps.find((step) => step.id === activeId) ?? widget.steps[0];
@@ -244,6 +254,23 @@ function GeometryFlowCard({
                 </button>
               )
               : null}
+            {onDraftStep ? (
+              <>
+                <button type="button" onClick={() => onDraftStep(widget, active, 'explain')}>
+                  解释本步
+                </button>
+                <button
+                  type="button"
+                  disabled={!canOfferGeometryFlowStepAction(widget, active)}
+                  title={canOfferGeometryFlowStepAction(widget, active)
+                    ? '按当前 revision 只读复核 GeometryDoc 中已有构造'
+                    : '该步骤没有可验证的 GeometryDoc 实体引用'}
+                  onClick={() => onDraftStep(widget, active, 'inspect')}
+                >
+                  复核本步
+                </button>
+              </>
+            ) : null}
           </div>
           {active.proof ? (
             <small className="tz-geometry-flow__proof-detail">
@@ -380,6 +407,9 @@ function GeometryProblemSearchCard({ widget }: { widget: GeometryProblemSearchWi
               <span>快照 {result.contentHash.slice(0, 8)}</span>
               {result.hasImages ? <span>含 {result.assetCount || '未核验'} 个题图引用</span> : null}
               <a href={result.sourceUrl} target="_blank" rel="noreferrer">查看题源</a>
+              <span className="tz-problem-search__admission" role="note">
+                需宿主准入回执后才能发送给 AI 或进入构造工作流
+              </span>
             </footer>
           </li>
         ))}
@@ -408,12 +438,18 @@ export function AgentMessageWidgets({
   onOpenExactPreview,
   onOpenSource,
   onFocusEntityRefs,
+  onDraftGeometryStep,
 }: {
   widgets: readonly AgentMessageWidget[];
   onLocateCanvas(): void;
   onOpenExactPreview(): void;
   onOpenSource(): void;
   onFocusEntityRefs?(refs: readonly string[]): void;
+  onDraftGeometryStep?(
+    flow: GeometryFlowWidget,
+    step: GeometryFlowWidget['steps'][number],
+    mode: GeometryFlowStepMode,
+  ): void;
 }) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   if (widgets.length === 0) return null;
@@ -430,6 +466,7 @@ export function AgentMessageWidgets({
               key={`${widget.kind}:${index}`}
               widget={widget}
               onFocusEntityRefs={onFocusEntityRefs}
+              onDraftStep={onDraftGeometryStep}
             />
           );
         }
@@ -437,7 +474,9 @@ export function AgentMessageWidgets({
           return <VisualAuditCard key={`${widget.kind}:${index}`} widget={widget} />;
         }
         if (widget.kind === 'problem-search') {
-          return <GeometryProblemSearchCard key={`${widget.kind}:${index}`} widget={widget} />;
+          return (
+            <GeometryProblemSearchCard key={`${widget.kind}:${index}`} widget={widget} />
+          );
         }
         if (widget.kind === 'code-example') {
           return (

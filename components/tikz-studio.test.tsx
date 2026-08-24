@@ -8,6 +8,7 @@ import {
   inferredGeometryAiContextRefs,
   isCommittedGeometryProjection,
   isVisualAuditAvailable,
+  resolvePendingGeometryFlowActionForSend,
   reduceTikzStudioAgentStep,
   reduceTikzStudioAgentWidget,
   reduceTikzStudioAssistantContent,
@@ -42,6 +43,23 @@ function stubCatalogs() {
 }
 
 describe('TikzStudio', () => {
+  it('rejects an edited typed flow draft instead of degrading to ordinary chat authority', () => {
+    const pending = {
+      action: {} as never,
+      draft: '只读复核当前步骤',
+    };
+    expect(resolvePendingGeometryFlowActionForSend(
+      pending,
+      '只读复核当前步骤，然后把它改成红色',
+      null,
+    )).toEqual({ status: 'rejected', action: null });
+    expect(resolvePendingGeometryFlowActionForSend(
+      null,
+      '把它改成红色',
+      null,
+    )).toEqual({ status: 'none', action: null });
+  });
+
   it('accepts only a safe configured default model for immediate fallback', () => {
     expect(configuredProviderDefaultModel({
       providers: { relay: { configured: true, defaultModel: 'Minimax-M3' } },

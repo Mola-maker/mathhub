@@ -6,6 +6,10 @@ import {
   geometryFlowBasisMatches,
   type GeometryFlowWidget,
 } from '@/lib/tikz/agent/widget-protocol';
+import {
+  canOfferGeometryFlowStepAction,
+  type GeometryFlowStepMode,
+} from '@/lib/tikz/agent/widget-actions';
 import { AssistantMathMarkdown } from './agent-message-content';
 import type { TikzEngine } from './use-tikz-engine';
 
@@ -34,6 +38,7 @@ export function TikzStepsPanel({
   revealUpTo,
   onReveal,
   onFlowFocus,
+  onDraftFlowStep,
   onShowSourceSteps,
   onClose,
 }: {
@@ -42,6 +47,11 @@ export function TikzStepsPanel({
   revealUpTo?: number;
   onReveal(stmtIndex: number | undefined): void;
   onFlowFocus?(refs: readonly string[]): void;
+  onDraftFlowStep?(
+    flow: GeometryFlowWidget,
+    step: GeometryFlowWidget['steps'][number],
+    mode: GeometryFlowStepMode,
+  ): void;
   onShowSourceSteps?(): void;
   onClose(): void;
 }) {
@@ -173,6 +183,26 @@ export function TikzStepsPanel({
               </p>
             ) : null}
             {active.constructionToolId ? <code>{active.constructionToolId}</code> : null}
+            {onDraftFlowStep ? (
+              <div className="tz-steps__draft-actions">
+                <button
+                  type="button"
+                  onClick={() => onDraftFlowStep(flow, active, 'explain')}
+                >
+                  解释本步
+                </button>
+                <button
+                  type="button"
+                  disabled={!canOfferGeometryFlowStepAction(flow, active)}
+                  title={canOfferGeometryFlowStepAction(flow, active)
+                    ? '按当前 revision 只读复核 GeometryDoc 中已有构造'
+                    : '该步骤没有可验证的 GeometryDoc 实体引用'}
+                  onClick={() => onDraftFlowStep(flow, active, 'inspect')}
+                >
+                  复核本步
+                </button>
+              </div>
+            ) : null}
             {active.tikz ? (
               <details>
                 <summary>查看本步 TikZ</summary>

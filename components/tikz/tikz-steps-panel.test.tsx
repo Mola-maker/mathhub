@@ -39,6 +39,7 @@ function flowFor(nextBasis = basis) {
         id: 'goal',
         title: '结论',
         explanation: '完成 $M_aM_b=M_aM_c$ 的推导。',
+        constructionToolId: 'midpoint',
         entityRefs: ['circle:nine-point'],
         state: 'goal' as const,
         proof: {
@@ -95,6 +96,35 @@ describe('TikzStepsPanel GeometryFlow basis gate', () => {
     expect(onFlowFocus).toHaveBeenCalledWith(['circle:nine-point']);
     expect(screen.getAllByText(/语义证明/u).length).toBeGreaterThan(0);
     expect(document.querySelector('.tz-steps__flow-explanation .katex')).toBeTruthy();
+  });
+
+  it('routes a flow step back to the host instead of executing embedded TikZ', () => {
+    const onDraftFlowStep = vi.fn();
+    const flow = flowFor();
+    render(
+      <TikzStepsPanel
+        engine={engineFor()}
+        flow={flow}
+        onReveal={vi.fn()}
+        onFlowFocus={vi.fn()}
+        onDraftFlowStep={onDraftFlowStep}
+        onShowSourceSteps={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '解释本步' }));
+    expect(onDraftFlowStep).toHaveBeenCalledWith(
+      flow,
+      expect.objectContaining({ id: 'given' }),
+      'explain',
+    );
+    fireEvent.click(screen.getByRole('button', { name: /结论/u }));
+    fireEvent.click(screen.getByRole('button', { name: '复核本步' }));
+    expect(onDraftFlowStep).toHaveBeenLastCalledWith(
+      flow,
+      expect.objectContaining({ id: 'goal' }),
+      'inspect',
+    );
   });
 
   it('stops an active autoplay immediately when the GeometryDoc basis changes', () => {

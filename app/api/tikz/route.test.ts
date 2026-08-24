@@ -76,6 +76,11 @@ import {
   TIKZ_AGENT_PROPOSAL_CHECKPOINT_SCHEMA_VERSION,
 } from '@/lib/tikz/agent/run-store';
 import { createTikzAgentRunResumeToken } from '@/lib/tikz/agent/run-resume-token';
+import { hostGeometryFlowWidget } from '@/lib/tikz/agent/host-geometry-flow-widget';
+import {
+  buildGeometryFlowStepHostAction,
+  geometryFlowStepActionDraft,
+} from '@/lib/tikz/agent/widget-actions';
 
 const request = (body: unknown) => new NextRequest('http://localhost/api/tikz', {
   method: 'POST',
@@ -834,6 +839,139 @@ ${JSON.stringify({
     expect(text).not.toContain('"aiPatchProposal"');
     expect(text).not.toContain('AI 运行失败');
     expect(text).toContain('"outcome":"answer"');
+  });
+
+  it('re-attests a typed read-only flow-step action and never grants create authority', async () => {
+    const tikzCode = String.raw`\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (4,0);
+\coordinate (C) at (1.2,2.8);
+\coordinate (M) at ($(A)!0.5!(B)$);
+\coordinate (H) at ($(A)!(C)!(B)$);
+\draw (A) -- (B) -- (C) -- cycle;
+\draw (C) -- (M);
+\draw (C) -- (H);
+\pic [draw] {right angle = A--H--C};
+\end{tikzpicture}`;
+    const projected = projectRouteGeometry(
+      tikzCode,
+      0,
+      'route-flow-action-document',
+      'route-flow-action-epoch',
+    );
+    const flow = hostGeometryFlowWidget(
+      '把中点 M 与垂足 H 的推导拆成动态几何流程图',
+      projected.geometryDoc,
+    );
+    const step = flow?.steps.find((candidate) => (
+      candidate.constructionToolId === 'midpoint'
+    ));
+    const hostAction = flow && step
+      ? buildGeometryFlowStepHostAction(flow, step, projected.geometryDoc)
+      : null;
+    expect(hostAction).not.toBeNull();
+    const contextRefs = [...new Set(hostAction!.operations.flatMap((operation) => [
+      ...operation.inputEntityIds,
+      ...operation.existingOutputEntityIds,
+    ]))];
+    const semanticKernel = buildGeometryAiContext(projected.geometryDoc, {
+      focusRefs: contextRefs,
+      focusDepth: 3,
+    });
+    vi.mocked(streamProvider).mockImplementation(async (_provider, messages, send) => {
+      const current = messages.find((message) => (
+        message.content.includes('TRUSTED HOST GEOMETRY FLOW ACTION')
+      ));
+      expect(current?.content).toContain('geometry-flow-step-host-action/v1');
+      expect(current?.content).toContain('"toolId":"midpoint"');
+      expect(current?.content).toContain('"inputEntityIds"');
+      const wrongOperation = [
+        '```tikz-geometry-intent',
+        JSON.stringify({
+          schemaVersion: 'geometry-intent/v2',
+          intentId: 'wrong-flow-operation',
+          operation: {
+            kind: 'construct',
+            toolId: 'perpendicular-foot',
+            inputRefs: ['point:A', 'point:B', 'point:C'],
+            requestedNames: {},
+            parameters: {},
+          },
+        }),
+        '```',
+      ].join('\n');
+      send(wrongOperation);
+      return wrongOperation;
+    });
+
+    const valid = await POST(request({
+      mode: 'build',
+      problem: geometryFlowStepActionDraft(hostAction!),
+      history: [],
+      provider: 'relay',
+      tikzCode,
+      sourceRevision: 0,
+      sourceHash: projected.sceneManifest.sourceHash,
+      sceneManifest: projected.sceneManifest,
+      semanticKernel,
+      contextRefs,
+      hostAction,
+    }));
+    expect(valid.status).toBe(200);
+    const validText = await valid.text();
+    expect(vi.mocked(streamProvider)).toHaveBeenCalled();
+    expect(validText).toContain('write-action-not-allowed');
+    expect(validText).toContain('read-only verification and cannot contain a write action');
+    expect(validText).not.toContain('"type":"proposal.ready"');
+
+    vi.mocked(streamProvider).mockClear();
+    vi.mocked(streamProvider).mockImplementationOnce(async (_provider, messages, send) => {
+      const current = messages.find((message) => (
+        message.content.includes('TRUSTED HOST GEOMETRY FLOW ACTION')
+      ));
+      expect(current?.content).toContain('grants no write authority');
+      const answer = '当前中点构造已存在，输入为 A、B，输出为 M；本轮无需修改画板。';
+      send(answer);
+      return answer;
+    });
+    const inspected = await POST(request({
+      mode: 'build',
+      problem: geometryFlowStepActionDraft(hostAction!),
+      history: [],
+      provider: 'relay',
+      tikzCode,
+      sourceRevision: 0,
+      sourceHash: projected.sceneManifest.sourceHash,
+      sceneManifest: projected.sceneManifest,
+      semanticKernel,
+      contextRefs,
+      hostAction,
+    }));
+    expect(inspected.status).toBe(200);
+    const inspectedText = await inspected.text();
+    expect(inspectedText).toContain('当前中点构造已存在');
+    expect(inspectedText).toContain('"outcome":"answer"');
+    expect(inspectedText).not.toContain('"type":"proposal.ready"');
+
+    vi.mocked(streamProvider).mockClear();
+    const stale = await POST(request({
+      mode: 'build',
+      problem: geometryFlowStepActionDraft(hostAction!),
+      history: [],
+      provider: 'relay',
+      tikzCode,
+      sourceRevision: 0,
+      sourceHash: projected.sceneManifest.sourceHash,
+      sceneManifest: projected.sceneManifest,
+      semanticKernel,
+      contextRefs,
+      hostAction: {
+        ...hostAction,
+        basis: { ...hostAction!.basis, revision: 1 },
+      },
+    }));
+    expect(stale.status).toBe(409);
+    expect(vi.mocked(streamProvider)).not.toHaveBeenCalled();
   });
 
   it('requires a same-run proof observation before an olympiad auxiliary construction', async () => {
