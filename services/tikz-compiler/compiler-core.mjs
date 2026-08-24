@@ -330,6 +330,11 @@ async function runProcess(command, args, options) {
         WINDIR: process.env.WINDIR,
         TEMP: process.env.TEMP,
         TMP: process.env.TMP,
+        // MiKTeX writes a per-process log even for --version and otherwise
+        // exits non-zero when a sandboxed/dev host cannot write its default
+        // AppData log directory. The local server binds this to a private temp
+        // directory; production TeX Live simply ignores it.
+        MIKTEX_LOG_DIR: process.env.MIKTEX_LOG_DIR,
         SOURCE_DATE_EPOCH: '0',
       }).filter((entry) => typeof entry[1] === 'string'),
     );
@@ -401,17 +406,23 @@ export function createCompiler(options = {}) {
     .includes(requestedEngine)
     ? requestedEngine
     : EXACT_PROFILE.runtimeCapabilities.texEngine;
-  const tectonicPath = (
-    options.tectonicPath
-    ?? process.env.TECTONIC_PATH
-    ?? 'tectonic'
+  const compilerPath = options.compilerPath ?? (
+    engine === 'lualatex'
+      ? options.lualatexPath ?? process.env.LUALATEX_PATH ?? 'lualatex'
+      : engine === 'xelatex'
+        ? options.xelatexPath
+          ?? process.env.XELATEX_PATH
+          // Preserve the old test/dev option while callers migrate to the
+          // engine-neutral compilerPath field.
+          ?? options.tectonicPath
+          ?? 'xelatex'
+        : engine === 'pdflatex'
+          ? options.pdflatexPath
+            ?? process.env.PDFLATEX_PATH
+            ?? options.tectonicPath
+            ?? 'pdflatex'
+          : options.tectonicPath ?? process.env.TECTONIC_PATH ?? 'tectonic'
   );
-  const lualatexPath = (
-    options.lualatexPath
-    ?? process.env.LUALATEX_PATH
-    ?? 'lualatex'
-  );
-  const compilerPath = engine === 'lualatex' ? lualatexPath : tectonicPath;
   const dvisvgmPath = (
     options.dvisvgmPath
     ?? process.env.DVISVGM_PATH

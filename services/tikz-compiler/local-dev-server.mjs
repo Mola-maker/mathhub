@@ -1,6 +1,9 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   compileCacheKeyDigest,
   compilerInputIdentity,
@@ -19,25 +22,39 @@ if (process.env.NODE_ENV === 'production') {
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '127.0.0.1';
 const token = process.env.COMPILER_TOKEN?.trim() || 'local-tikz-compiler-token';
-const tectonicPath = process.env.TECTONIC_PATH || 'tectonic';
 const dvisvgmPath = process.env.DVISVGM_PATH || 'dvisvgm';
-const compilerImageDigest = 'local-tectonic-native-dev';
-const identity = compilerInputIdentity(compilerImageDigest);
-const compiler = createCompiler({
-  engine: 'tectonic',
-  tectonicPath,
-  dvisvgmPath,
-  // A cold native Tectonic cache can legitimately take longer than the
-  // worker's warm-container budget. Keep this below the browser's 180 s job
-  // deadline while preserving the exact profile's --only-cached contract.
-  timeoutMs: Number(process.env.COMPILE_TIMEOUT_MS || 150_000),
-  maxQueue: 4,
-});
-const jobs = createLocalJobRegistry();
+const requestedLocalEngine = process.env.TIKZ_LOCAL_TEX_ENGINE?.trim().toLowerCase()
+  || 'auto';
+const allowedLocalEngines = new Set([
+  'auto', 'tectonic', 'xelatex', 'pdflatex', 'lualatex',
+]);
+if (!allowedLocalEngines.has(requestedLocalEngine)) {
+  throw new Error(`Unsupported TIKZ_LOCAL_TEX_ENGINE: ${requestedLocalEngine}`);
+}
+if (
+  TIKZ_COMPILER_PROFILE === 'tikz-luatex-graphdrawing-v1'
+  && !['auto', 'lualatex'].includes(requestedLocalEngine)
+) {
+  throw new Error('The graphdrawing profile requires TIKZ_LOCAL_TEX_ENGINE=lualatex.');
+}
+if (
+  TIKZ_COMPILER_PROFILE === 'tikz-standard-v1'
+  && requestedLocalEngine === 'lualatex'
+) {
+  throw new Error('LuaLaTeX is reserved for the tikz-luatex-graphdrawing-v1 profile.');
+}
+const localRuntimeLogDirectory = process.env.MIKTEX_LOG_DIR?.trim()
+  || join(tmpdir(), 'math-geohub-miktex-logs');
+await mkdir(localRuntimeLogDirectory, { recursive: true });
+// Keep MiKTeX maintenance logs outside source workspaces and make sandboxed
+// local development behave like an ordinary terminal. compiler-core forwards
+// this one runtime-specific variable to every TeX/dvisvgm child.
+process.env.MIKTEX_LOG_DIR = localRuntimeLogDirectory;
 
 function probeExecutable(command, args = ['--version']) {
   return new Promise((resolve) => {
     const child = spawn(command, args, {
+      env: process.env,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -76,15 +93,60 @@ function probeExecutable(command, args = ['--version']) {
   });
 }
 
-const [tectonicRuntime, dvisvgmRuntime] = await Promise.all([
-  probeExecutable(tectonicPath),
+function compilerCommand(engine) {
+  if (engine === 'tectonic') return process.env.TECTONIC_PATH?.trim() || 'tectonic';
+  if (engine === 'xelatex') return process.env.XELATEX_PATH?.trim() || 'xelatex';
+  if (engine === 'pdflatex') return process.env.PDFLATEX_PATH?.trim() || 'pdflatex';
+  return process.env.LUALATEX_PATH?.trim() || 'lualatex';
+}
+
+const engineOrder = TIKZ_COMPILER_PROFILE === 'tikz-luatex-graphdrawing-v1'
+  ? ['lualatex']
+  : requestedLocalEngine === 'auto'
+    // XeLaTeX is the closest installed fallback to Tectonic's Unicode/XeTeX
+    // behavior. pdfLaTeX remains useful for minimal ASCII installations.
+    ? ['tectonic', 'xelatex', 'pdflatex']
+    : [requestedLocalEngine];
+const [compilerRuntimes, dvisvgmRuntime] = await Promise.all([
+  Promise.all(engineOrder.map(async (engine) => ({
+    engine,
+    command: compilerCommand(engine),
+    ...await probeExecutable(compilerCommand(engine)),
+  }))),
   probeExecutable(dvisvgmPath),
 ]);
-const runtimeReady = tectonicRuntime.available && dvisvgmRuntime.available;
+const selectedCompilerRuntime = compilerRuntimes.find((runtime) => runtime.available)
+  ?? compilerRuntimes[0];
+const selectedEngine = selectedCompilerRuntime?.engine
+  ?? (TIKZ_COMPILER_PROFILE === 'tikz-luatex-graphdrawing-v1' ? 'lualatex' : 'tectonic');
+const compilerImageDigest = `local-${selectedEngine}-native-dev`;
+const profileIdentity = compilerInputIdentity(compilerImageDigest);
+const identity = TIKZ_COMPILER_PROFILE === 'tikz-standard-v1'
+  && selectedEngine !== 'tectonic'
+  ? {
+      ...profileIdentity,
+      bundleIdentity: `local-${selectedEngine}-dvisvgm@${compilerImageDigest}`,
+    }
+  : profileIdentity;
+const compiler = createCompiler({
+  engine: selectedEngine,
+  compilerPath: selectedCompilerRuntime?.command ?? compilerCommand(selectedEngine),
+  dvisvgmPath,
+  // A cold native engine cache can legitimately take longer than the worker's
+  // warm-container budget. Keep this below the browser's 180 s job deadline.
+  timeoutMs: Number(process.env.COMPILE_TIMEOUT_MS || 150_000),
+  maxQueue: 4,
+});
+const jobs = createLocalJobRegistry();
+const runtimeReady = Boolean(selectedCompilerRuntime?.available)
+  && dvisvgmRuntime.available;
 const missingRuntimeNames = [
-  ...(tectonicRuntime.available ? [] : ['Tectonic']),
+  ...(selectedCompilerRuntime?.available
+    ? []
+    : [`TeX engine (${engineOrder.join(' / ')})`]),
   ...(dvisvgmRuntime.available ? [] : ['dvisvgm']),
 ];
+const localRuntimeMode = `local-${selectedEngine}-native-dev`;
 
 function queuedJob(id, cacheKeyDigest, submittedSourceDigest, visibility) {
   return {
@@ -213,12 +275,16 @@ async function handle(request, response) {
     json(response, runtimeReady ? 200 : 503, {
       ok: runtimeReady,
       ready: runtimeReady,
-      mode: 'local-tectonic-native-dev',
+      mode: localRuntimeMode,
       profile: TIKZ_COMPILER_PROFILE,
       profileManifestDigest: identity.profileManifestDigest,
       runtime: {
-        tectonic: tectonicRuntime,
+        requestedEngine: requestedLocalEngine,
+        selectedEngine,
+        compiler: selectedCompilerRuntime,
+        candidates: compilerRuntimes,
         dvisvgm: dvisvgmRuntime,
+        logDirectory: localRuntimeLogDirectory,
       },
       ...compiler.stats(),
     });
@@ -323,6 +389,6 @@ const server = createServer((request, response) => {
 
 server.listen(port, host, () => {
   process.stdout.write(
-    `Local Tectonic TikZ compiler listening on http://${host}:${port} (${runtimeReady ? 'ready' : `missing ${missingRuntimeNames.join(', ')}`})\n`,
+    `Local ${selectedEngine} TikZ compiler listening on http://${host}:${port} (${runtimeReady ? 'ready' : `missing ${missingRuntimeNames.join(', ')}`})\n`,
   );
 });

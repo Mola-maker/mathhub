@@ -14,6 +14,7 @@ const JOB_ID = /^j_[a-f0-9]{64}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const CACHE_KEY_VERSION = 'tikz-cache-key/v3' as const;
 const SOURCE_POLICY = 'tikz-untrusted-no-io/v1' as const;
+const LOCAL_DEVELOPMENT_COMPILER_IMAGE = /^local-(xelatex|pdflatex)-native-dev$/;
 
 export interface CompilerPolicyDiagnostic {
   type: 'source-policy';
@@ -373,7 +374,29 @@ function expectedBundleIdentity(
   profile: TikzExactCompilerProfile,
   compilerImageDigest: string,
 ): string {
+  const localEngine = process.env.NODE_ENV !== 'production'
+    && profile.id === 'tikz-standard-v1'
+    ? LOCAL_DEVELOPMENT_COMPILER_IMAGE.exec(compilerImageDigest)?.[1]
+    : undefined;
+  if (localEngine) {
+    return `local-${localEngine}-dvisvgm@${compilerImageDigest}`;
+  }
   return `${profile.bundleIdentityPrefix}@${compilerImageDigest}`;
+}
+
+function localDevelopmentRenderer(
+  profile: TikzExactCompilerProfile,
+  compilerImageDigest: string,
+): string | null {
+  if (process.env.NODE_ENV === 'production' || profile.id !== 'tikz-standard-v1') {
+    return null;
+  }
+  const engine = LOCAL_DEVELOPMENT_COMPILER_IMAGE.exec(compilerImageDigest)?.[1];
+  return engine === 'xelatex'
+    ? 'xelatex-xdv-dvisvgm-local-dev'
+    : engine === 'pdflatex'
+      ? 'pdflatex-dvi-dvisvgm-local-dev'
+      : null;
 }
 
 function recomputeCacheKey(
@@ -464,6 +487,9 @@ function validAttestation(
   const attestation = value as Partial<CompilerArtifactAttestation>;
   const expectedProfile = tikzExactCompilerProfile(expectedProfileId);
   const recomputedCacheKey = recomputeCacheKey(attestation, expectedProfile);
+  const expectedLocalRenderer = typeof attestation.compilerImageDigest === 'string'
+    ? localDevelopmentRenderer(expectedProfile, attestation.compilerImageDigest)
+    : null;
   return (
     attestation.schemaVersion === 'tikz-artifact-attestation/v1'
     && attestation.jobId === expectedJobId
@@ -496,6 +522,7 @@ function validAttestation(
     && attestation.compilerImageDigest.length > 0
     && attestation.bundleIdentity
       === expectedBundleIdentity(expectedProfile, attestation.compilerImageDigest)
+    && (expectedLocalRenderer === null || attestation.renderer === expectedLocalRenderer)
     && attestation.mediaType === 'image/svg+xml'
     && typeof attestation.svgBytes === 'number'
     && Number.isSafeInteger(attestation.svgBytes)
@@ -532,6 +559,7 @@ function assertAttestedSuccess(job: CompilerJob): CompilerArtifactAttestation {
     || job.wrapperDigest !== job.attestation.wrapperDigest
     || job.bundleIdentity !== job.attestation.bundleIdentity
     || job.profileManifestDigest !== job.attestation.profileManifestDigest
+    || job.renderer !== job.attestation.renderer
   ) {
     throw new TikzCompileError(
       '精确编译任务缺少可验证的产物证明',

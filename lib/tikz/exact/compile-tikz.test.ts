@@ -82,6 +82,31 @@ function attestationFor(
   };
 }
 
+function localXelatexAttestation(sourceDigest: string): CompilerArtifactAttestation {
+  const compilerImageDigest = 'local-xelatex-native-dev';
+  const bundleIdentity = `local-xelatex-dvisvgm@${compilerImageDigest}`;
+  const cacheKeyDigest = digest([
+    CACHE_KEY_VERSION,
+    compilerImageDigest,
+    PROFILE,
+    VISIBILITY,
+    sourceDigest,
+    SOURCE_POLICY,
+    WRAPPER_ID,
+    WRAPPER_DIGEST,
+    bundleIdentity,
+    PROFILE_MANIFEST_DIGEST,
+  ].join('\0'));
+  return {
+    ...attestationFor(sourceDigest),
+    jobId: `j_${cacheKeyDigest}`,
+    cacheKeyDigest,
+    bundleIdentity,
+    renderer: 'xelatex-xdv-dvisvgm-local-dev',
+    compilerImageDigest,
+  };
+}
+
 // A job must advertise the same execution identity as its attestation; the
 // client recomputes the cache key from these fields before trusting an artifact.
 function jobFor(attestation: CompilerArtifactAttestation) {
@@ -201,6 +226,40 @@ describe('compileTikzToSvg', () => {
     });
     expect(fetchMock.mock.calls[1][0])
       .toBe(`http://compiler.internal/v1/jobs/${jobId}/artifact`);
+  });
+
+  it('accepts an honestly identified XeLaTeX fallback only in local development', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('TIKZ_COMPILER_URL', 'http://127.0.0.1:8788');
+    vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
+    const attestation = localXelatexAttestation(digest(SOURCE));
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      ...jobFor(attestation),
+      status: 'succeeded',
+      attestation,
+    })));
+
+    await expect(createTikzCompileJob(SOURCE)).resolves.toMatchObject({
+      status: 'succeeded',
+      renderer: 'xelatex-xdv-dvisvgm-local-dev',
+      bundleIdentity: 'local-xelatex-dvisvgm@local-xelatex-native-dev',
+    });
+  });
+
+  it('rejects the local XeLaTeX fallback identity in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('TIKZ_COMPILER_URL', 'https://compiler.internal');
+    vi.stubEnv('TIKZ_COMPILER_TOKEN', 'test-token');
+    const attestation = localXelatexAttestation(digest(SOURCE));
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      ...jobFor(attestation),
+      status: 'succeeded',
+      attestation,
+    })));
+
+    await expect(createTikzCompileJob(SOURCE)).rejects.toMatchObject({
+      code: 'INVALID_JOB_IDENTITY',
+    });
   });
 
   it('保留编译服务的状态码与错误码', async () => {

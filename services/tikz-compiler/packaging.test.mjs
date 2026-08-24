@@ -59,7 +59,7 @@ test('local Compose explicitly permits the development Worker identity', async (
   );
 });
 
-test('one-command local Studio uses the same Tectonic exact profile identity', async () => {
+test('one-command local Studio selects an available native exact engine without hiding its identity', async () => {
   const [packageJson, launcher, localServer] = await Promise.all([
     readFile(new URL('../../package.json', import.meta.url), 'utf8'),
     readFile(new URL('../../tools/dev-tikz-studio.mjs', import.meta.url), 'utf8'),
@@ -71,9 +71,11 @@ test('one-command local Studio uses the same Tectonic exact profile identity', a
   assert.match(launcher, /TIKZ_COMPILER_TOKEN/);
   assert.match(launcher, /local-dev-server\.mjs/);
   assert.match(launcher, /node_modules\/next\/dist\/bin\/next/);
-  assert.match(localServer, /engine:\s*'tectonic'/);
-  assert.match(localServer, /local-tectonic-native-dev/);
-  assert.match(localServer, /probeExecutable\(tectonicPath\)/);
+  assert.match(localServer, /TIKZ_LOCAL_TEX_ENGINE/);
+  assert.match(localServer, /\['tectonic', 'xelatex', 'pdflatex'\]/);
+  assert.match(localServer, /compilerPath:\s*selectedCompilerRuntime/);
+  assert.match(localServer, /local-\$\{selectedEngine\}-native-dev/);
+  assert.match(localServer, /MIKTEX_LOG_DIR/);
   assert.match(localServer, /probeExecutable\(dvisvgmPath\)/);
-  assert.doesNotMatch(localServer, /engine:\s*'xelatex'/);
+  assert.match(localServer, /graphdrawing profile requires TIKZ_LOCAL_TEX_ENGINE=lualatex/);
 });

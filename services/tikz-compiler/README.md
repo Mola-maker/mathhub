@@ -31,7 +31,7 @@ PGF graph drawing 包自身的 Lua 代码能够执行。
 
 ### 推荐：一条命令启动 Studio 与精准编译服务
 
-本机已安装 Tectonic 与 dvisvgm 时，直接运行：
+本机安装了 dvisvgm，并具备至少一个受支持 TeX 引擎时，直接运行：
 
 ```powershell
 npm run dev:tikz
@@ -39,11 +39,26 @@ npm run dev:tikz
 
 该入口会启动 Next.js 和 development-only compiler，并为两者注入一致的
 `TIKZ_COMPILER_URL/TOKEN`。如果 8787 已有 compiler，它会复用现有服务。
-compiler 会在监听前检查 Tectonic 与 dvisvgm；工具缺失时交互画板仍可使用，
+compiler 会在监听前检查引擎与 dvisvgm。标准 profile 默认依次选择
+Tectonic、XeLaTeX、pdfLaTeX；graphdrawing profile 只接受 LuaLaTeX。实际选中的
+引擎会写入 `/healthz`、renderer 与本地产物 identity，绝不会把回退结果伪装成
+Tectonic。工具缺失时交互画板仍可使用，
 `/healthz` 与精准预览会明确返回缺失的运行时，而不会把环境问题报告成 TikZ
-语法错误。本地服务使用与生产 `tikz-standard-v1` 相同的
-Tectonic `--untrusted --only-cached` + dvisvgm profile；XeLaTeX 结果不能冒充该
-profile 的精确产物。
+语法错误。Windows/MiKTeX 的维护日志会写入系统临时目录，避免默认 AppData 日志
+不可写时把一个可用引擎误判成崩溃。生产 `tikz-standard-v1` 仍固定使用隔离的
+Tectonic `--untrusted --only-cached` + dvisvgm profile；本地 XeLaTeX/pdfLaTeX
+回退只用于开发预览，并以独立 renderer/identity 呈现。
+
+可用以下变量覆盖自动选择：
+
+```dotenv
+TIKZ_LOCAL_TEX_ENGINE=auto
+TECTONIC_PATH=C:\path\to\tectonic.exe
+XELATEX_PATH=xelatex
+PDFLATEX_PATH=pdflatex
+LUALATEX_PATH=lualatex
+DVISVGM_PATH=dvisvgm
+```
 
 ### 方式一：由产品方验证容器环境
 
