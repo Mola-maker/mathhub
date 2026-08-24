@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
@@ -303,7 +303,22 @@ function killProcessGroup(child) {
   if (!child.pid) return;
   try {
     if (process.platform === 'win32') {
-      child.kill('SIGKILL');
+      // MiKTeX starts helper processes (for example miktex-makefmt and
+      // miktex-luahbtex). Killing only the launcher leaks those descendants
+      // after a timeout and eventually exhausts a long-running dev server.
+      // taskkill receives a numeric PID directly (never through a shell) and
+      // /T tears down the complete process tree before the job is rejected.
+      const taskkill = join(
+        process.env.SystemRoot ?? 'C:\\Windows',
+        'System32',
+        'taskkill.exe',
+      );
+      const result = spawnSync(
+        taskkill,
+        ['/PID', String(child.pid), '/T', '/F'],
+        { stdio: 'ignore', windowsHide: true },
+      );
+      if (result.status !== 0) child.kill('SIGKILL');
     } else {
       process.kill(-child.pid, 'SIGKILL');
     }
@@ -359,8 +374,13 @@ async function runProcess(command, args, options) {
       if (settled) return;
       settled = true;
       killProcessGroup(child);
+      const partialLog = [compactLog(stdout), compactLog(stderr)]
+        .filter(Boolean)
+        .join('\n');
       rejectRun(new CompilerError(
-        'TikZ 精确编译超时，请简化代码后重试',
+        partialLog
+          ? `TikZ 精确编译超时。编译器停止前日志：${partialLog}`
+          : 'TikZ 精确编译超时，请简化代码后重试',
         504,
         'COMPILE_TIMEOUT',
       ));
@@ -440,6 +460,7 @@ export function createCompiler(options = {}) {
     options.maxCacheEntries ?? process.env.MAX_CACHE_ENTRIES,
     DEFAULT_CACHE_ENTRIES,
   );
+  const disablePackageInstaller = options.disablePackageInstaller === true;
   const execute = options.execute ?? runProcess;
   const cache = new Map();
   const inFlight = new Map();
@@ -482,6 +503,7 @@ export function createCompiler(options = {}) {
         compilerPath,
         engine === 'pdflatex' || engine === 'lualatex'
           ? [
+              ...(disablePackageInstaller ? ['--disable-installer'] : []),
               engine === 'pdflatex'
                 ? '-output-format=dvi'
                 : '--output-format=dvi',
@@ -493,6 +515,7 @@ export function createCompiler(options = {}) {
             ]
           : engine === 'xelatex'
             ? [
+              ...(disablePackageInstaller ? ['--disable-installer'] : []),
               '-no-pdf',
               '--no-shell-escape',
               '--halt-on-error',

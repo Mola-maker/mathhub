@@ -45,7 +45,12 @@ Tectonic、XeLaTeX、pdfLaTeX；graphdrawing profile 只接受 LuaLaTeX。实际
 Tectonic。工具缺失时交互画板仍可使用，
 `/healthz` 与精准预览会明确返回缺失的运行时，而不会把环境问题报告成 TikZ
 语法错误。Windows/MiKTeX 的维护日志会写入系统临时目录，避免默认 AppData 日志
-不可写时把一个可用引擎误判成崩溃。生产 `tikz-standard-v1` 仍固定使用隔离的
+不可写时把一个可用引擎误判成崩溃；缺包安装器会被禁用，编译超时会终止完整
+进程树并保留受限长度的诊断日志。MiKTeX 的 LuaLaTeX 首次运行可能阻塞在 format
+生成/发行版维护阶段，因此 graphdrawing 本地服务默认把它报告为未验证，而不是
+伪装成 ready。生产 graphdrawing 始终使用镜像中预热的 TeX Live；已经自行完成
+MiKTeX format 与 graphdrawing 验证的开发机可显式设置
+`TIKZ_ALLOW_MIKTEX_GRAPHDRAWING=1`。生产 `tikz-standard-v1` 仍固定使用隔离的
 Tectonic `--untrusted --only-cached` + dvisvgm profile；本地 XeLaTeX/pdfLaTeX
 回退只用于开发预览，并以独立 renderer/identity 呈现。
 

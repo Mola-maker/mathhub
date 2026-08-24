@@ -184,3 +184,43 @@ test('native xelatex mode emits XDV and converts Unicode text as paths', async (
   assert.ok(calls[1].args.includes('--exact'));
   assert.ok(calls[1].args.includes('input.xdv'));
 });
+
+test('native MiKTeX modes can disable the interactive package installer', async () => {
+  for (const [engine, outputName] of [
+    ['pdflatex', 'input.dvi'],
+    ['xelatex', 'input.xdv'],
+    ['lualatex', 'input.dvi'],
+  ]) {
+    const calls = [];
+    const execute = async (command, args, options) => {
+      calls.push({ command, args });
+      if (command === `fake-${engine}`) {
+        await writeFile(`${options.cwd}/${outputName}`, outputName, 'utf8');
+      } else {
+        await writeFile(
+          `${options.cwd}/output.svg`,
+          '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>',
+          'utf8',
+        );
+      }
+      return { exitCode: 0, signal: null, stdout: '', stderr: '' };
+    };
+    const compiler = createCompiler({
+      engine,
+      compilerPath: `fake-${engine}`,
+      dvisvgmPath: 'fake-dvisvgm',
+      disablePackageInstaller: true,
+      execute,
+      timeoutMs: 1_000,
+    });
+
+    await compiler.render(source);
+
+    assert.equal(calls[0].command, `fake-${engine}`);
+    assert.ok(
+      calls[0].args.includes('--disable-installer'),
+      `${engine} must never open MiKTeX's package installer`,
+    );
+    assert.ok(!calls[1].args.includes('--disable-installer'));
+  }
+});

@@ -132,19 +132,32 @@ const compiler = createCompiler({
   engine: selectedEngine,
   compilerPath: selectedCompilerRuntime?.command ?? compilerCommand(selectedEngine),
   dvisvgmPath,
+  // Never let a headless compile wait on MiKTeX's missing-package dialog.
+  // A missing package is a deterministic diagnostic; package installation is
+  // an explicit product-owner action outside the renderer.
+  disablePackageInstaller: /MiKTeX/iu.test(selectedCompilerRuntime?.detail ?? ''),
   // A cold native engine cache can legitimately take longer than the worker's
   // warm-container budget. Keep this below the browser's 180 s job deadline.
   timeoutMs: Number(process.env.COMPILE_TIMEOUT_MS || 150_000),
   maxQueue: 4,
 });
 const jobs = createLocalJobRegistry();
+const unverifiedMiktexGraphdrawing = (
+  TIKZ_COMPILER_PROFILE === 'tikz-luatex-graphdrawing-v1'
+  && /MiKTeX/iu.test(selectedCompilerRuntime?.detail ?? '')
+  && process.env.TIKZ_ALLOW_MIKTEX_GRAPHDRAWING !== '1'
+);
 const runtimeReady = Boolean(selectedCompilerRuntime?.available)
-  && dvisvgmRuntime.available;
+  && dvisvgmRuntime.available
+  && !unverifiedMiktexGraphdrawing;
 const missingRuntimeNames = [
   ...(selectedCompilerRuntime?.available
     ? []
     : [`TeX engine (${engineOrder.join(' / ')})`]),
   ...(dvisvgmRuntime.available ? [] : ['dvisvgm']),
+  ...(unverifiedMiktexGraphdrawing
+    ? ['TeX Live LuaLaTeX（本机 MiKTeX graphdrawing 未通过无交互运行时验证）']
+    : []),
 ];
 const localRuntimeMode = `local-${selectedEngine}-native-dev`;
 
@@ -168,6 +181,13 @@ function queuedJob(id, cacheKeyDigest, submittedSourceDigest, visibility) {
 }
 
 function startLocalCompile({ id, cacheKeyDigest, source, submittedSourceDigest, visibility }) {
+  const queued = jobs.get(id);
+  if (queued) {
+    jobs.set(id, {
+      ...queued,
+      public: { ...queued.public, status: 'running' },
+    });
+  }
   void compiler.render(source).then((result) => {
     const artifact = Buffer.from(result.svg, 'utf8');
     const artifactDigest = createHash('sha256').update(artifact).digest('hex');
@@ -285,6 +305,7 @@ async function handle(request, response) {
         candidates: compilerRuntimes,
         dvisvgm: dvisvgmRuntime,
         logDirectory: localRuntimeLogDirectory,
+        graphdrawingRuntimeVerified: !unverifiedMiktexGraphdrawing,
       },
       ...compiler.stats(),
     });
