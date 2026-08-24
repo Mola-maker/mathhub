@@ -29,7 +29,7 @@ describe('analyze', () => {
     expect(analysis.status).toBe('complete');
     expect(analysis.scene?.points.get('O')?.position).toEqual({ x: 0, y: 0 });
     expect(analysis.cst.opaqueNodes).toHaveLength(0);
-    expect(analysis.statements.find((statement) => statement.kind === 'graph')).toMatchObject({
+    expect(analysis.stmts?.find((statement) => statement.kind === 'graph')).toMatchObject({
       nodes: [
         { name: 'A' }, { name: 'B' }, { name: 'C' },
         { name: 'D' }, { name: 'E' }, { name: 'F' },
@@ -43,6 +43,58 @@ describe('analyze', () => {
         { from: 'E', to: 'F', connector: '->' },
       ],
     });
+    expect(analysis.scene?.points.get('B')?.position.x).toBe(2);
+    expect(analysis.scene?.points.get('D')?.position.x).toBe(2);
+    expect(analysis.scene?.points.get('B')?.position.y)
+      .not.toBe(analysis.scene?.points.get('D')?.position.y);
+    expect(analysis.scene?.points.get('F')?.position.x).toBe(6);
+  });
+
+  it('projects layered graphdrawing topology with stable ranks and explicit fidelity', () => {
+    const analysis = analyze(String.raw`\begin{tikzpicture}
+\graph [layered layout, grow right, level distance=3cm, sibling distance=2cm] {
+  A -> { B -> C, D -> E } -> F
+};
+\end{tikzpicture}`);
+    expect(analysis.status).toBe('complete');
+    expect(analysis.scene?.points.get('A')?.position).toEqual({ x: 0, y: 0 });
+    expect(analysis.scene?.points.get('B')?.position).toEqual({ x: 3, y: -1 });
+    expect(analysis.scene?.points.get('D')?.position).toEqual({ x: 3, y: 1 });
+    expect(analysis.scene?.points.get('C')?.position).toEqual({ x: 6, y: -1 });
+    expect(analysis.scene?.points.get('E')?.position).toEqual({ x: 6, y: 1 });
+    expect(analysis.scene?.points.get('F')?.position).toEqual({ x: 9, y: 0 });
+    expect(analysis.scene?.elements.find((element) => element.kind === 'graph-node')).toMatchObject({
+      layoutIntent: 'layered',
+      layoutAlgorithm: 'layered layout',
+      layoutFidelity: 'deterministic-preview',
+      exactCompilerRequired: true,
+    });
+  });
+
+  it('projects circular graphdrawing layouts deterministically', () => {
+    const source = String.raw`\begin{tikzpicture}
+\graph [circular layout, radius=2cm] { A -- B -- C -- D -- A };
+\end{tikzpicture}`;
+    const first = analyze(source);
+    const second = analyze(source);
+    expect([...first.scene!.points].map(([name, point]) => [name, point.position]))
+      .toEqual([...second.scene!.points].map(([name, point]) => [name, point.position]));
+    expect(first.scene?.points.get('A')?.position.x).toBeCloseTo(0, 12);
+    expect(first.scene?.points.get('A')?.position.y).toBeCloseTo(2, 12);
+    expect(first.scene?.points.get('C')?.position.y).toBeCloseTo(-2, 12);
+  });
+
+  it('keeps force-layout previews deterministic and non-collinear', () => {
+    const source = String.raw`\begin{tikzpicture}
+\graph [spring layout] { A -- B -- C -- D -- A, A -- C };
+\end{tikzpicture}`;
+    const first = analyze(source);
+    const second = analyze(source);
+    const firstPositions = [...first.scene!.points].map(([name, point]) => [name, point.position] as const);
+    expect(firstPositions).toEqual(
+      [...second.scene!.points].map(([name, point]) => [name, point.position] as const),
+    );
+    expect(new Set(firstPositions.map(([, point]) => point.y.toFixed(6))).size).toBeGreaterThan(2);
   });
 
   it('preserves dynamic graph syntax as local opaque exact-only source', () => {

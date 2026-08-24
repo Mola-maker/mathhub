@@ -25,6 +25,12 @@ import {
   tikzCoordinateTransformScale,
   type TikzCoordinateTransform,
 } from '../subset/coordinate-transform';
+import {
+  layoutStaticGraph,
+  type GraphLayoutFidelity,
+  type GraphLayoutIntent,
+  type StaticGraphLayout,
+} from './graph-layout';
 
 export interface ScenePoint {
   stableId: string;
@@ -201,6 +207,11 @@ export type SceneElement =
     radius: number;
     text: string;
     outlined: boolean;
+    /** Canvas projection intent; never a claim of Lua graphdrawing equality. */
+    layoutIntent: GraphLayoutIntent;
+    layoutAlgorithm: string | null;
+    layoutFidelity: GraphLayoutFidelity;
+    exactCompilerRequired: boolean;
   })
   | (Base & { kind: 'label'; at: Pt; text: string; anchor: string })
   | (Base & { kind: 'angle-mark'; vertex: Pt; from: Pt; to: Pt; right: boolean });
@@ -249,44 +260,18 @@ function graphOption(statement: Extract<Statement, { kind: 'graph' }>, key: stri
   return unwrappedOptionValue(entry?.interpretedValue ?? null);
 }
 
-function graphLength(value: string | null, fallback: number): number {
-  if (!value) return fallback;
-  const match = /^(-?(?:\d+(?:\.\d*)?|\.\d+))(cm|mm|pt)?$/iu.exec(value.trim());
-  if (!match) return fallback;
-  const numeric = Number(match[1]);
-  const scale = match[2]?.toLowerCase() === 'mm'
-    ? 0.1
-    : match[2]?.toLowerCase() === 'pt'
-      ? 1 / 28.45274
-      : 1;
-  const result = numeric * scale;
-  return Number.isFinite(result) && Math.abs(result) > 1e-9
-    ? Math.abs(result)
-    : fallback;
+const graphLayoutCache = new WeakMap<object, StaticGraphLayout>();
+
+function graphLayout(statement: Extract<Statement, { kind: 'graph' }>): StaticGraphLayout {
+  const cached = graphLayoutCache.get(statement);
+  if (cached) return cached;
+  const layout = layoutStaticGraph(statement);
+  graphLayoutCache.set(statement, layout);
+  return layout;
 }
 
-function graphPositions(
-  statement: Extract<Statement, { kind: 'graph' }>,
-): ReadonlyMap<string, Pt> {
-  const directions = [
-    ['grow right', { x: 1, y: 0 }],
-    ['grow left', { x: -1, y: 0 }],
-    ['grow up', { x: 0, y: 1 }],
-    ['grow down', { x: 0, y: -1 }],
-  ] as const;
-  const selected = directions.find(([key]) => (
-    statement.options?.sequence.entries.some((entry) => (
-      entry.interpretedKey.replace(/^\/tikz\//u, '').trim().toLowerCase() === key
-    ))
-  )) ?? directions[0];
-  const spacing = graphLength(graphOption(statement, selected[0]), 2);
-  return new Map(statement.nodes.map((node, index) => {
-    const local = {
-      x: selected[1].x * spacing * index,
-      y: selected[1].y * spacing * index,
-    };
-    return [node.name, applyTikzCoordinateTransform(statement.coordinateTransform, local)] as const;
-  }));
+function graphPositions(statement: Extract<Statement, { kind: 'graph' }>): ReadonlyMap<string, Pt> {
+  return graphLayout(statement).positions;
 }
 
 function graphStyleRaw(...values: Array<string | null | undefined>): string | null {
@@ -964,7 +949,8 @@ export function evaluateScene(stmts: Statement[], sourceRevision = 0): Scene {
         }
       }
     } else if (s.kind === 'graph') {
-      const positions = graphPositions(s);
+      const layout = graphLayout(s);
+      const positions = layout.positions;
       const graphNodeOptions = graphOption(s, 'nodes');
       const graphEdgeOptions = graphOption(s, 'edges');
       const nodeByName = new Map(s.nodes.map((node) => [node.name, node] as const));
@@ -1017,6 +1003,10 @@ export function evaluateScene(stmts: Statement[], sourceRevision = 0): Scene {
           radius: graphNodeRadius(graphNode.text, s),
           text: nodeByName.get(graphNode.name)?.text ?? graphNode.name,
           outlined: graphHasDraw(rawStyle),
+          layoutIntent: layout.intent,
+          layoutAlgorithm: layout.requestedKey,
+          layoutFidelity: layout.fidelity,
+          exactCompilerRequired: layout.exactCompilerRequired,
           stmtIndex: idx,
           refs: [graphNode.name],
           style: resolveStyle(rawStyle, 'draw'),

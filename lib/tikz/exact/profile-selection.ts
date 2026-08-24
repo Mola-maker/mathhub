@@ -33,7 +33,10 @@ const GRAPH_DRAWING_SIGNALS: readonly {
   },
   {
     kind: 'layout-key',
-    pattern: /(?:^|[\[,{]\s*)(?:tree|layered|spring|spring electrical|force|circular|radial|random|stress|simple necklace|necklace|phylogenetic)\s+layout\b\s*(?==|[,\]}])/imu,
+    // Layout algorithms are pgfkeys entries. Braces are deliberately not
+    // accepted as boundaries because ordinary node text such as
+    // `{spring layout}` must stay on the standard compiler profile.
+    pattern: /(?:^|[\[,]\s*)(?:tree|layered|spring|spring electrical|force|circular|radial|random|stress|simple necklace|necklace|phylogenetic)\s+layout\b\s*(?==|[,\]])/imu,
   },
 ];
 

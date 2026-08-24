@@ -144,6 +144,10 @@ export interface SceneManifestElement {
   to?: SceneManifestPosition;
   right?: boolean;
   outlined?: boolean;
+  layoutIntent?: string;
+  layoutAlgorithm?: string | null;
+  layoutFidelity?: string;
+  exactCompilerRequired?: boolean;
 }
 
 export interface SceneManifestIssue {
@@ -399,6 +403,10 @@ function elementManifest(element: SceneElement, index: number, stmts: readonly S
       radius: finiteNumber(element.radius),
       text: element.text,
       outlined: element.outlined,
+      layoutIntent: element.layoutIntent,
+      layoutAlgorithm: element.layoutAlgorithm,
+      layoutFidelity: element.layoutFidelity,
+      exactCompilerRequired: element.exactCompilerRequired,
     };
     case 'ellipse': return {
       ...base,

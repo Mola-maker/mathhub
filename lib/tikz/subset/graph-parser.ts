@@ -215,8 +215,9 @@ const MAX_STATIC_GRAPH_EDGES = 4096;
 /**
  * Parses the statically decidable topology part of the official graphs
  * library. Static chain groups are expanded according to their entry/exit
- * nodes. Subgraphs, quoted/anonymous nodes, foreach expansion and graphdrawing
- * algorithms stay lossless/opaque and are delegated to the exact compiler.
+ * nodes. Algorithm keys can drive a deterministic Canvas projection while
+ * Lua graphdrawing remains exact visual truth. Subgraphs, quoted/anonymous
+ * nodes and foreach expansion stay lossless/opaque.
  */
 export function parseStaticGraphBody(
   source: string,

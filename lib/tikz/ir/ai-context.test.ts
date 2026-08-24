@@ -109,9 +109,31 @@ describe('Geometry AI context write policy', () => {
       entity.kind === 'graph-node' && entity.name === 'A'
     ));
     expect(graphNodeA).toBeDefined();
+    expect(graphNodeA?.parameters).toMatchObject({
+      layoutIntent: 'standard',
+      layoutFidelity: 'deterministic-preview',
+      exactCompilerRequired: false,
+    });
     expect(context.construction.sourceBindings
       .filter((binding) => binding.targets.some((target) => target.id === graphNodeA?.id))
       .map((binding) => binding.writable)).toEqual([false]);
+  });
+
+  it('tells AI when graphdrawing coordinates are preview-only and exact-compiler authoritative', () => {
+    const context = contextFor(String.raw`\begin{tikzpicture}
+\graph [layered layout] { A -> { B, C } };
+\end{tikzpicture}`, []);
+    const nodes = context.entities.filter((entity) => entity.kind === 'graph-node');
+    expect(nodes).toHaveLength(3);
+    expect(nodes[0]).toMatchObject({
+      parameters: {
+        layoutIntent: 'layered',
+        layoutAlgorithm: 'layered layout',
+        layoutFidelity: 'deterministic-preview',
+        exactCompilerRequired: true,
+      },
+      tags: expect.arrayContaining(['layout:layered', 'exact-compiler-authoritative']),
+    });
   });
 
   it('publishes official chain-group entry and exit topology to AI context', () => {

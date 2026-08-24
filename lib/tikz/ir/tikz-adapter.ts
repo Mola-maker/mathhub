@@ -49,7 +49,7 @@ import { CONSTRUCTION_PLAN_FOOTPRINT_ABI_VERSION } from '../authoring/constructi
 import { CONSTRUCTION_CATALOG_DIGEST } from '../authoring/construction-catalog';
 
 export const TIKZ_SEMANTIC_ADAPTER_ID = 'mathgeo.tikz.semantic-adapter';
-export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.24.0';
+export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.25.0';
 export const TIKZ_PLUGIN_SET_DIGEST = [
   `${TIKZ_SEMANTIC_ADAPTER_ID}@${TIKZ_SEMANTIC_ADAPTER_VERSION}`,
   MANAGED_CONSTRUCTION_V3_ENVELOPE_SCHEMA,
@@ -501,10 +501,19 @@ function elementEntity(element: SceneElement): GeometryEntity {
           radius: element.radius,
           text: element.text,
           outlined: element.outlined,
+          layoutIntent: element.layoutIntent,
+          layoutAlgorithm: element.layoutAlgorithm,
+          layoutFidelity: element.layoutFidelity,
+          exactCompilerRequired: element.exactCompilerRequired,
           references: element.refs,
           ...elementTransformParameters(element),
         },
-        tags: ['graph-node', 'library-product'],
+        tags: [
+          'graph-node',
+          'library-product',
+          `layout:${element.layoutIntent}`,
+          element.exactCompilerRequired ? 'exact-compiler-authoritative' : 'interactive-static-layout',
+        ],
       };
     case 'label':
       return {
