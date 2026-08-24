@@ -1703,6 +1703,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         readBindingIds: proposalIdentity.readBindingIds,
         bindings: proposalIdentity.bindings,
         geometryDoc: proposalIdentity.geometryDoc,
+        agentContext: proposalIdentity.agentContext,
       }, {
         runId,
         nextSequence,

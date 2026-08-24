@@ -198,6 +198,92 @@ ${JSON.stringify({
     })).toMatchObject({ steps: 1, protocolRepairs: 0 });
   });
 
+  it('preserves a final write step after one tool call and both protocol repairs', async () => {
+    const intent = `\`\`\`tikz-geometry-intent
+${JSON.stringify({
+  schemaVersion: 'geometry-intent/v2',
+  intentId: 'style-after-inspection',
+  operation: {
+    kind: 'style',
+    targetRefs: ['nine-point-circle'],
+    options: { draw: 'red' },
+  },
+})}
+\`\`\``;
+    const invokeModel = vi.fn()
+      .mockResolvedValueOnce(tool('inspect-before-write'))
+      .mockResolvedValueOnce(EMPTY_VISIBLE_MODEL_OUTPUT)
+      .mockResolvedValueOnce('I will make the existing circle red now.')
+      .mockResolvedValueOnce(intent);
+
+    const result = await runTikzAgentLoop({
+      messages: [{ role: 'user', content: '把已有九点圆改成红色' }],
+      invokeModel,
+      executeTool: vi.fn(async (call) => ({
+        schemaVersion: 'tikz-agent-tool-observation/v1' as const,
+        callId: call.callId,
+        ok: true,
+        payload: { entity: 'nine-point-circle' },
+      })),
+      requiresWriteAction: true,
+    });
+
+    expect(result).toMatchObject({
+      output: intent,
+      steps: 4,
+      toolCalls: 1,
+      protocolRepairs: 2,
+      exhausted: false,
+    });
+    expect(invokeModel).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not replay quarantined executable bytes into a repair request', async () => {
+    const invalid = [
+      'private prose that should not be retained',
+      '```tikz-action\n\\draw (A)--(B);\n```',
+      '```tikz-geometry-intent\n{}\n```',
+    ].join('\n');
+    const valid = '```tikz-action\n\\draw (A)--(B);\n```';
+    const invokeModel = vi.fn()
+      .mockResolvedValueOnce(invalid)
+      .mockResolvedValueOnce(valid);
+
+    await runTikzAgentLoop({
+      messages: [],
+      invokeModel,
+      executeTool: vi.fn(),
+    });
+
+    const repairMessages = invokeModel.mock.calls[1]![0];
+    expect(repairMessages.at(-2)?.content).toContain('Previous candidate quarantined');
+    expect(repairMessages.at(-2)?.content).not.toContain('\\draw');
+    expect(repairMessages.at(-2)?.content).not.toContain('private prose');
+  });
+
+  it('bounds sequential read tools independently of the final decision budget', async () => {
+    const invokeModel = vi.fn(async (_messages, step) => tool(`inspect-${step}`));
+    const result = await runTikzAgentLoop({
+      messages: [],
+      invokeModel,
+      executeTool: vi.fn(async (call) => ({
+        schemaVersion: 'tikz-agent-tool-observation/v1' as const,
+        callId: call.callId,
+        ok: true,
+        payload: {},
+      })),
+    });
+
+    expect(result).toMatchObject({
+      toolCalls: 4,
+      toolExecutions: 1,
+      toolCacheHits: 3,
+      exhausted: true,
+      output: expect.stringContaining('读取工具已达到上限'),
+    });
+    expect(invokeModel).toHaveBeenCalledTimes(5);
+  });
+
   it('replans prose that merely claims a requested style mutation without emitting it', async () => {
     const intent = `\`\`\`tikz-geometry-intent
 ${JSON.stringify({
@@ -464,7 +550,7 @@ ${JSON.stringify({
     })).rejects.toBeInstanceOf(TikzAgentProtocolError);
   });
 
-  it('stops after the third model step', async () => {
+  it('stops after the independent read-tool budget', async () => {
     const result = await runTikzAgentLoop({
       messages: [],
       invokeModel: vi.fn(async (_messages, step) => tool(`c${step}`)),
@@ -475,6 +561,6 @@ ${JSON.stringify({
         payload: {},
       })),
     });
-    expect(result).toMatchObject({ steps: 3, toolCalls: 2, exhausted: true });
+    expect(result).toMatchObject({ steps: 5, toolCalls: 4, exhausted: true });
   });
 });

@@ -256,8 +256,12 @@ describe('TikZ agent read tools', () => {
     expect(result).toMatchObject({
       ok: true,
       payload: {
-        verdict: 'formally-proven',
-        method: 'circle-definition-implies-equal-distance',
+        // The source circle is defined only through Mab. Equal radii to Mac
+        // and Mbc are true in this coordinate snapshot but are not encoded as
+        // required on-circle constraints, so the verifier must not invent a
+        // formal proof.
+        verdict: 'numerically-satisfied',
+        method: 'normalized-radius-spread',
         residual: 0,
       },
     });
@@ -301,7 +305,7 @@ describe('TikZ agent read tools', () => {
       },
       toolId: 'midpoint',
       bindingIds: bindingIds as string[],
-      requestedNames: {},
+      requestedNames: { midpoint: 'M' },
       parameters: {},
     };
     const before = context.basis.source;

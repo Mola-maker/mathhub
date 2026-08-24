@@ -83,6 +83,19 @@ const request = (body: unknown) => new NextRequest('http://localhost/api/tikz', 
   headers: { 'content-type': 'application/json' },
 });
 
+function joinedSseTokens(text: string): string {
+  return text.split(/\r?\n\r?\n/u).flatMap((frame) => {
+    const line = frame.split(/\r?\n/u).find((candidate) => candidate.startsWith('data: '));
+    if (!line || line.slice(6) === '[DONE]') return [];
+    try {
+      const payload = JSON.parse(line.slice(6)) as { token?: unknown };
+      return typeof payload.token === 'string' ? [payload.token] : [];
+    } catch {
+      return [];
+    }
+  }).join('');
+}
+
 function projectRouteGeometry(
   source: string,
   revision: number,
@@ -152,7 +165,13 @@ function managedNinePointRouteFixture() {
   const labelAnchorNames = projected.geometryDoc.semantic.ir.entities
     .filter((entity) => (
       entity.kind === 'point'
-      && entity.metadata?.constructionId === plan.id
+      && (
+        entity.metadata?.constructionId === plan.id
+        || (
+          Array.isArray(entity.metadata?.managedConstructionIds)
+          && entity.metadata.managedConstructionIds.includes(plan.id)
+        )
+      )
       && typeof entity.name === 'string'
       && entity.name.length > 0
     ))
@@ -207,6 +226,14 @@ function proofAwareTriangleRouteFixture() {
 describe('POST /api/tikz', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(streamProvider).mockImplementation(async (
+      _provider,
+      _messages,
+      send,
+    ) => {
+      send('好的');
+      return '```tikz\n\\begin{tikzpicture}\\coordinate (A) at (0,0);\\end{tikzpicture}\n```';
+    });
     resetMemoryTikzAgentRunStore();
   });
 
@@ -1441,7 +1468,8 @@ ${JSON.stringify({
     expect(reasoningOnlyResponse.status).toBe(200);
     const reasoningOnlyText = await reasoningOnlyResponse.text();
     expect(reasoningOnlyText).toContain('修改已提交');
-    expect(reasoningOnlyText).toContain('模型本轮没有产生可展示的自然语言总结');
+    expect(joinedSseTokens(reasoningOnlyText))
+      .toContain('模型本轮没有产生可展示的自然语言总结');
     expect(reasoningOnlyText).toContain('"type":"commit.verified"');
     expect(reasoningOnlyText).toContain('"type":"run.completed"');
     expect(reasoningOnlyText).not.toContain('"type":"proposal.rejected"');

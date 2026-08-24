@@ -10,8 +10,17 @@ import { classifyTikzExecutableEnvelopes } from './executable-envelope';
 import { extractTikzAgentWidgets } from './widget-protocol';
 import { tikzAgentToolObservationCacheKey } from './tool-observation-cache';
 
-export const MAX_TIKZ_AGENT_MODEL_STEPS = 3;
-export const MAX_TIKZ_AGENT_PROTOCOL_REPAIRS = MAX_TIKZ_AGENT_MODEL_STEPS - 1;
+/**
+ * Tool exploration and protocol recovery consume different budgets. A
+ * geometry inspection followed by one reasoning-only transport frame and one
+ * prose-only mutation decision still needs a final model step in which to
+ * emit the atomic write envelope.
+ */
+export const MAX_TIKZ_AGENT_TOOL_STEPS = 4;
+export const MAX_TIKZ_AGENT_PROTOCOL_REPAIRS = 2;
+export const MAX_TIKZ_AGENT_MODEL_STEPS = 1
+  + MAX_TIKZ_AGENT_TOOL_STEPS
+  + MAX_TIKZ_AGENT_PROTOCOL_REPAIRS;
 const MAX_OBSERVATION_CHARS = 32_000;
 
 export interface TikzAgentToolObservation {
@@ -128,6 +137,23 @@ function protocolRepairMessage(
         detail,
       }),
     ].join('\n'),
+  };
+}
+
+/**
+ * Never replay a rejected executable candidate into the next model step.
+ * The typed host observation below carries all useful repair information;
+ * retaining the original blocks encourages models to echo or combine them
+ * and needlessly retains a potentially large, untrusted response in memory.
+ */
+function quarantinedAssistantReceipt(code: string): Message {
+  return {
+    role: 'assistant',
+    content: [
+      '[trusted host protocol feedback: Previous candidate quarantined by the host.]',
+      `Protocol diagnostic: ${code}.`,
+      'No tool call or write action from that candidate was executed.',
+    ].join(' '),
   };
 }
 
@@ -307,7 +333,7 @@ export async function runTikzAgentLoop(
       }
       protocolRepairs += 1;
       await options.onProtocolRepair?.(conflict);
-      messages.push({ role: 'assistant', content: output });
+      messages.push(quarantinedAssistantReceipt(conflict.code));
       messages.push(protocolRepairMessage(
         conflict.code,
         conflict.detail,
@@ -324,6 +350,18 @@ export async function runTikzAgentLoop(
         toolCacheHits,
         protocolRepairs,
         exhausted: false,
+        toolReceipts: [...toolReceipts],
+      };
+    }
+    if (toolCalls >= MAX_TIKZ_AGENT_TOOL_STEPS) {
+      return {
+        output: '本轮读取工具已达到上限；画板未改变。请缩小检查范围后重试。',
+        steps: step,
+        toolCalls,
+        toolExecutions,
+        toolCacheHits,
+        protocolRepairs,
+        exhausted: true,
         toolReceipts: [...toolReceipts],
       };
     }

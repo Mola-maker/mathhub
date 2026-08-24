@@ -7,16 +7,15 @@ function maskRecordLine(line: string): string {
   const body = ending ? line.slice(0, -ending.length) : line;
   const prefix = /^([ \t]*%[ \t]*@mathgeo[ \t]+record)\b/u.exec(body)?.[1]
     ?? '% @mathgeo record';
-  const visible = `${prefix} ${HIDDEN_RECORD_LABEL}`;
-  if (visible.length >= body.length) return `${' '.repeat(body.length)}${ending}`;
-  return `${visible}${' '.repeat(body.length - visible.length)}${ending}`;
+  return `${prefix} ${HIDDEN_RECORD_LABEL}${ending}`;
 }
 /**
  * Build a provider-facing source view without duplicating trusted managed-IR
  * JSON into the prompt. Only attached blocks whose metadata and integrity have
- * already passed the host parser are masked. Every UTF-16 offset and newline
- * remains addressable by the proposal binding ranges; CodeMirror, Broker and
- * the exact compiler retain the unmodified source.
+ * already passed the host parser are masked. Model-facing GeometryIntent/v2
+ * has no source-range authority, so retaining thousands of padding spaces is
+ * unnecessary. CodeMirror, Broker and the exact compiler keep the unmodified
+ * source and all revision-bound offsets.
  */
 export function tikzSourceForAgent(source: string): string {
   const ranges = parseManagedConstructionBlocks(source)
@@ -41,9 +40,5 @@ export function tikzSourceForAgent(source: string): string {
     cursor = range.end;
   }
   parts.push(source.slice(cursor));
-  const result = parts.join('');
-  if (result.length !== source.length) {
-    throw new TypeError('Agent source masking changed source offsets.');
-  }
-  return result;
+  return parts.join('');
 }

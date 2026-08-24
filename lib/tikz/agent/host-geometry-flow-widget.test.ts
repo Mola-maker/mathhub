@@ -114,7 +114,10 @@ describe('hostGeometryFlowWidget', () => {
     expect(widget?.steps[3]).toMatchObject({
       constructionToolId: 'perpendicular-foot',
       entityRefs: expect.arrayContaining(['point:A', 'point:B', 'point:C', 'point:H']),
-      proof: { status: 'numerically-satisfied', evidenceIds: [] },
+      proof: {
+        status: 'formally-proven',
+        evidenceIds: ['definition:point:H'],
+      },
     });
     expect(JSON.stringify(widget)).not.toContain('\\draw');
     expect(widget?.steps.every((step) => step.tikz === undefined)).toBe(true);

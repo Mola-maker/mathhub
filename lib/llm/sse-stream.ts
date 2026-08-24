@@ -129,8 +129,15 @@ export function makeSseStream(
         }
       } finally {
         options.signal?.removeEventListener('abort', abortFromCaller);
+        // An aborted signal makes enqueue reject by design. Closing must be a
+        // separate cleanup step; otherwise the thrown terminal-frame attempt
+        // leaves response.text()/the browser reader hanging indefinitely.
         try {
-          if (!canceled) enqueue('data: [DONE]\n\n', false);
+          if (!canceled && !runController.signal.aborted) {
+            enqueue('data: [DONE]\n\n', false);
+          }
+        } catch { /* terminal frame is best-effort */ }
+        try {
           controller.close();
         } catch { /* already closed */ }
       }
