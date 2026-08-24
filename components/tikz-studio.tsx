@@ -91,6 +91,13 @@ import {
   problemInspectionDraft,
   type ProblemInspectionReceipt,
 } from '@/lib/tikz/problems/problem-inspection-protocol';
+import {
+  isProblemConstructionAction,
+  problemConstructionBasisMatches,
+  problemConstructionDraft,
+  type ProblemConstructionAction,
+  type ProblemConstructionBasis,
+} from '@/lib/tikz/problems/problem-construction-protocol';
 
 type Provider = 'relay';
 export type TikzStudioMessage = {
@@ -114,6 +121,11 @@ export interface PendingProblemInspectionDraft {
   readonly draft: string;
 }
 
+export interface PendingProblemConstructionDraft {
+  readonly action: ProblemConstructionAction;
+  readonly draft: string;
+}
+
 export type PendingGeometryFlowActionResolution =
   | { readonly status: 'none'; readonly action: null }
   | { readonly status: 'ready'; readonly action: GeometryFlowStepHostAction }
@@ -123,6 +135,11 @@ export type PendingProblemInspectionResolution =
   | { readonly status: 'none'; readonly receipt: null }
   | { readonly status: 'ready'; readonly receipt: ProblemInspectionReceipt }
   | { readonly status: 'rejected'; readonly receipt: null };
+
+export type PendingProblemConstructionResolution =
+  | { readonly status: 'none'; readonly action: null }
+  | { readonly status: 'ready'; readonly action: ProblemConstructionAction }
+  | { readonly status: 'rejected'; readonly action: null };
 
 /**
  * Composer edits never silently discard a typed Host receipt.  The next send
@@ -155,6 +172,45 @@ export function resolvePendingProblemInspectionForSend(
     || Date.parse(pending.receipt.expiresAt) <= now
   ) return { status: 'rejected', receipt: null };
   return { status: 'ready', receipt: pending.receipt };
+}
+
+export function problemConstructionBasisFromGeometryDoc(
+  geometryDoc: GeometryDoc | null | undefined,
+): ProblemConstructionBasis | null {
+  const basis = geometryDoc?.basis;
+  if (
+    !basis?.sourceId
+    || !basis.kernelHash
+    || !basis.projectionHash
+    || !basis.pluginSetDigest
+  ) return null;
+  return {
+    documentId: basis.documentId,
+    epoch: basis.epoch,
+    revision: basis.revision,
+    sourceId: basis.sourceId,
+    sourceHash: basis.sourceHash,
+    kernelHash: basis.kernelHash,
+    projectionHash: basis.projectionHash,
+    pluginSetDigest: basis.pluginSetDigest,
+  };
+}
+
+export function resolvePendingProblemConstructionForSend(
+  pending: PendingProblemConstructionDraft | null,
+  problem: string,
+  geometryDoc: GeometryDoc | null | undefined,
+  now = Date.now(),
+): PendingProblemConstructionResolution {
+  if (!pending) return { status: 'none', action: null };
+  const basis = problemConstructionBasisFromGeometryDoc(geometryDoc);
+  if (
+    pending.draft.trim() !== problem
+    || !isProblemConstructionAction(pending.action)
+    || Date.parse(pending.action.expiresAt) <= now
+    || !problemConstructionBasisMatches(pending.action, basis)
+  ) return { status: 'rejected', action: null };
+  return { status: 'ready', action: pending.action };
 }
 
 export type AgentRunRecoveryState = {
@@ -734,6 +790,7 @@ export function TikzStudio({
   const [repairStatus, setRepairStatus] = useState('');
   const [stepsOpen, setStepsOpen] = useState(false);
   const [activeGeometryFlow, setActiveGeometryFlow] = useState<GeometryFlowWidget | null>(null);
+  const [activeProblemInspection, setActiveProblemInspection] = useState<ProblemInspectionReceipt | null>(null);
   const [exactMode, setExactMode] = useState(false);
   const [syntaxOpen, setSyntaxOpen] = useState(false);
   const [selectionTransformOpen, setSelectionTransformOpen] = useState(false);
@@ -743,7 +800,9 @@ export function TikzStudio({
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingFlowActionRef = useRef<PendingGeometryFlowActionDraft | null>(null);
   const pendingProblemInspectionRef = useRef<PendingProblemInspectionDraft | null>(null);
+  const pendingProblemConstructionRef = useRef<PendingProblemConstructionDraft | null>(null);
   const problemInspectionControllerRef = useRef<AbortController | null>(null);
+  const problemConstructionControllerRef = useRef<AbortController | null>(null);
   const studioRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const agentTurnAdmissionRef = useRef<string | null>(null);
@@ -798,6 +857,9 @@ export function TikzStudio({
       problemInspectionControllerRef.current?.abort();
       problemInspectionControllerRef.current = null;
       pendingProblemInspectionRef.current = null;
+      problemConstructionControllerRef.current?.abort();
+      problemConstructionControllerRef.current = null;
+      pendingProblemConstructionRef.current = null;
       pendingFlowActionRef.current = null;
       setInput(geometryFlowStepExplanationDraft(flow, step));
       setCatalogError('');
@@ -813,6 +875,9 @@ export function TikzStudio({
     problemInspectionControllerRef.current?.abort();
     problemInspectionControllerRef.current = null;
     pendingProblemInspectionRef.current = null;
+    problemConstructionControllerRef.current?.abort();
+    problemConstructionControllerRef.current = null;
+    pendingProblemConstructionRef.current = null;
     pendingFlowActionRef.current = { action, draft };
     setInput(draft);
     setCatalogError('');
@@ -870,7 +935,9 @@ export function TikzStudio({
       ) throw new Error('题源核验回执与所选搜索结果不一致');
       const draft = problemInspectionDraft(receipt);
       pendingFlowActionRef.current = null;
+      pendingProblemConstructionRef.current = null;
       pendingProblemInspectionRef.current = { receipt, draft };
+      setActiveProblemInspection(receipt);
       setInput(draft);
       requestAnimationFrame(() => composerInputRef.current?.focus());
     } catch (error) {
@@ -882,6 +949,71 @@ export function TikzStudio({
       }
     }
   }, []);
+
+  const prepareProblemConstruction = useCallback(async () => {
+    const receipt = activeProblemInspection;
+    if (!receipt || Date.parse(receipt.expiresAt) <= Date.now()) {
+      setActiveProblemInspection(null);
+      setCatalogError('题源核验回执已过期；请从搜索结果重新核验。');
+      return;
+    }
+    if (agentTurnAdmissionRef.current) {
+      setCatalogError('请先等待或停止当前 Agent 运行，再准备题源构图。');
+      return;
+    }
+    const current = engineRef.current;
+    const basis = problemConstructionBasisFromGeometryDoc(current.geometryDoc);
+    if (!basis || !current.interactiveWritebackSafe) {
+      setCatalogError('当前 GeometryDoc 尚未形成可写的一致 revision；请先修复源码或等待投影完成。');
+      return;
+    }
+    const controller = new AbortController();
+    problemConstructionControllerRef.current?.abort();
+    problemConstructionControllerRef.current = controller;
+    setCatalogError('');
+    try {
+      const response = await fetch('/api/tikz/problems/construct/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({ inspectionReceipt: receipt, basis }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        error?: string;
+        action?: unknown;
+      };
+      if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
+      if (!isProblemConstructionAction(payload.action)) {
+        throw new Error('服务端返回了无效的题源构图动作');
+      }
+      const action = payload.action;
+      const currentBasis = problemConstructionBasisFromGeometryDoc(
+        engineRef.current.geometryDoc,
+      );
+      if (
+        action.inspectionReceiptId !== receipt.receiptId
+        || action.sourceId !== receipt.sourceId
+        || action.contentHash !== receipt.contentHash
+        || !problemConstructionBasisMatches(action, currentBasis)
+      ) throw new Error('题源构图动作与当前回执或 GeometryDoc 不一致');
+      if (agentTurnAdmissionRef.current) {
+        throw new Error('当前 Agent 已开始运行；本次构图动作未进入编辑器');
+      }
+      const draft = problemConstructionDraft(action);
+      pendingFlowActionRef.current = null;
+      pendingProblemInspectionRef.current = null;
+      pendingProblemConstructionRef.current = { action, draft };
+      setInput(draft);
+      requestAnimationFrame(() => composerInputRef.current?.focus());
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setCatalogError(error instanceof Error ? error.message : '题源构图动作准备失败');
+    } finally {
+      if (problemConstructionControllerRef.current === controller) {
+        problemConstructionControllerRef.current = null;
+      }
+    }
+  }, [activeProblemInspection]);
 
   useEffect(() => {
     if (!activeGeometryFlow) return;
@@ -909,6 +1041,9 @@ export function TikzStudio({
       problemInspectionControllerRef.current?.abort();
       problemInspectionControllerRef.current = null;
       pendingProblemInspectionRef.current = null;
+      problemConstructionControllerRef.current?.abort();
+      problemConstructionControllerRef.current = null;
+      pendingProblemConstructionRef.current = null;
       for (const audit of visualAuditControllers.values()) {
         audit.controller.abort(new DOMException('TikZ Studio closed', 'AbortError'));
       }
@@ -1139,6 +1274,9 @@ export function TikzStudio({
     problemInspectionControllerRef.current?.abort();
     problemInspectionControllerRef.current = null;
     pendingProblemInspectionRef.current = null;
+    problemConstructionControllerRef.current?.abort();
+    problemConstructionControllerRef.current = null;
+    pendingProblemConstructionRef.current = null;
     if (startOpen) {
       window.location.assign('/');
       return;
@@ -1226,6 +1364,21 @@ export function TikzStudio({
       problemInspectionControllerRef.current?.abort();
       problemInspectionControllerRef.current = null;
     }
+    if (!pendingProblemConstructionRef.current) {
+      problemConstructionControllerRef.current?.abort();
+      problemConstructionControllerRef.current = null;
+    }
+    const problemConstructionResolution = resolvePendingProblemConstructionForSend(
+      pendingProblemConstructionRef.current,
+      problem,
+      engine.geometryDoc,
+    );
+    if (problemConstructionResolution.status === 'rejected') {
+      pendingProblemConstructionRef.current = null;
+      setCatalogError('题源构图动作已过期、被编辑或不再匹配当前 GeometryDoc；请重新点击“为本题构图”。');
+      return;
+    }
+    const problemConstructionAction = problemConstructionResolution.action;
     const problemInspectionResolution = resolvePendingProblemInspectionForSend(
       pendingProblemInspectionRef.current,
       problem,
@@ -1248,10 +1401,15 @@ export function TikzStudio({
       setCatalogError('动态推导动作已过期或被编辑；请从当前步骤重新发起。');
       return;
     }
-    if (problemInspectionReceipt && flowStepAction) {
+    if (
+      Number(Boolean(problemInspectionReceipt))
+        + Number(Boolean(problemConstructionAction))
+        + Number(Boolean(flowStepAction)) > 1
+    ) {
       pendingFlowActionRef.current = null;
       pendingProblemInspectionRef.current = null;
-      setCatalogError('题源分析回执不能与画板步骤动作混用；请重新选择一个操作。');
+      pendingProblemConstructionRef.current = null;
+      setCatalogError('题源分析、题源构图与画板步骤动作不能混用；请重新选择一个操作。');
       return;
     }
     if (!engine.interactiveWritebackSafe) {
@@ -1359,6 +1517,7 @@ export function TikzStudio({
     setInput('');
     pendingFlowActionRef.current = null;
     pendingProblemInspectionRef.current = null;
+    pendingProblemConstructionRef.current = null;
 
     const controller = new AbortController();
     agentControllerRef.current?.abort();
@@ -1393,6 +1552,7 @@ export function TikzStudio({
           contextRefs,
           hostAction: flowStepAction ?? undefined,
           problemInspectionReceipt: problemInspectionReceipt ?? undefined,
+          problemConstructionAction: problemConstructionAction ?? undefined,
         }),
       });
       if (!response.ok || !response.body) {
@@ -2348,6 +2508,9 @@ export function TikzStudio({
                       problemInspectionControllerRef.current?.abort();
                       problemInspectionControllerRef.current = null;
                       pendingProblemInspectionRef.current = null;
+                      problemConstructionControllerRef.current?.abort();
+                      problemConstructionControllerRef.current = null;
+                      pendingProblemConstructionRef.current = null;
                       pendingFlowActionRef.current = null;
                       setInput(choice.value);
                       requestAnimationFrame(() => composerInputRef.current?.focus());
@@ -2372,6 +2535,46 @@ export function TikzStudio({
               </motion.div>
             ))}
           </div>
+          {activeProblemInspection ? (
+            <section
+              className="tz-problem-construction-capability"
+              data-testid="problem-construction-capability"
+              aria-label="已核验题源构图动作"
+            >
+              <div>
+                <strong>已核验题源</strong>
+                <span>{activeProblemInspection.title}</span>
+                <small>构图写入会绑定点击时的 GeometryDoc revision，且只允许类型化构造。</small>
+              </div>
+              <div className="tz-problem-construction-capability__actions">
+                <button
+                  type="button"
+                  onClick={() => void prepareProblemConstruction()}
+                  disabled={streaming || !engine.interactiveWritebackSafe}
+                >
+                  为本题构图
+                </button>
+                <button
+                  type="button"
+                  aria-label="关闭已核验题源"
+                  onClick={() => {
+                    const pendingDraft = pendingProblemConstructionRef.current?.draft
+                      ?? pendingProblemInspectionRef.current?.draft;
+                    problemConstructionControllerRef.current?.abort();
+                    problemConstructionControllerRef.current = null;
+                    pendingProblemConstructionRef.current = null;
+                    problemInspectionControllerRef.current?.abort();
+                    problemInspectionControllerRef.current = null;
+                    pendingProblemInspectionRef.current = null;
+                    setActiveProblemInspection(null);
+                    if (pendingDraft?.trim() === input.trim()) setInput('');
+                  }}
+                >
+                  关闭
+                </button>
+              </div>
+            </section>
+          ) : null}
           <div className="tz-composer">
             <textarea
               ref={composerInputRef}
@@ -2385,6 +2588,8 @@ export function TikzStudio({
                 // the text as a broad untyped mutation request.
                 problemInspectionControllerRef.current?.abort();
                 problemInspectionControllerRef.current = null;
+                problemConstructionControllerRef.current?.abort();
+                problemConstructionControllerRef.current = null;
                 setInput(event.target.value);
               }}
               onKeyDown={(event) => {

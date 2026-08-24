@@ -18,7 +18,7 @@ const MAX_RECEIPT_TTL_MS = 15 * 60_000;
 const CLOCK_SKEW_MS = 30_000;
 const developmentSecret = randomBytes(MIN_SECRET_BYTES);
 
-function configuredSecret(): Buffer | null {
+export function problemInspectionSigningSecret(): Buffer | null {
   const value = process.env.PROBLEM_INSPECTION_SECRET?.trim();
   if (!value) return process.env.NODE_ENV === 'production' ? null : developmentSecret;
   const bytes = Buffer.from(value, 'utf8');
@@ -26,7 +26,7 @@ function configuredSecret(): Buffer | null {
 }
 
 export function problemInspectionReceiptConfigured(): boolean {
-  return configuredSecret() !== null;
+  return problemInspectionSigningSecret() !== null;
 }
 
 function receiptMaterial(receipt: Omit<ProblemInspectionReceipt, 'token'>): string {
@@ -63,7 +63,7 @@ export function createProblemInspectionReceipt(
   value: GeometryProblemRecord,
   now = new Date(),
 ): ProblemInspectionReceipt {
-  const secret = configuredSecret();
+  const secret = problemInspectionSigningSecret();
   if (!secret) throw new TypeError('PROBLEM_INSPECTION_SECRET is not configured');
   const unsigned: Omit<ProblemInspectionReceipt, 'token'> = {
     schemaVersion: PROBLEM_INSPECTION_RECEIPT_SCHEMA,
@@ -93,7 +93,7 @@ export function verifyProblemInspectionReceipt(
   value: unknown,
   now = new Date(),
 ): ProblemInspectionReceipt | null {
-  const secret = configuredSecret();
+  const secret = problemInspectionSigningSecret();
   if (!secret || !isProblemInspectionReceipt(value)) return null;
   const issuedAt = Date.parse(value.issuedAt);
   const expiresAt = Date.parse(value.expiresAt);

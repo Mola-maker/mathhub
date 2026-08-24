@@ -204,9 +204,9 @@ ${JSON.stringify({
   schemaVersion: 'geometry-intent/v2',
   intentId: 'style-after-inspection',
   operation: {
-    kind: 'style',
-    targetRefs: ['nine-point-circle'],
-    options: { draw: 'red' },
+    kind: 'present',
+    targetRef: 'nine-point-circle',
+    style: { color: 'red' },
   },
 })}
 \`\`\``;
@@ -290,9 +290,9 @@ ${JSON.stringify({
   schemaVersion: 'geometry-intent/v2',
   intentId: 'style-nine-point-circle',
   operation: {
-    kind: 'style',
-    targetRefs: ['nine-point-circle'],
-    options: { draw: 'red', lineWidth: 'thick' },
+    kind: 'present',
+    targetRef: 'nine-point-circle',
+    style: { color: 'red', width: 'thick' },
   },
 })}
 \`\`\``;
@@ -348,6 +348,56 @@ ${JSON.stringify({
       code: 'legacy-model-write-protocol',
     }));
     expect(invokeModel.mock.calls[1]![0].at(-1)?.content).toContain('GeometryIntent/v2');
+  });
+
+  it('enforces a construct-only Host capability across protocol repair', async () => {
+    const present = `\`\`\`tikz-geometry-intent
+${JSON.stringify({
+  schemaVersion: 'geometry-intent/v2',
+  intentId: 'forbidden-style',
+  operation: {
+    kind: 'present',
+    targetRef: 'circle:existing',
+    style: { color: 'red' },
+  },
+})}
+\`\`\``;
+    const construct = `\`\`\`tikz-geometry-intent
+${JSON.stringify({
+  schemaVersion: 'geometry-intent/v2',
+  intentId: 'allowed-construction',
+  operation: {
+    kind: 'construct',
+    toolId: 'nine-point-circle',
+    inputRefs: ['point:A', 'point:B', 'point:C'],
+    requestedNames: {},
+    parameters: {},
+  },
+})}
+\`\`\``;
+    const invokeModel = vi.fn()
+      .mockResolvedValueOnce('```tikz-action\n\\draw (A)--(B);\n```')
+      .mockResolvedValueOnce(present)
+      .mockResolvedValueOnce(construct);
+    const repairs: string[] = [];
+
+    const result = await runTikzAgentLoop({
+      messages: [],
+      invokeModel,
+      executeTool: vi.fn(),
+      requiresWriteAction: true,
+      allowPlainActions: false,
+      allowedGeometryIntentOperations: ['construct', 'construct-dag'],
+      onProtocolRepair: (repair) => repairs.push(repair.code),
+    });
+
+    expect(result).toMatchObject({ output: construct, protocolRepairs: 2, steps: 3 });
+    expect(repairs).toEqual([
+      'plain-action-not-allowed',
+      'geometry-intent-operation-not-allowed',
+    ]);
+    expect(invokeModel.mock.calls[2]?.[0].at(-1)?.content)
+      .toContain('construct, construct-dag');
   });
 
   it('returns one safe unapplied result after mixed, multiple or unclosed output exhausts repair', async () => {

@@ -156,7 +156,7 @@ describe('TikzStudio', () => {
     expect(screen.getByText('正在读取 api.molamaker.cn 模型目录…')).toBeTruthy();
   });
 
-  it('uses real widget clicks to prepare and send a fixed read-only problem receipt', async () => {
+  it('uses real clicks for read-only inspection and an explicitly basis-bound construction action', async () => {
     const contentHash = '0123456789abcdef'.repeat(4);
     const issuedAt = new Date();
     const receipt = {
@@ -208,6 +208,36 @@ describe('TikzStudio', () => {
         return Response.json({
           schemaVersion: 'geometry-problem-inspection-prepared/v1',
           receipt,
+        });
+      }
+      if (path.includes('/api/tikz/problems/construct/prepare')) {
+        const prepared = JSON.parse(String(init?.body ?? '{}')) as {
+          basis: Record<string, unknown>;
+        };
+        return Response.json({
+          schemaVersion: 'geometry-problem-construction-prepared/v1',
+          action: {
+            schemaVersion: 'geometry-problem-construction-action/v1',
+            actionId: 'problem-construction-browser-test',
+            inspectionReceiptId: receipt.receiptId,
+            source: receipt.source,
+            sourceId: receipt.sourceId,
+            contentHash: receipt.contentHash,
+            provider: receipt.provider,
+            title: receipt.title,
+            sourceUrl: receipt.sourceUrl,
+            datasetUrl: receipt.datasetUrl,
+            licenseId: receipt.licenseId,
+            sourceMaterialRights: receipt.sourceMaterialRights,
+            basis: prepared.basis,
+            issuedAt: issuedAt.toISOString(),
+            expiresAt: new Date(issuedAt.getTime() + 3 * 60_000).toISOString(),
+            mode: 'semantic-construction-proposal',
+            taint: 'untrusted-external-reference',
+            writeAuthority: 'construct-only',
+            allowedGeometryIntentOperations: ['construct', 'construct-dag'],
+            token: 'v1.browser-construction-token',
+          },
         });
       }
       const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
@@ -285,6 +315,19 @@ describe('TikzStudio', () => {
     expect(String(buildBodies[1]?.problem)).toContain('只读分析');
     expect(String(buildBodies[1]?.problem)).not.toContain('搜索一道九点圆竞赛题');
     expect(await screen.findByText('已完成只读分析，画板未改变。')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '为本题构图' }));
+    await waitFor(() => expect((composer as HTMLTextAreaElement).value)
+      .toContain('operation.kind 必须是 construct 或 construct-dag'));
+    fireEvent.click(screen.getByRole('button', { name: '发送 ↵' }));
+
+    await waitFor(() => expect(buildBodies).toHaveLength(3));
+    expect(buildBodies[2]?.problemInspectionReceipt).toBeUndefined();
+    expect(buildBodies[2]?.problemConstructionAction).toMatchObject({
+      actionId: 'problem-construction-browser-test',
+      writeAuthority: 'construct-only',
+      allowedGeometryIntentOperations: ['construct', 'construct-dag'],
+    });
   });
 
   it('projects terminal-only failures into readable chat instead of an empty success', async () => {

@@ -9,6 +9,10 @@ import {
 import { classifyTikzExecutableEnvelopes } from './executable-envelope';
 import { extractTikzAgentWidgets } from './widget-protocol';
 import { tikzAgentToolObservationCacheKey } from './tool-observation-cache';
+import {
+  isGeometryIntent,
+  type GeometryIntent,
+} from './geometry-intent';
 
 /**
  * Tool exploration and protocol recovery consume different budgets. A
@@ -60,6 +64,10 @@ export interface TikzAgentLoopOptions {
   readonly allowWriteActions?: boolean;
   /** The user explicitly requested a structured read-only visual artifact. */
   readonly requiresReadOnlyWidget?: boolean;
+  /** Capability turns may forbid the raw-source fallback entirely. */
+  readonly allowPlainActions?: boolean;
+  /** Optional Host-owned allowlist for the sole GeometryIntent operation. */
+  readonly allowedGeometryIntentOperations?: readonly GeometryIntent['operation']['kind'][];
 }
 
 export interface TikzAgentProtocolConflict {
@@ -114,11 +122,15 @@ function protocolRepairMessage(
   code: string,
   detail: string,
   requiresWriteAction: boolean,
+  policy: Pick<TikzAgentLoopOptions, 'allowPlainActions' | 'allowedGeometryIntentOperations'>,
 ): Message {
   const requiresMutationDecision = requiresWriteAction && (
     code === 'missing-write-action'
     || code === 'missing-visible-agent-decision'
     || code === 'non-executable-write-candidate'
+    || code === 'plain-action-not-allowed'
+    || code === 'invalid-semantic-intent'
+    || code === 'geometry-intent-operation-not-allowed'
   );
   return {
     role: 'user',
@@ -126,7 +138,9 @@ function protocolRepairMessage(
       'The following JSON is trusted host protocol feedback, not user content and not write authority.',
       'Discard every executable envelope from your previous turn. Do not claim that any was applied.',
       requiresMutationDecision
-        ? 'The user explicitly authorized a mutation. Reply with one read-only tool call, exactly one tikz-geometry-intent containing GeometryIntent/v2, or plain tikz-action blocks forming one ordered atomic batch for unsupported exact-source additions. For one style edit plus several labels, use one present operation with a labels array of 1-16 distinct anchors; never emit one GeometryIntent per label. Never emit legacy tikz-patch, tikz-construction-plan, tikz-construction-intent, or tikz-managed-presentation envelopes. Use prose-only only for one explicit clarification question when the target is genuinely ambiguous.'
+        ? policy.allowedGeometryIntentOperations?.length
+          ? `The user explicitly authorized a capability-bounded mutation. Reply with exactly one tikz-geometry-intent containing GeometryIntent/v2 whose operation.kind is one of: ${policy.allowedGeometryIntentOperations.join(', ')}. Plain tikz-action and every legacy typed write envelope are forbidden. Use prose-only only for one explicit clarification question when the target is genuinely ambiguous.`
+          : `The user explicitly authorized a mutation. Reply with one read-only tool call, exactly one tikz-geometry-intent containing GeometryIntent/v2${policy.allowPlainActions === false ? '' : ', or plain tikz-action blocks forming one ordered atomic batch for unsupported exact-source additions'}. For one style edit plus several labels, use one present operation with a labels array of 1-16 distinct anchors; never emit one GeometryIntent per label. Never emit legacy tikz-patch, tikz-construction-plan, tikz-construction-intent, or tikz-managed-presentation envelopes. Use prose-only only for one explicit clarification question when the target is genuinely ambiguous.`
         : code === 'missing-visible-agent-decision'
           ? 'Your transport returned only hidden reasoning. Return a concise user-visible final answer now. Do not emit internal chain-of-thought and do not claim a write occurred.'
           : 'Reply again using either natural prose only, one read-only tool call, one tikz-geometry-intent containing GeometryIntent/v2, or plain tikz-action blocks that together form one ordered atomic batch. Never emit a legacy typed write envelope.',
@@ -138,6 +152,25 @@ function protocolRepairMessage(
       }),
     ].join('\n'),
   };
+}
+
+function semanticIntentOperation(output: string): {
+  readonly present: boolean;
+  readonly valid: boolean;
+  readonly kind: GeometryIntent['operation']['kind'] | null;
+} {
+  const executable = classifyTikzExecutableEnvelopes(output);
+  const semantic = executable.envelopes.filter((item) => item.kind === 'semantic-intent');
+  if (semantic.length === 0) return { present: false, valid: true, kind: null };
+  if (semantic.length !== 1) return { present: true, valid: false, kind: null };
+  try {
+    const value: unknown = JSON.parse(semantic[0]!.body);
+    return isGeometryIntent(value)
+      ? { present: true, valid: true, kind: value.operation.kind }
+      : { present: true, valid: false, kind: null };
+  } catch {
+    return { present: true, valid: false, kind: null };
+  }
 }
 
 /**
@@ -190,6 +223,10 @@ function detectProtocolConflict(input: {
   readonly requiresWriteAction: boolean;
   readonly requiresReadOnlyWidget: boolean;
   readonly readOnlyWidgetSatisfiedByHost: boolean;
+  readonly semanticIntentValid: boolean;
+  readonly semanticIntentOperationKind: GeometryIntent['operation']['kind'] | null;
+  readonly allowPlainActions: boolean;
+  readonly allowedGeometryIntentOperations?: readonly GeometryIntent['operation']['kind'][];
 }): TikzAgentProtocolConflict | null {
   const actionCount = input.plainActionCount + input.typedActionCount;
   if (input.malformedExecutable) {
@@ -216,6 +253,12 @@ function detectProtocolConflict(input: {
       detail: 'This turn is read-only verification and cannot contain a write action.',
     };
   }
+  if (input.plainActionCount > 0 && !input.allowPlainActions) {
+    return {
+      code: 'plain-action-not-allowed',
+      detail: 'This capability-bounded turn forbids raw tikz-action writes.',
+    };
+  }
   if (input.legacyTypedActionCount > 0) {
     return {
       code: 'legacy-model-write-protocol',
@@ -229,6 +272,22 @@ function detectProtocolConflict(input: {
     return {
       code: 'write-envelope-conflict',
       detail: 'The previous turn mixed plain and typed writes or contained multiple typed writes.',
+    };
+  }
+  if (input.semanticIntentCount > 0 && !input.semanticIntentValid) {
+    return {
+      code: 'invalid-semantic-intent',
+      detail: 'The GeometryIntent/v2 envelope is not valid JSON or does not match the schema.',
+    };
+  }
+  if (
+    input.semanticIntentOperationKind
+    && input.allowedGeometryIntentOperations
+    && !input.allowedGeometryIntentOperations.includes(input.semanticIntentOperationKind)
+  ) {
+    return {
+      code: 'geometry-intent-operation-not-allowed',
+      detail: `GeometryIntent operation ${input.semanticIntentOperationKind} is outside the Host capability allowlist.`,
     };
   }
   if (
@@ -295,6 +354,7 @@ export async function runTikzAgentLoop(
     lastOutput = output;
     const tool = extractTikzAgentToolCall(output);
     const executable = classifyTikzExecutableEnvelopes(output);
+    const semanticIntent = semanticIntentOperation(output);
     const widgets = extractTikzAgentWidgets(output);
     const conflict = detectProtocolConflict({
       output,
@@ -310,6 +370,10 @@ export async function runTikzAgentLoop(
       requiresWriteAction: options.requiresWriteAction === true,
       requiresReadOnlyWidget: options.requiresReadOnlyWidget === true,
       readOnlyWidgetSatisfiedByHost,
+      semanticIntentValid: semanticIntent.valid,
+      semanticIntentOperationKind: semanticIntent.kind,
+      allowPlainActions: options.allowPlainActions !== false,
+      allowedGeometryIntentOperations: options.allowedGeometryIntentOperations,
     });
     if (conflict) {
       if (
@@ -338,6 +402,7 @@ export async function runTikzAgentLoop(
         conflict.code,
         conflict.detail,
         options.requiresWriteAction === true,
+        options,
       ));
       continue;
     }
