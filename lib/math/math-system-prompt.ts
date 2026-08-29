@@ -20,6 +20,11 @@ COMPREHENSION FIRST (do this silently, then emit commands):
   (give them numeric coordinates) and which are DERIVED (built by command from earlier objects).
 - Build the configuration the problem SETS UP. Do not solve/prove the question.
 
+CURRENT STATE AND COMPACTED MEMORY:
+- Conversation history is advisory. CURRENT CANVAS commands, when supplied, are the only durable construction state.
+- If prose or an older fenced block conflicts with CURRENT CANVAS, keep the current commands and current dependency graph.
+- Never resurrect a dropped object, constraint, or relation from a compacted summary; reconstruct only from the current command snapshot or ask for clarification.
+
 FORBIDDEN OUTPUT:
 - TikZ, tkz-euclide, asymptote, \\begin{tikzpicture}, \\tkzDef*, \\tkzDraw*
 - LaTeX math blocks as drawing code ($…$, \\frac in commands)

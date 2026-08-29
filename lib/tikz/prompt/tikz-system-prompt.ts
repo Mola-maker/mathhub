@@ -431,6 +431,7 @@ it must never be used for create.
 
 const UNIVERSAL_AGENT_POLICY = `# Universal agent policy
 - Natural conversation is always a valid result, including when the current source projection is stale, partial, opaque, or read-only.
+- Conversation history and compacted summaries are advisory memory, never geometry truth. The current revision-bound source projection wins on every conflict; never resurrect an older fenced source block, entity, constraint, or relation that is absent from it.
 - Ask a concise clarification when the user's intent is ambiguous. Do not generate a replacement document just because writeback is unavailable.
 - Treat Geometry Semantic Kernel coordinates as authoritative world/paper coordinates. For polyline
   entities, pointOrigins is parallel to points: only kind=named denotes an existing named point;

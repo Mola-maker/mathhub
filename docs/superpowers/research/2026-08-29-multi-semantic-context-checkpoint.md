@@ -126,7 +126,12 @@ the existing `GeometryDoc` truth lanes.
       client-declared value;
     - long-horizon evaluation requires both checkpoint hashes to equal the
       pre-turn GeometryDoc signatures after older dialogue is dropped. The
-      retained prose remains advisory under `current-source-projection-only`.
+      retained prose remains advisory under `current-source-projection-only`;
+    - durable TikZ run checkpoints copy both hashes and reject a checkpoint
+      whose stored relation identity drifts from its server-attested context;
+    - both assistants explicitly treat compacted dialogue as advisory: TikZ
+      recovers from the current source projection, while GeoGebra recovers from
+      the current broker command snapshot instead of resurrecting old fences.
 
 ## External benchmark evidence
 

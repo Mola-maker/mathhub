@@ -17,6 +17,8 @@ export interface TikzAgentRunBasis {
   readonly sourceId: string;
   readonly revision: number;
   readonly sourceHash: string;
+  readonly semanticHash?: string;
+  readonly relationHash?: string;
   readonly pluginSetDigest?: string;
 }
 
@@ -60,6 +62,8 @@ export function isTikzAgentRunBasis(value: unknown): value is TikzAgentRunBasis 
     && Number.isSafeInteger(basis.revision)
     && (basis.revision ?? -1) >= 0
     && boundedIdentity(basis.sourceHash)
+    && (basis.semanticHash === undefined || boundedIdentity(basis.semanticHash))
+    && (basis.relationHash === undefined || boundedIdentity(basis.relationHash))
     && (
       basis.pluginSetDigest === undefined
       || boundedIdentity(basis.pluginSetDigest)
@@ -83,6 +87,8 @@ export function sameTikzAgentRunBasis(
 ): boolean {
   return sameTikzAgentReplayBasis(left, right)
     && left.schemaVersion === right.schemaVersion
+    && left.semanticHash === right.semanticHash
+    && left.relationHash === right.relationHash
     && left.pluginSetDigest === right.pluginSetDigest;
 }
 
@@ -103,6 +109,8 @@ export function isTikzAgentRunCheckpoint(
     && contextBasis.sourceId === checkpoint.basis.sourceId
     && contextBasis.revision === checkpoint.basis.revision
     && contextBasis.sourceHash === checkpoint.basis.sourceHash
+    && contextBasis.semanticHash === checkpoint.basis.semanticHash
+    && contextBasis.relationHash === checkpoint.basis.relationHash
     && Number.isSafeInteger(checkpoint.createdAt)
     && (checkpoint.createdAt ?? 0) > 0;
 }
@@ -149,6 +157,12 @@ export function createTikzAgentRunCheckpoint(input: {
       sourceId: contextBasis.sourceId,
       revision: contextBasis.revision,
       sourceHash: contextBasis.sourceHash,
+      ...(contextBasis.semanticHash
+        ? { semanticHash: contextBasis.semanticHash }
+        : {}),
+      ...(contextBasis.relationHash
+        ? { relationHash: contextBasis.relationHash }
+        : {}),
       ...(input.pluginSetDigest ? { pluginSetDigest: input.pluginSetDigest } : {}),
     },
     contextCheckpoint: input.contextCheckpoint,

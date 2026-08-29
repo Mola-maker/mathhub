@@ -18,4 +18,11 @@ describe('TikZ system prompt geometry-flow policy', () => {
     const prompt = buildTikzSystemPrompt('解释当前三角形的高。', {});
     expect(prompt).not.toContain('Explicit read-only geometry-flow request');
   });
+
+  it('keeps compacted dialogue subordinate to the current source projection', () => {
+    const prompt = buildTikzSystemPrompt('继续当前构造。', {});
+    expect(prompt).toContain('Conversation history and compacted summaries are advisory memory');
+    expect(prompt).toContain('never geometry truth');
+    expect(prompt).toContain('never resurrect an older fenced source block');
+  });
 });

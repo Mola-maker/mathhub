@@ -20,6 +20,8 @@ describe('TikZ Agent run checkpoint', () => {
       sourceId: 'doc-1:tikz',
       revision: 2,
       sourceHash: '1111111111111111',
+      semanticHash: 'semantic-1111',
+      relationHash: 'relations-1111',
       attestation: 'server-attested',
     },
   }).checkpoint;
@@ -34,10 +36,16 @@ describe('TikZ Agent run checkpoint', () => {
     expect(checkpoint).not.toBeNull();
     expect(isTikzAgentRunCheckpoint(checkpoint)).toBe(true);
     expect(checkpoint?.basis.revision).toBe(2);
+    expect(checkpoint?.basis.semanticHash).toBe('semantic-1111');
+    expect(checkpoint?.basis.relationHash).toBe('relations-1111');
     expect(sameTikzAgentRunBasis(
       checkpoint!.basis,
       { ...checkpoint!.basis, pluginSetDigest: 'other-plugins' },
     )).toBe(false);
+    expect(isTikzAgentRunCheckpoint({
+      ...checkpoint,
+      basis: { ...checkpoint!.basis, relationHash: 'relations-stale' },
+    })).toBe(false);
   });
 
   it('records only an exact one-revision proposal successor', () => {
