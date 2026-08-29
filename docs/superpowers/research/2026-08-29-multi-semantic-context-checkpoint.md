@@ -103,6 +103,29 @@ the existing `GeometryDoc` truth lanes.
       applet events so they cannot create duplicate commits;
     - clearing chat no longer clears the canvas broker. Reset canvas is itself
       a revisioned empty-snapshot transaction.
+12. Independent TikZ/GeoGebra semantic-pair gate
+    - evaluation report v3 optionally loads separately authored `.tikz` and
+      `.ggb.txt` sources, verifies their repository-pinned SHA-256 digests and
+      projects each source through its real adapter;
+    - the complex nine-point-circle core requires 19 portable entities and
+      seven portable midpoint/perpendicular-foot constraints to match under the
+      renderer-neutral mathematical signature. Relation and presentation hashes
+      remain separately visible and can become strict gates per fixture;
+    - ordinary TikZ calc midpoint and perpendicular-foot coordinates now emit
+      first-class constraints, rather than leaving those dependencies only in
+      expression metadata;
+    - the paired fixture contract is itself included in the byte-pinned
+      expectations profile, so callers cannot swap paths, hashes or coverage
+      thresholds while reusing a trusted case definition.
+13. Semantic context-compaction attestation
+    - context bases can now carry the renderer-neutral `semanticHash` alongside
+      revision and source hash;
+    - the TikZ route reconstructs and server-attests that hash, while Math
+      Studio forwards the current GeoGebra broker projection as a
+      client-declared value;
+    - long-horizon evaluation requires the checkpoint semantic hash to equal
+      the pre-turn GeometryDoc signature after older dialogue is dropped. The
+      retained prose remains advisory under `current-source-projection-only`.
 
 ## External benchmark evidence
 
@@ -158,8 +181,8 @@ stores only our own fixture and a pinned provenance URL.
    keep compatibility re-exports during the migration.
 2. Promote selected GeoGebra bindings from read-only only after a bounded,
    lossless binding-to-command patch planner is available.
-3. Add cross-renderer long-horizon fixtures backed by independently authored
-   TikZ and GeoGebra sources, rather than the current remapped semantic unit
-   fixture.
+3. Make portable incidence relations strict across the paired TikZ/GeoGebra
+   fixture after both adapters expose the same endpoint relation vocabulary;
+   then add circle/tangent and branch-sensitive intersection pairs.
 4. Add explicit expiry/renewal policy for restore handles once a durable
    transcript store exists; continue emitting an empty handle list until then.

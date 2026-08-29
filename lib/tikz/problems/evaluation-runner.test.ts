@@ -596,6 +596,34 @@ describe('geometry evaluation runner', () => {
       disposition: 'research-reference-only',
       recordId: 'mathnet:iran-2025-nine-point-cyclic',
     });
+    expect(report.pairedSemantic).toMatchObject({
+      schemaVersion: 'geometry-evaluation-paired-semantic-report/v1',
+      passed: true,
+      tikz: {
+        sourceLanguage: 'tikz',
+        comparable: true,
+        coverage: {
+          entities: { portable: 19, total: 19 },
+          constraints: { portable: 7, total: 7 },
+        },
+      },
+      geogebra: {
+        sourceLanguage: 'geogebra-command',
+        comparable: true,
+        coverage: {
+          entities: { portable: 19, total: 19 },
+          constraints: { portable: 7, total: 7 },
+        },
+      },
+      comparison: {
+        equivalent: true,
+        semanticHashMatches: true,
+      },
+    });
+    expect(report.pairedSemantic?.assertions).toContainEqual(expect.objectContaining({
+      id: 'paired-semantic:mathematical-equivalence',
+      passed: true,
+    }));
   });
 
   it('runs the MathNet nine-point answer, construction, style-label set, and dual-render chain', async () => {
@@ -619,6 +647,7 @@ describe('geometry evaluation runner', () => {
     });
 
     expect(report.passed).toBe(true);
+    expect(report.pairedSemantic?.passed).toBe(true);
     expect(report.lanes.map((lane) => lane.status)).toEqual([
       'passed',
       'passed',

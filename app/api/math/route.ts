@@ -76,6 +76,7 @@ function declaredGeogebraContextBasis(value: unknown): GeometryAgentContextBasis
     revision: basis.revision,
     sourceHash: basis.sourceHash,
     ...(typeof basis.sourceId === 'string' ? { sourceId: basis.sourceId } : {}),
+    ...(typeof basis.semanticHash === 'string' ? { semanticHash: basis.semanticHash } : {}),
     // GeoGebra lives in the browser; the service can shape-check this anchor
     // but cannot independently reconstruct the live applet in this request.
     attestation: 'client-declared',

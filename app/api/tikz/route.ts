@@ -51,6 +51,7 @@ import {
   type GeometryAgentContextBasis,
   type GeometryConversationContext,
 } from '@/lib/geometry/agent/conversation-context';
+import { buildGeometrySemanticSignature } from '@/lib/geometry/semantic-signature';
 import { geometryProblemSearchWidget } from '@/lib/tikz/agent/problem-search-widget';
 import {
   problemInspectionDraft,
@@ -1610,6 +1611,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           revision: body.sourceRevision as number,
           sourceId: proposalIdentity.sourceId,
           sourceHash: body.sourceHash as string,
+          semanticHash: buildGeometrySemanticSignature(proposalIdentity.geometryDoc).semanticHash,
           attestation: 'server-attested',
         }
       : undefined,

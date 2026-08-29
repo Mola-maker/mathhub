@@ -45,6 +45,7 @@ import type {
   GeometryEvaluationInvariant,
   GeometryEvaluationLane,
   GeometryEvaluationProposalSchema,
+  GeometryEvaluationPairedSemanticFixture,
   GeometryEvaluationTurn,
 } from './evaluation-corpus';
 import {
@@ -56,9 +57,16 @@ import {
   isGeometryAgentContextCheckpoint,
   type GeometryAgentContextCheckpoint,
 } from '@/lib/geometry/agent/conversation-context';
+import { projectGeogebraCommandsToGeometryDoc } from '@/lib/geometry/adapters/geogebra-geometry-doc';
+import {
+  buildGeometrySemanticSignature,
+  compareGeometrySemanticSignatures,
+  type GeometrySemanticSignature,
+  type GeometrySemanticSignatureComparison,
+} from '@/lib/geometry/semantic-signature';
 
 export const GEOMETRY_EVALUATION_REPORT_SCHEMA_VERSION =
-  'geometry-evaluation-report/v2' as const;
+  'geometry-evaluation-report/v3' as const;
 export const GEOMETRY_EVALUATION_RENDER_ARTIFACT_SCHEMA_VERSION =
   'geometry-evaluation-render-artifact/v1' as const;
 export const GEOMETRY_EVALUATION_EXACT_COMPILER_SCHEMA_VERSION =
@@ -177,12 +185,34 @@ export interface GeometryEvaluationLaneReport {
   readonly unsupportedCapabilities: readonly GeometryEvaluationCapability[];
 }
 
+export interface GeometryEvaluationSemanticSignatureAttestation {
+  readonly sourceLanguage: string;
+  readonly sourceSha256: string;
+  readonly projectionStatus: GeometrySemanticSignature['projectionStatus'];
+  readonly comparable: boolean;
+  readonly semanticHash: string;
+  readonly relationHash: string;
+  readonly presentationHash: string;
+  readonly coverage: GeometrySemanticSignature['coverage'];
+  readonly exclusionCount: number;
+}
+
+export interface GeometryEvaluationPairedSemanticReport {
+  readonly schemaVersion: 'geometry-evaluation-paired-semantic-report/v1';
+  readonly passed: boolean;
+  readonly tikz: GeometryEvaluationSemanticSignatureAttestation;
+  readonly geogebra: GeometryEvaluationSemanticSignatureAttestation;
+  readonly comparison: GeometrySemanticSignatureComparison;
+  readonly assertions: readonly GeometryEvaluationAssertion[];
+}
+
 export interface GeometryEvaluationReport {
   readonly schemaVersion: typeof GEOMETRY_EVALUATION_REPORT_SCHEMA_VERSION;
   readonly caseId: string;
   readonly passed: boolean;
   readonly source: GeometryEvaluationCase['source'];
   readonly fixture: GeometryEvaluationCase['localFixture'];
+  readonly pairedSemantic?: GeometryEvaluationPairedSemanticReport;
   readonly lanes: readonly GeometryEvaluationLaneReport[];
 }
 
@@ -192,6 +222,7 @@ const EVALUATION_PROFILE_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const SHA256_HEX = /^[a-f0-9]{64}$/u;
 const MAX_EVALUATION_FIXTURE_BYTES = 256 * 1024;
 const MAX_EVALUATION_EXPECTATIONS_BYTES = 128 * 1024;
+const MAX_GEOGEBRA_PAIRED_COMMANDS = 512;
 
 function sha256Bytes(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -214,11 +245,14 @@ function evaluationCaseExpectation(caseDefinition: GeometryEvaluationCase): unkn
     caseId: caseDefinition.caseId,
     title: caseDefinition.title,
     source: caseDefinition.source,
+    ...(caseDefinition.localFixture.pairedSemanticFixture
+      ? { pairedSemanticFixture: caseDefinition.localFixture.pairedSemanticFixture }
+      : {}),
     turns: caseDefinition.turns,
   };
 }
 
-function pinnedFixtureFile(stem: string, extension: '.tikz' | '.json'): string {
+function pinnedFixtureFile(stem: string, extension: '.tikz' | '.json' | '.ggb.txt'): string {
   if (
     !EVALUATION_FIXTURE_STEM.test(stem)
     || stem.includes('//')
@@ -291,6 +325,134 @@ async function loadPinnedEvaluationFixture(
     });
   }
   return { source };
+}
+
+function semanticSignatureAttestation(
+  signature: GeometrySemanticSignature,
+  sourceSha256: string,
+): GeometryEvaluationSemanticSignatureAttestation {
+  return {
+    sourceLanguage: signature.sourceLanguage,
+    sourceSha256,
+    projectionStatus: signature.projectionStatus,
+    comparable: signature.comparable,
+    semanticHash: signature.semanticHash,
+    relationHash: signature.relationHash,
+    presentationHash: signature.presentationHash,
+    coverage: signature.coverage,
+    exclusionCount: signature.exclusions.length,
+  };
+}
+
+async function evaluatePairedSemanticFixture(input: {
+  readonly caseId: string;
+  readonly fixture: GeometryEvaluationPairedSemanticFixture;
+}): Promise<GeometryEvaluationPairedSemanticReport> {
+  const fixture = input.fixture;
+  if (
+    fixture.schemaVersion !== 'geometry-evaluation-paired-semantic-fixture/v1'
+    || fixture.authorship !== 'independently-authored'
+    || !SHA256_HEX.test(fixture.tikzSourceSha256)
+    || !SHA256_HEX.test(fixture.geogebraCommandsSha256)
+    || !Number.isSafeInteger(fixture.minimumPortableEntityCount)
+    || fixture.minimumPortableEntityCount < 1
+    || (fixture.minimumPortableConstraintCount !== undefined
+      && (!Number.isSafeInteger(fixture.minimumPortableConstraintCount)
+        || fixture.minimumPortableConstraintCount < 0))
+  ) throw new Error('Paired semantic fixture contract is invalid');
+
+  const [tikzBytes, geogebraBytes] = await Promise.all([
+    readFile(pinnedFixtureFile(fixture.tikzFixturePath, '.tikz')),
+    readFile(pinnedFixtureFile(fixture.geogebraCommandsPath, '.ggb.txt')),
+  ]);
+  if (
+    tikzBytes.byteLength > MAX_EVALUATION_FIXTURE_BYTES
+    || geogebraBytes.byteLength > MAX_EVALUATION_FIXTURE_BYTES
+  ) throw new Error('Paired semantic fixture exceeds the local byte budget');
+  const tikzSha256 = sha256Bytes(tikzBytes);
+  const geogebraSha256 = sha256Bytes(geogebraBytes);
+  if (
+    tikzSha256 !== fixture.tikzSourceSha256
+    || geogebraSha256 !== fixture.geogebraCommandsSha256
+  ) throw new Error('Paired semantic fixture digest does not match the corpus definition');
+
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  const tikzSource = decoder.decode(tikzBytes);
+  const geogebraSource = decoder.decode(geogebraBytes);
+  const commands = geogebraSource.split(/\r?\n/gu)
+    .map((command) => command.trim())
+    .filter(Boolean);
+  if (
+    commands.length === 0
+    || commands.length > MAX_GEOGEBRA_PAIRED_COMMANDS
+    || commands.some((command) => command.length > 4_096 || /[\r\n\u0000]/u.test(command))
+  ) throw new Error('Paired GeoGebra command fixture is empty or exceeds its safety bound');
+
+  const tikzSnapshot = createGeometryEvaluationSnapshot({
+    documentId: `paired-${input.caseId}-tikz`,
+    epoch: 'paired-semantic-epoch-1',
+    revision: 0,
+    source: tikzSource,
+  });
+  const tikzSignature = buildGeometrySemanticSignature(tikzSnapshot.geometryDoc);
+  const geogebraProjection = projectGeogebraCommandsToGeometryDoc({
+    identity: {
+      documentId: `paired-${input.caseId}-geogebra`,
+      epoch: 'paired-semantic-epoch-1',
+      revision: 0,
+    },
+    commands,
+  });
+  const geogebraSignature = geogebraProjection.semanticSignature;
+  const comparison = compareGeometrySemanticSignatures(tikzSignature, geogebraSignature);
+  const minimumConstraints = fixture.minimumPortableConstraintCount ?? 0;
+  const assertions = [
+    assertion(
+      'paired-semantic:tikz-comparable',
+      tikzSignature.comparable,
+      `${tikzSignature.coverage.entities.portable}/${tikzSignature.coverage.entities.total} portable entities`,
+    ),
+    assertion(
+      'paired-semantic:geogebra-comparable',
+      geogebraSignature.comparable,
+      `${geogebraSignature.coverage.entities.portable}/${geogebraSignature.coverage.entities.total} portable entities`,
+    ),
+    assertion(
+      'paired-semantic:minimum-portable-entities',
+      tikzSignature.coverage.entities.portable >= fixture.minimumPortableEntityCount
+        && geogebraSignature.coverage.entities.portable >= fixture.minimumPortableEntityCount,
+      `minimum ${fixture.minimumPortableEntityCount}`,
+    ),
+    assertion(
+      'paired-semantic:minimum-portable-constraints',
+      tikzSignature.coverage.constraints.portable >= minimumConstraints
+        && geogebraSignature.coverage.constraints.portable >= minimumConstraints,
+      `minimum ${minimumConstraints}`,
+    ),
+    assertion(
+      'paired-semantic:mathematical-equivalence',
+      comparison.equivalent,
+      comparison.reasons.join(', ') || 'equivalent',
+    ),
+    assertion(
+      'paired-semantic:relation-equivalence',
+      fixture.requireRelationMatch !== true || comparison.relationHashMatches,
+      comparison.relationHashMatches ? 'matched' : 'reported-only mismatch',
+    ),
+    assertion(
+      'paired-semantic:presentation-equivalence',
+      fixture.requirePresentationMatch !== true || comparison.presentationHashMatches,
+      comparison.presentationHashMatches ? 'matched' : 'reported-only mismatch',
+    ),
+  ];
+  return {
+    schemaVersion: 'geometry-evaluation-paired-semantic-report/v1',
+    passed: assertions.every((item) => item.passed),
+    tikz: semanticSignatureAttestation(tikzSignature, tikzSha256),
+    geogebra: semanticSignatureAttestation(geogebraSignature, geogebraSha256),
+    comparison,
+    assertions,
+  };
 }
 
 const MUTATION_LANES = new Set<GeometryEvaluationLane>([
@@ -955,6 +1117,8 @@ function invariantAssertion(input: {
           && typeof basis.sourceId === 'string'
           && basis.sourceId === before.geometryDoc.basis.sourceId
           && basis.sourceHash === hashSource(before.source)
+          && basis.semanticHash
+            === buildGeometrySemanticSignature(before.geometryDoc).semanticHash
           && (invariant.maximumRetainedMessages === undefined
             || checkpoint.retainedMessageCount <= invariant.maximumRetainedMessages)
           && (invariant.requiredLosses ?? []).every((loss) => checkpoint.loss.includes(loss)),
@@ -1008,6 +1172,12 @@ export async function runGeometryEvaluationCase(input: {
   if (input.initialSource !== undefined && input.initialSource !== fixture.source) {
     throw new Error('Caller source does not match the pinned evaluation fixture bytes');
   }
+  const pairedSemantic = input.caseDefinition.localFixture.pairedSemanticFixture
+    ? await evaluatePairedSemanticFixture({
+        caseId: input.caseDefinition.caseId,
+        fixture: input.caseDefinition.localFixture.pairedSemanticFixture,
+      })
+    : undefined;
   const documentId = input.documentId ?? `evaluation:${input.caseDefinition.caseId}`;
   const epoch = input.epoch ?? 'evaluation-epoch-1';
   const document = new StudioDocument(fixture.source, { documentId, epoch });
@@ -1168,9 +1338,11 @@ export async function runGeometryEvaluationCase(input: {
     schemaVersion: GEOMETRY_EVALUATION_REPORT_SCHEMA_VERSION,
     caseId: input.caseDefinition.caseId,
     passed: lanes.length === input.caseDefinition.turns.length
-      && lanes.every((lane) => lane.status === 'passed'),
+      && lanes.every((lane) => lane.status === 'passed')
+      && (pairedSemantic?.passed ?? true),
     source: input.caseDefinition.source,
     fixture: input.caseDefinition.localFixture,
+    ...(pairedSemantic ? { pairedSemantic } : {}),
     lanes,
   };
 }

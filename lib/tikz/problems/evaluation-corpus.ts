@@ -116,6 +116,22 @@ export interface GeometryEvaluationLocalFixture {
   readonly authorship: 'independently-authored';
   readonly sourceSha256: string;
   readonly expectationsSha256: string;
+  readonly pairedSemanticFixture?: GeometryEvaluationPairedSemanticFixture;
+}
+
+export interface GeometryEvaluationPairedSemanticFixture {
+  readonly schemaVersion: 'geometry-evaluation-paired-semantic-fixture/v1';
+  /** Safe stems below lib/tikz/__fixtures__; extensions are owned by the runner. */
+  readonly tikzFixturePath: string;
+  readonly geogebraCommandsPath: string;
+  readonly authorship: 'independently-authored';
+  readonly tikzSourceSha256: string;
+  readonly geogebraCommandsSha256: string;
+  readonly minimumPortableEntityCount: number;
+  readonly minimumPortableConstraintCount?: number;
+  /** Relations/presentation are reported separately and become gates only when requested. */
+  readonly requireRelationMatch?: boolean;
+  readonly requirePresentationMatch?: boolean;
 }
 
 export interface GeometryEvaluationTurn {
@@ -259,7 +275,17 @@ export const GEOMETRY_EVALUATION_CORPUS: readonly GeometryEvaluationCase[] = [
       expectationProfile: 'mathnet-nine-point-cyclic',
       authorship: 'independently-authored',
       sourceSha256: 'e5cb12b4dda508321456a8cf1d1e7e090d3545fb2fa7d151ce1732253ad909bc',
-      expectationsSha256: 'd25f5eb7f2e7f77610f73bd57eba392d651e6a047733d4356224610b27a36b65',
+      expectationsSha256: '141e094fa031c82ea4e4829c9990fce49f01e1f3ce8275ac92f9b7a3dc44782a',
+      pairedSemanticFixture: {
+        schemaVersion: 'geometry-evaluation-paired-semantic-fixture/v1',
+        tikzFixturePath: 'evaluation/mathnet-nine-point-cyclic-semantic-core',
+        geogebraCommandsPath: 'evaluation/mathnet-nine-point-cyclic-semantic-core',
+        authorship: 'independently-authored',
+        tikzSourceSha256: '72fa2792949965fd190a33e05e7b943f30391c07c2c5cfdb5e9542990ed8863c',
+        geogebraCommandsSha256: 'dee5871c53afcf3b62665795971c5ad9551af3a2d80ae781e19ca77d59d3689b',
+        minimumPortableEntityCount: 19,
+        minimumPortableConstraintCount: 7,
+      },
     },
     turns: [
       {

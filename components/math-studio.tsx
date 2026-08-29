@@ -1237,6 +1237,7 @@ export function MathStudio({
           revision: geometryProjection.revision,
           sourceId: geometryProjection.sourceId,
           sourceHash: geometryProjection.sourceHash,
+          semanticHash: geometryProjection.semanticHash,
         };
       }
 

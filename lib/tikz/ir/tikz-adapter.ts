@@ -659,41 +659,70 @@ function pointConstraints(
   pointIdsByName: ReadonlyMap<string, string>,
 ): GeometryConstraint[] {
   return points.flatMap((point) => {
+    const result: GeometryConstraint[] = [];
+    const entityId = (name: string) => pointIdsByName.get(name)
+      ?? `unresolved:point:${name}`;
+    const definition = point.definition;
+    if (definition?.kind === 'interpolate' && Math.abs(definition.t - 0.5) <= 1e-12) {
+      result.push({
+        recordType: 'constraint',
+        id: `constraint:midpoint:${point.stableId}`,
+        kind: 'midpoint',
+        strength: 'required',
+        enabled: true,
+        arguments: [
+          { role: 'point', entityId: point.stableId },
+          { role: 'segment-start', entityId: entityId(definition.startName) },
+          { role: 'segment-end', entityId: entityId(definition.endName) },
+        ],
+        sourceBindingIds: [`binding:${point.stableId}`],
+      });
+    } else if (definition?.kind === 'perpendicular-foot') {
+      result.push({
+        recordType: 'constraint',
+        id: `constraint:perpendicular-foot:${point.stableId}`,
+        kind: 'perpendicular-foot',
+        strength: 'required',
+        enabled: true,
+        arguments: [
+          { role: 'result', entityId: point.stableId },
+          { role: 'point', entityId: entityId(definition.pointName) },
+          { role: 'reference-start', entityId: entityId(definition.lineStartName) },
+          { role: 'reference-end', entityId: entityId(definition.lineEndName) },
+        ],
+        sourceBindingIds: [`binding:${point.stableId}`],
+      });
+    }
+
     const constraint = point.constraint;
-    if (!constraint) return [];
-    return [{
-      recordType: 'constraint' as const,
-      id: `constraint:on-circle:${point.stableId}`,
-      kind: 'point-on-circle',
-      strength: 'required' as const,
-      enabled: true,
-      arguments: [
-        { role: 'point', entityId: point.stableId },
-        {
-          role: 'center',
-          entityId: pointIdsByName.get(constraint.centerName)
-            ?? `unresolved:point:${constraint.centerName}`,
+    if (constraint) {
+      result.push({
+        recordType: 'constraint',
+        id: `constraint:on-circle:${point.stableId}`,
+        kind: 'point-on-circle',
+        strength: 'required',
+        enabled: true,
+        arguments: [
+          { role: 'point', entityId: point.stableId },
+          { role: 'center', entityId: entityId(constraint.centerName) },
+          ...(constraint.throughName
+            ? [{ role: 'through', entityId: entityId(constraint.throughName) }]
+            : []),
+        ],
+        parameters: {
+          parameterKind: 'angle-degrees',
+          parameter: constraint.angleDeg,
+          radius: constraint.radius,
+          domain: 'circle',
+          parameterRanges: constraint.angleRanges.map((range) => ({
+            start: range.start,
+            end: range.end,
+          })),
         },
-        ...(constraint.throughName
-          ? [{
-            role: 'through',
-            entityId: pointIdsByName.get(constraint.throughName)
-              ?? `unresolved:point:${constraint.throughName}`,
-          }]
-          : []),
-      ],
-      parameters: {
-        parameterKind: 'angle-degrees',
-        parameter: constraint.angleDeg,
-        radius: constraint.radius,
-        domain: 'circle',
-        parameterRanges: constraint.angleRanges.map((range) => ({
-          start: range.start,
-          end: range.end,
-        })),
-      },
-      sourceBindingIds: [`binding:${point.stableId}`],
-    }];
+        sourceBindingIds: [`binding:${point.stableId}`],
+      });
+    }
+    return result;
   });
 }
 
@@ -2352,10 +2381,12 @@ export function projectTikzAnalysisToGeometryTruth(
   );
   const constraints = [
     ...pointConstraints(points, pointIdsByName).filter((constraint) => {
-      const pointId = constraint.arguments.find(
-        (argument) => argument.role === 'point',
-      )?.entityId;
-      return !pointId || !managed.constrainedPointIds.has(pointId);
+      // Inferred constraints always place their constrained/result entity
+      // first. Managed blocks own that output and must suppress the inferred
+      // duplicate even when the semantic role is `result` rather than `point`.
+      const constrainedEntityId = constraint.arguments[0]?.entityId;
+      return !constrainedEntityId
+        || !managed.constrainedPointIds.has(constrainedEntityId);
     }),
     ...managed.constraints,
   ];

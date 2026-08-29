@@ -244,7 +244,11 @@ function styleSignature(
 
 function languageFor(snapshot: GeometrySemanticSnapshotLike): string {
   const value = snapshot.semantic.ir.metadata?.sourceLanguage;
-  return typeof value === 'string' && value.trim() ? value : 'unknown';
+  if (typeof value === 'string' && value.trim()) return value;
+  const adapterId = snapshot.semantic.ir.metadata?.adapterId;
+  if (typeof adapterId === 'string' && /tikz/iu.test(adapterId)) return 'tikz';
+  if (snapshot.basis.sourceId?.endsWith(':tikz')) return 'tikz';
+  return 'unknown';
 }
 
 export function buildGeometrySemanticSignature(

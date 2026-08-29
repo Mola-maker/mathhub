@@ -45,6 +45,30 @@ describe('geometry evaluation corpus', () => {
         .toBe(entry.localFixture.sourceSha256);
       expect(createHash('sha256').update(readFileSync(`${fixtureBase}.json`)).digest('hex'))
         .toBe(entry.localFixture.expectationsSha256);
+      const paired = entry.localFixture.pairedSemanticFixture;
+      if (paired) {
+        const pairedTikz = path.join(
+          process.cwd(),
+          'lib',
+          'tikz',
+          '__fixtures__',
+          `${paired.tikzFixturePath}.tikz`,
+        );
+        const pairedGeogebra = path.join(
+          process.cwd(),
+          'lib',
+          'tikz',
+          '__fixtures__',
+          `${paired.geogebraCommandsPath}.ggb.txt`,
+        );
+        expect(paired.authorship).toBe('independently-authored');
+        expect(existsSync(pairedTikz)).toBe(true);
+        expect(existsSync(pairedGeogebra)).toBe(true);
+        expect(createHash('sha256').update(readFileSync(pairedTikz)).digest('hex'))
+          .toBe(paired.tikzSourceSha256);
+        expect(createHash('sha256').update(readFileSync(pairedGeogebra)).digest('hex'))
+          .toBe(paired.geogebraCommandsSha256);
+      }
 
       expect(entry.turns.length).toBeGreaterThanOrEqual(2);
       for (const turn of entry.turns) {
@@ -109,6 +133,17 @@ describe('geometry evaluation corpus', () => {
       kind: 'context-checkpoint-current',
       requiredLosses: ['older-dialogue-dropped'],
       maximumRetainedMessages: 4,
+    });
+  });
+
+  it('pins an independently authored TikZ and GeoGebra semantic pair for the complex case', () => {
+    const mathNet = GEOMETRY_EVALUATION_CORPUS.find((entry) => (
+      entry.caseId === 'mathnet-iran-2025-nine-point-cyclic'
+    ));
+    expect(mathNet?.localFixture.pairedSemanticFixture).toMatchObject({
+      schemaVersion: 'geometry-evaluation-paired-semantic-fixture/v1',
+      authorship: 'independently-authored',
+      minimumPortableEntityCount: 19,
     });
   });
 });

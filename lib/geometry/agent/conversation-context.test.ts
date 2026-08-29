@@ -52,11 +52,13 @@ describe('compactGeometryConversationContext', () => {
         revision: 4,
         sourceId: 'doc-1:tikz',
         sourceHash: 'abcd',
+        semanticHash: 'semantic-abcd',
         attestation: 'server-attested',
       },
     });
 
     expect(result.checkpoint.basis?.revision).toBe(4);
+    expect(result.checkpoint.basis?.semanticHash).toBe('semantic-abcd');
     expect(result.checkpoint.basis?.attestation).toBe('server-attested');
     expect(result.checkpoint.loss).not.toContain('revision-basis-unavailable');
     expect(isGeometryAgentContextCheckpoint(result.checkpoint)).toBe(true);
@@ -80,6 +82,19 @@ describe('compactGeometryConversationContext', () => {
         sourceId: 'doc:tikz',
         sourceHash: 'abcd',
         attestation: 'server-attested',
+      },
+      loss: [],
+    })).toBe(false);
+    expect(isGeometryAgentContextCheckpoint({
+      ...result.checkpoint,
+      basis: {
+        lane: 'geogebra',
+        documentId: 'doc-2',
+        epoch: 'epoch-1',
+        revision: 0,
+        sourceHash: 'abcd',
+        semanticHash: 'bad\u0000hash',
+        attestation: 'client-declared',
       },
       loss: [],
     })).toBe(false);

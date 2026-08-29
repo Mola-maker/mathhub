@@ -7,6 +7,7 @@ import type { GeometryTransactionRequest } from '../ir/transactions';
 import { attestAiTransaction } from '../transactions/transaction-attestation';
 import type { SourceHashEvidence } from '../transactions/broker';
 import { compactGeometryConversationContext } from '@/lib/geometry/agent/conversation-context';
+import { buildGeometrySemanticSignature } from '@/lib/geometry/semantic-signature';
 import type {
   GeometryEvaluationCapability,
   GeometryEvaluationLane,
@@ -169,6 +170,7 @@ export function createLocalGeometryEvaluationAdapter(
             revision: snapshot.geometryDoc.basis.revision,
             sourceId: snapshot.geometryDoc.basis.sourceId,
             sourceHash: snapshot.geometryDoc.basis.sourceHash,
+            semanticHash: buildGeometrySemanticSignature(snapshot.geometryDoc).semanticHash,
             attestation: 'server-attested',
           },
           maxMessages: 4,
