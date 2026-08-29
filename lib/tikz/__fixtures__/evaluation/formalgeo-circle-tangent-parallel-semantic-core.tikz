@@ -1,0 +1,14 @@
+\begin{tikzpicture}
+\coordinate (O1) at (0,0);
+\coordinate (O2) at (3,0);
+\draw[name path=c1] (O1) circle[radius=3];
+\draw[name path=c2] (O2) circle[radius=3];
+\path[name intersections={of=c1 and c2}]
+  (intersection-1) coordinate (P)
+  (intersection-2) coordinate (Q);
+\draw (P) -- (Q);
+\coordinate (U) at ($(P)!1!90:(O1)$);
+\draw (P) -- (U);
+\coordinate (V) at ($(U)+(Q)-(P)$);
+\draw (Q) -- (V);
+\end{tikzpicture}

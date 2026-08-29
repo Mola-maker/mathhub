@@ -51,14 +51,19 @@ caches, fixtures, screenshots, or generated source.
 
 ## Implemented semantic core
 
-The first independently authored pair now covers the non-branch-ambiguous
+The extended independently authored pair covers the non-branch-ambiguous
 foundation of that chain: two center-radius circles, both named intersection
-outputs, and their common chord. TikZ `name path` records stay available as
-construction/source-binding helpers, while portable intersection relations
-target the real circle entities. The pair pins seven mathematical entities and
-three portable relations (two intersections and one segment incidence), and
-requires both the semantic and relation hashes to match GeoGebra.
+outputs, their common chord, a tangent derived by rotating one radius direction
+through 90 degrees, and a second segment whose direction is copied by vector
+translation. TikZ `name path` records and GeoGebra `Vector` commands stay
+available as construction/source-binding helpers without inflating portable
+entity coverage. Both adapters recover the same tangent and parallel
+constraints from ordinary source constructions rather than coordinate
+coincidence or managed metadata.
 
-Tangent, parallel, point-on-circle, circumcenter, and orthocenter parity remain
-future gates. This initial pair must not be described as validating the full
+The pair pins eleven mathematical entities, two portable constraints, and five
+portable relations (two intersections and three segment incidences), and
+requires both the semantic and relation hashes to match. An explicit
+point-on-circle constraint plus circumcenter and orthocenter parity remain
+future gates, so this pair still must not be described as validating the full
 IMO-derived dependency shape.

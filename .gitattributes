@@ -1,2 +1,3 @@
 lib/tikz/__fixtures__/**/*.json text eol=lf
 lib/tikz/__fixtures__/**/*.tikz text eol=lf
+lib/tikz/__fixtures__/**/*.ggb.txt text eol=lf

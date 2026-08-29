@@ -155,9 +155,9 @@ describe('geometry evaluation corpus', () => {
     expect(formalGeo?.localFixture.pairedSemanticFixture).toMatchObject({
       schemaVersion: 'geometry-evaluation-paired-semantic-fixture/v1',
       authorship: 'independently-authored',
-      minimumPortableEntityCount: 7,
-      minimumPortableConstraintCount: 0,
-      minimumPortableRelationCount: 3,
+      minimumPortableEntityCount: 11,
+      minimumPortableConstraintCount: 2,
+      minimumPortableRelationCount: 5,
       requireRelationMatch: true,
     });
   });

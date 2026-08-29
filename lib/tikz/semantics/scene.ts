@@ -75,6 +75,13 @@ export type ScenePointDefinition =
     angleDegrees: number;
   }
   | {
+    /** result = point + (to - from) */
+    kind: 'translate';
+    pointName: string;
+    fromName: string;
+    toName: string;
+  }
+  | {
     kind: 'reference';
     pointName: string;
   };
@@ -351,6 +358,14 @@ function pointDefinitionOf(expr: CoordExpr): ScenePointDefinition | undefined {
         scale: calc.t.value,
         angleDegrees: calc.angleDeg.value,
       }
+      : undefined;
+  }
+  if (calc.op === 'sub' && calc.left.op === 'add') {
+    const pointName = directCalcPointRef(calc.left.left);
+    const toName = directCalcPointRef(calc.left.right);
+    const fromName = directCalcPointRef(calc.right);
+    return pointName && fromName && toName
+      ? { kind: 'translate', pointName, fromName, toName }
       : undefined;
   }
   return undefined;

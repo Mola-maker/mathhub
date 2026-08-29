@@ -117,4 +117,36 @@ describe('TikZ derived coordinate semantic constraints', () => {
     expect(signature.coverage.relations.portable).toBe(3);
     expect(signature.canonical.entities).toHaveLength(7);
   });
+
+  it('infers tangent and parallel constraints from rotation and translation constructions', () => {
+    const source = String.raw`\begin{tikzpicture}
+\coordinate (O1) at (0,0);
+\coordinate (O2) at (3,0);
+\draw[name path=c1] (O1) circle[radius=3];
+\draw[name path=c2] (O2) circle[radius=3];
+\path[name intersections={of=c1 and c2}]
+  (intersection-1) coordinate (P)
+  (intersection-2) coordinate (Q);
+\draw (P) -- (Q);
+\coordinate (U) at ($(P)!1!90:(O1)$);
+\draw (P) -- (U);
+\coordinate (V) at ($(U)+(Q)-(P)$);
+\draw (Q) -- (V);
+\end{tikzpicture}`;
+    const document = geometryDoc(source);
+    const tangent = document.semantic.ir.constraints.find((item) => item.kind === 'tangent');
+    const parallel = document.semantic.ir.constraints.find((item) => item.kind === 'parallel');
+
+    expect(tangent?.arguments).toHaveLength(3);
+    expect(tangent?.arguments[1]?.entityId).toBe('point:P');
+    expect(tangent?.arguments[2]?.entityId).toMatch(/^element:/u);
+    expect(parallel?.arguments).toHaveLength(2);
+    expect(parallel?.arguments.every((argument) => argument.entityId?.startsWith('element:')))
+      .toBe(true);
+
+    const signature = buildGeometrySemanticSignature(document);
+    expect(signature.coverage.entities).toEqual({ portable: 11, total: 11 });
+    expect(signature.coverage.constraints).toEqual({ portable: 2, total: 2 });
+    expect(signature.coverage.relations.portable).toBe(5);
+  });
 });

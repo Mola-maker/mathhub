@@ -64,4 +64,40 @@ describe('projectGeogebraCommandsToGeometryDoc', () => {
     expect(result.geometryDoc.semantic.ir.entities).toHaveLength(1);
     expect(result.semanticSignature.comparable).toBe(false);
   });
+
+  it('infers tangent and parallel constraints from rotation and vector translation', () => {
+    const result = projectGeogebraCommandsToGeometryDoc({
+      identity,
+      commands: [
+        'O1=(0,0)',
+        'O2=(3,0)',
+        'c1=Circle(O1,3)',
+        'c2=Circle(O2,3)',
+        'P=Intersect(c1,c2,1)',
+        'Q=Intersect(c1,c2,2)',
+        'chord=Segment(P,Q)',
+        'U=Rotate(O1,90°,P)',
+        'tangentSegment=Segment(P,U)',
+        'dirPQ=Vector(P,Q)',
+        'V=Translate(U,dirPQ)',
+        'parallelSegment=Segment(Q,V)',
+      ],
+    });
+
+    expect(result.opaqueCommandCount).toBe(0);
+    expect(result.geometryDoc.semantic.status).toBe('complete');
+    expect(result.geometryDoc.semantic.ir.constraints.map((item) => item.kind))
+      .toEqual(expect.arrayContaining(['tangent', 'parallel']));
+    const vectorBinding = result.geometryDoc.construction.bindings.find((binding) => (
+      binding.kind === 'extension' && binding.payload.commandName === 'Vector'
+    ));
+    expect(vectorBinding?.targets).toEqual([]);
+    expect(result.geometryDoc.semantic.ir.entities.some((entity) => entity.name === 'dirPQ'))
+      .toBe(false);
+    expect(result.semanticSignature.coverage).toMatchObject({
+      entities: { portable: 11, total: 11 },
+      constraints: { portable: 2, total: 2 },
+      relations: { portable: 5 },
+    });
+  });
 });

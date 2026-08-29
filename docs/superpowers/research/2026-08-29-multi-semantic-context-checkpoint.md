@@ -132,14 +132,18 @@ the existing `GeometryDoc` truth lanes.
     - both assistants explicitly treat compacted dialogue as advisory: TikZ
       recovers from the current source projection, while GeoGebra recovers from
       the current broker command snapshot instead of resurrecting old fences.
-14. FormalGeo circle-intersection semantic core
+14. FormalGeo tangent-parallel semantic core
     - TikZ named-path aliases remain revision-bound construction helpers but no
       longer inflate renderer-neutral entity coverage;
     - named-intersection outputs now emit portable relations against the real
       circle/line entities, preserving source dependency bindings separately;
+    - source-derived quarter-turn radius constructions now normalize to a
+      portable tangent constraint in both TikZ and GeoGebra;
+    - vector-translation constructions now normalize to a portable parallel
+      constraint without promoting construction-only vector helpers;
     - an independently authored, SHA-256-pinned TikZ/GeoGebra pair requires
-      seven portable entities and three matching portable relations. Tangent
-      and parallel constraint parity remain deliberately pending.
+      eleven portable entities, two matching portable constraints, and five
+      matching portable relations.
 
 ## External benchmark evidence
 
@@ -197,7 +201,7 @@ stores only our own fixture and a pinned provenance URL.
    lossless binding-to-command patch planner is available.
 3. Extend the independently re-authored FormalGeo semantic core documented in
    `2026-08-30-formalgeo-imo-2025-circle-tangent-provenance.md` from its current
-   circle intersections/common chord into point-on-circle, tangent, parallel,
-   circumcenter, and orthocenter parity.
+   circle intersections, common chord, tangent, and parallel chain into an
+   explicit point-on-circle constraint plus circumcenter and orthocenter parity.
 4. Add explicit expiry/renewal policy for restore handles once a durable
    transcript store exists; continue emitting an empty handle list until then.

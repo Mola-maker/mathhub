@@ -633,7 +633,7 @@ describe('geometry evaluation runner', () => {
     }));
   });
 
-  it('matches the byte-pinned FormalGeo circle-intersection semantic core', async () => {
+  it('matches the byte-pinned FormalGeo tangent-parallel semantic core', async () => {
     const execute = vi.fn();
     const caseDefinition = GEOMETRY_EVALUATION_CORPUS.find((entry) => (
       entry.caseId === 'formalgeo-circle-tangent-chain'
@@ -652,18 +652,18 @@ describe('geometry evaluation runner', () => {
         sourceLanguage: 'tikz',
         comparable: true,
         coverage: {
-          entities: { portable: 7, total: 7 },
-          constraints: { portable: 0, total: 0 },
-          relations: { portable: 3 },
+          entities: { portable: 11, total: 11 },
+          constraints: { portable: 2, total: 2 },
+          relations: { portable: 5 },
         },
       },
       geogebra: {
         sourceLanguage: 'geogebra-command',
         comparable: true,
         coverage: {
-          entities: { portable: 7, total: 7 },
-          constraints: { portable: 0, total: 0 },
-          relations: { portable: 3 },
+          entities: { portable: 11, total: 11 },
+          constraints: { portable: 2, total: 2 },
+          relations: { portable: 5 },
         },
       },
       comparison: {

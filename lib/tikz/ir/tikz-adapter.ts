@@ -49,7 +49,7 @@ import { CONSTRUCTION_PLAN_FOOTPRINT_ABI_VERSION } from '../authoring/constructi
 import { CONSTRUCTION_CATALOG_DIGEST } from '../authoring/construction-catalog';
 
 export const TIKZ_SEMANTIC_ADAPTER_ID = 'mathgeo.tikz.semantic-adapter';
-export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.26.0';
+export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.27.0';
 export const TIKZ_PLUGIN_SET_DIGEST = [
   `${TIKZ_SEMANTIC_ADAPTER_ID}@${TIKZ_SEMANTIC_ADAPTER_VERSION}`,
   MANAGED_CONSTRUCTION_V3_ENVELOPE_SCHEMA,
@@ -232,6 +232,16 @@ function pointDefinitionExpression(point: ScenePoint): GeometryExpression | unde
           scale: definition.scale,
           angleDegrees: definition.angleDegrees,
         },
+      };
+    case 'translate':
+      return {
+        kind: 'operation',
+        operator: 'translate-by-vector',
+        arguments: [
+          pointReference(definition.pointName),
+          pointReference(definition.fromName),
+          pointReference(definition.toName),
+        ],
       };
   }
 }
@@ -688,6 +698,159 @@ function pathIntersectionRelations(
       sourceBindingIds: [`binding:${point.stableId}`],
       metadata: { source: 'tikz-name-intersections' },
     }];
+  });
+}
+
+function isQuarterTurn(angleDegrees: number): boolean {
+  const normalized = ((angleDegrees % 180) + 180) % 180;
+  return Math.abs(normalized - 90) <= 1e-9;
+}
+
+/**
+ * A segment from P to a 90-degree rotation of a circle's radius direction is
+ * a source-derived tangent, not a coordinate coincidence. The touch point must
+ * itself depend on that named circle path so the inference remains topological.
+ */
+function rotationDerivedTangentConstraints(
+  points: readonly ScenePoint[],
+  elements: readonly SceneElement[],
+  namedPathElements: ReadonlyMap<string, string>,
+): GeometryConstraint[] {
+  const pointsByName = new Map(points.map((point) => [point.name, point] as const));
+  const elementsById = new Map(elements.map((element) => [element.stableId, element] as const));
+  const seen = new Set<string>();
+  const result: GeometryConstraint[] = [];
+
+  for (const line of elements) {
+    if (line.kind !== 'polyline' || line.cycle || line.refs.length !== 2) continue;
+    for (const [touchName, directionName] of [
+      [line.refs[0]!, line.refs[1]!],
+      [line.refs[1]!, line.refs[0]!],
+    ] as const) {
+      const touch = pointsByName.get(touchName);
+      const direction = pointsByName.get(directionName);
+      const rotation = direction?.definition;
+      if (
+        !touch
+        || rotation?.kind !== 'rotate'
+        || rotation.centerName !== touchName
+        || Math.abs(rotation.scale) <= 1e-12
+        || !isQuarterTurn(rotation.angleDegrees)
+      ) continue;
+      const circleIds = [...new Set(touch.dependsOn.flatMap((dependency) => {
+        if (!dependency.startsWith('path:')) return [];
+        const elementId = namedPathElements.get(dependency.slice('path:'.length));
+        const element = elementId ? elementsById.get(elementId) : undefined;
+        return element?.kind === 'circle'
+          && element.definition?.centerName === rotation.pointName
+          ? [element.stableId]
+          : [];
+      }))];
+      if (circleIds.length !== 1) continue;
+      const key = `${line.stableId}\u0000${touch.stableId}\u0000${circleIds[0]}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push({
+        recordType: 'constraint',
+        id: `constraint:tangent:${line.stableId}:${touch.stableId}`,
+        kind: 'tangent',
+        strength: 'required',
+        enabled: true,
+        arguments: [
+          { role: 'line', entityId: line.stableId },
+          { role: 'touch-point', entityId: touch.stableId },
+          { role: 'circle', entityId: circleIds[0]! },
+        ],
+        sourceBindingIds: [`binding:${line.stableId}`],
+        metadata: { source: 'tikz-quarter-turn-radius' },
+      });
+    }
+  }
+  return result;
+}
+
+function unorderedPointPair(left: string, right: string): string {
+  return left.localeCompare(right) <= 0
+    ? `${left}\u0000${right}`
+    : `${right}\u0000${left}`;
+}
+
+/**
+ * If V = U + (Q - P), then segment QV copies segment PU's direction exactly.
+ * Preserve this construction fact as a portable parallel constraint.
+ */
+function translationDerivedParallelConstraints(
+  points: readonly ScenePoint[],
+  elements: readonly SceneElement[],
+): GeometryConstraint[] {
+  const pointsByName = new Map(points.map((point) => [point.name, point] as const));
+  const segmentsByEndpoints = new Map<string, SceneElement[]>();
+  for (const element of elements) {
+    if (element.kind !== 'polyline' || element.cycle || element.refs.length !== 2) continue;
+    const key = unorderedPointPair(element.refs[0]!, element.refs[1]!);
+    segmentsByEndpoints.set(key, [...(segmentsByEndpoints.get(key) ?? []), element]);
+  }
+  const seen = new Set<string>();
+  const result: GeometryConstraint[] = [];
+  for (const line of elements) {
+    if (line.kind !== 'polyline' || line.cycle || line.refs.length !== 2) continue;
+    for (const [throughName, translatedName] of [
+      [line.refs[0]!, line.refs[1]!],
+      [line.refs[1]!, line.refs[0]!],
+    ] as const) {
+      const definition = pointsByName.get(translatedName)?.definition;
+      if (definition?.kind !== 'translate' || definition.toName !== throughName) continue;
+      const referenceCandidates = segmentsByEndpoints.get(unorderedPointPair(
+        definition.fromName,
+        definition.pointName,
+      )) ?? [];
+      const references = referenceCandidates.filter((candidate) => (
+        candidate.stableId !== line.stableId
+      ));
+      if (references.length !== 1) continue;
+      const reference = references[0]!;
+      const key = [line.stableId, reference.stableId].sort().join('\u0000');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push({
+        recordType: 'constraint',
+        id: `constraint:parallel:${line.stableId}:${reference.stableId}`,
+        kind: 'parallel',
+        strength: 'required',
+        enabled: true,
+        arguments: [
+          { role: 'line', entityId: line.stableId },
+          { role: 'reference', entityId: reference.stableId },
+        ],
+        sourceBindingIds: [`binding:${line.stableId}`],
+        metadata: { source: 'tikz-vector-translation' },
+      });
+    }
+  }
+  return result;
+}
+
+function duplicatesManagedConstraint(
+  inferred: GeometryConstraint,
+  managed: readonly GeometryConstraint[],
+): boolean {
+  const inferredIds = inferred.arguments.flatMap((argument) => (
+    argument.entityId ? [argument.entityId] : []
+  ));
+  return managed.some((constraint) => {
+    const kind = constraint.kind === 'tangent-at-point' ? 'tangent' : constraint.kind;
+    if (kind !== inferred.kind) return false;
+    const managedIds = constraint.arguments.flatMap((argument) => (
+      argument.entityId ? [argument.entityId] : []
+    ));
+    if (kind === 'tangent') {
+      return inferredIds.every((entityId, index) => managedIds[index] === entityId);
+    }
+    if (kind === 'parallel') {
+      return inferredIds.length === managedIds.length
+        && inferredIds.every((entityId) => managedIds.includes(entityId));
+    }
+    return false;
   });
 }
 
@@ -2473,6 +2636,10 @@ export function projectTikzAnalysisToGeometryTruth(
   const entitiesById = new Map(
     entities.map((entity) => [entity.id, entity] as const),
   );
+  const inferredConstraints = [
+    ...rotationDerivedTangentConstraints(points, elements, namedPathElements),
+    ...translationDerivedParallelConstraints(points, elements),
+  ].filter((constraint) => !duplicatesManagedConstraint(constraint, managed.constraints));
   const constraints = [
     ...pointConstraints(points, pointIdsByName).filter((constraint) => {
       // Inferred constraints always place their constrained/result entity
@@ -2482,6 +2649,7 @@ export function projectTikzAnalysisToGeometryTruth(
       return !constrainedEntityId
         || !managed.constrainedPointIds.has(constrainedEntityId);
     }),
+    ...inferredConstraints,
     ...managed.constraints,
   ];
   const relations = [
