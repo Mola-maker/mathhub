@@ -7,6 +7,8 @@ export const GEOGEBRA_COMMAND_TRANSACTION_SCHEMA_VERSION =
   'geogebra-command-transaction/v1' as const;
 export const GEOGEBRA_APPLIED_SCRIPT_RECEIPT_SCHEMA_VERSION =
   'geogebra-applied-script-receipt/v1' as const;
+export const GEOGEBRA_OBSERVED_COMMAND_SNAPSHOT_RECEIPT_SCHEMA_VERSION =
+  'geogebra-observed-command-snapshot-receipt/v1' as const;
 export const GEOGEBRA_COMMAND_SNAPSHOT_SCHEMA_VERSION =
   'geogebra-command-snapshot/v1' as const;
 
@@ -47,6 +49,16 @@ export interface GeogebraAppliedScriptReceipt {
   readonly appliedAt: number;
 }
 
+export interface GeogebraObservedCommandSnapshotReceipt {
+  readonly schemaVersion: typeof GEOGEBRA_OBSERVED_COMMAND_SNAPSHOT_RECEIPT_SCHEMA_VERSION;
+  readonly transactionId: string;
+  readonly candidateSourceHash: string;
+  readonly commandCount: number;
+  readonly objectCount: number;
+  readonly complete: true;
+  readonly observedAt: number;
+}
+
 export interface GeogebraCommandSnapshot {
   readonly schemaVersion: typeof GEOGEBRA_COMMAND_SNAPSHOT_SCHEMA_VERSION;
   readonly commands: readonly string[];
@@ -64,6 +76,7 @@ export interface GeogebraCommandTransactionRecord {
   readonly beforeSourceHash: string;
   readonly afterSourceHash: string;
   readonly semanticHash: string;
+  readonly evidence: 'applied-script' | 'observed-live-snapshot';
   readonly committedAt: number;
 }
 
@@ -87,6 +100,7 @@ export type GeogebraCommandBrokerResult =
       | 'patch-precondition-failed'
       | 'idempotency-conflict'
       | 'applied-receipt-mismatch'
+      | 'observed-receipt-mismatch'
       | 'projection-failed';
     readonly message: string;
     readonly currentRevision: number;
@@ -204,7 +218,7 @@ function validTransaction(request: GeogebraCommandTransaction): boolean {
     && request.patches.every(validPatch);
 }
 
-function validReceipt(receipt: GeogebraAppliedScriptReceipt): boolean {
+function validAppliedReceipt(receipt: GeogebraAppliedScriptReceipt): boolean {
   return receipt.schemaVersion === GEOGEBRA_APPLIED_SCRIPT_RECEIPT_SCHEMA_VERSION
     && IDENTIFIER.test(receipt.transactionId)
     && typeof receipt.candidateSourceHash === 'string'
@@ -218,6 +232,23 @@ function validReceipt(receipt: GeogebraAppliedScriptReceipt): boolean {
     && receipt.failureCount === 0
     && Number.isSafeInteger(receipt.appliedAt)
     && receipt.appliedAt > 0;
+}
+
+function validObservedReceipt(receipt: GeogebraObservedCommandSnapshotReceipt): boolean {
+  return receipt.schemaVersion === GEOGEBRA_OBSERVED_COMMAND_SNAPSHOT_RECEIPT_SCHEMA_VERSION
+    && IDENTIFIER.test(receipt.transactionId)
+    && typeof receipt.candidateSourceHash === 'string'
+    && receipt.candidateSourceHash.length > 0
+    && receipt.candidateSourceHash.length <= 256
+    && Number.isSafeInteger(receipt.commandCount)
+    && receipt.commandCount >= 0
+    && receipt.commandCount <= MAX_COMMANDS
+    && Number.isSafeInteger(receipt.objectCount)
+    && receipt.objectCount >= 0
+    && receipt.objectCount <= MAX_COMMANDS
+    && receipt.complete === true
+    && Number.isSafeInteger(receipt.observedAt)
+    && receipt.observedAt > 0;
 }
 
 function cloneSnapshot(snapshot: GeogebraCommandSnapshot): GeogebraCommandSnapshot {
@@ -281,6 +312,43 @@ export function createGeogebraAppliedScriptReceipt(input: {
   };
 }
 
+export function createGeogebraObservedCommandSnapshotReceipt(input: {
+  readonly transactionId: string;
+  readonly snapshot: {
+    readonly complete: boolean;
+    readonly commands: readonly string[];
+    readonly sourceHash: string;
+    readonly objectCount: number;
+  };
+  readonly observedAt?: number;
+}): GeogebraObservedCommandSnapshotReceipt | null {
+  const observedAt = input.observedAt ?? Date.now();
+  if (
+    !IDENTIFIER.test(input.transactionId)
+    || input.snapshot.complete !== true
+    || !validCommands(input.snapshot.commands)
+    || input.snapshot.sourceHash !== geogebraCommandSourceHash(input.snapshot.commands)
+    || !Number.isSafeInteger(input.snapshot.objectCount)
+    || input.snapshot.objectCount < 0
+    || input.snapshot.objectCount > MAX_COMMANDS
+    || !Number.isSafeInteger(observedAt)
+    || observedAt <= 0
+  ) return null;
+  return {
+    schemaVersion: GEOGEBRA_OBSERVED_COMMAND_SNAPSHOT_RECEIPT_SCHEMA_VERSION,
+    transactionId: input.transactionId,
+    candidateSourceHash: input.snapshot.sourceHash,
+    commandCount: input.snapshot.commands.length,
+    objectCount: input.snapshot.objectCount,
+    complete: true,
+    observedAt,
+  };
+}
+
+type GeogebraCommitEvidence =
+  | { readonly kind: 'applied-script'; readonly receipt: GeogebraAppliedScriptReceipt }
+  | { readonly kind: 'observed-live-snapshot'; readonly receipt: GeogebraObservedCommandSnapshotReceipt };
+
 export class GeogebraCommandTransactionBroker {
   readonly #records = new Map<string, GeogebraCommandTransactionRecord>();
   #snapshot: GeogebraCommandSnapshot;
@@ -316,6 +384,22 @@ export class GeogebraCommandTransactionBroker {
   commitApplied(
     request: GeogebraCommandTransaction,
     receipt: GeogebraAppliedScriptReceipt,
+    coordOf?: (name: string) => { x: number; y: number } | null,
+  ): GeogebraCommandBrokerResult {
+    return this.#commit(request, { kind: 'applied-script', receipt }, coordOf);
+  }
+
+  commitObserved(
+    request: GeogebraCommandTransaction,
+    receipt: GeogebraObservedCommandSnapshotReceipt,
+    coordOf?: (name: string) => { x: number; y: number } | null,
+  ): GeogebraCommandBrokerResult {
+    return this.#commit(request, { kind: 'observed-live-snapshot', receipt }, coordOf);
+  }
+
+  #commit(
+    request: GeogebraCommandTransaction,
+    evidence: GeogebraCommitEvidence,
     coordOf?: (name: string) => { x: number; y: number } | null,
   ): GeogebraCommandBrokerResult {
     const current = this.#snapshot;
@@ -368,13 +452,19 @@ export class GeogebraCommandTransactionBroker {
       return reject('conflict', 'patch-precondition-failed', 'GeoGebra command patch precondition failed.');
     }
     const candidateSourceHash = geogebraCommandSourceHash(candidate);
-    if (
-      !validReceipt(receipt)
-      || receipt.transactionId !== request.transactionId
-      || receipt.candidateSourceHash !== candidateSourceHash
-      || receipt.commandCount !== candidate.length
-    ) {
-      return reject('rejected', 'applied-receipt-mismatch', 'Host-applied GeoGebra receipt does not match the candidate script.');
+    const receiptMatches = evidence.kind === 'applied-script'
+      ? validAppliedReceipt(evidence.receipt)
+        && evidence.receipt.transactionId === request.transactionId
+        && evidence.receipt.candidateSourceHash === candidateSourceHash
+        && evidence.receipt.commandCount === candidate.length
+      : validObservedReceipt(evidence.receipt)
+        && evidence.receipt.transactionId === request.transactionId
+        && evidence.receipt.candidateSourceHash === candidateSourceHash
+        && evidence.receipt.commandCount === candidate.length;
+    if (!receiptMatches) {
+      return evidence.kind === 'applied-script'
+        ? reject('rejected', 'applied-receipt-mismatch', 'Host-applied GeoGebra receipt does not match the candidate script.')
+        : reject('rejected', 'observed-receipt-mismatch', 'Observed GeoGebra snapshot receipt does not match the candidate command source.');
     }
     let projection: ReturnType<typeof projectGeogebraCommandsToGeometryDoc>;
     try {
@@ -407,7 +497,10 @@ export class GeogebraCommandTransactionBroker {
       beforeSourceHash: basis.sourceHash,
       afterSourceHash: projection.geometryDoc.basis.sourceHash,
       semanticHash: projection.semanticSignature.semanticHash,
-      committedAt: receipt.appliedAt,
+      evidence: evidence.kind,
+      committedAt: evidence.kind === 'applied-script'
+        ? evidence.receipt.appliedAt
+        : evidence.receipt.observedAt,
     };
     this.#snapshot = {
       schemaVersion: GEOGEBRA_COMMAND_SNAPSHOT_SCHEMA_VERSION,

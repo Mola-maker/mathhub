@@ -65,7 +65,7 @@ interface ProjectedDefinition {
 }
 
 const STYLE_COMMAND =
-  /^(SetColor|SetCaption|ShowLabel|SetLineThickness|SetPointSize|SetLineStyle)\s*\(([\s\S]*)\)\s*$/u;
+  /^(SetColor|SetCaption|ShowLabel|SetLineThickness|SetPointSize|SetLineStyle|SetVisibleInView)\s*\(([\s\S]*)\)\s*$/u;
 const ENTITY_NAME = /^[A-Za-z_][\w']*$/u;
 
 function sourceStatements(commands: readonly string[]): { source: string; statements: SourceStatement[] } {
@@ -201,8 +201,9 @@ function extensionBinding(input: {
     role: input.role,
     targets: input.targets,
     source: sourceReference(input.source, input.statement),
-    // Math Studio has no source transaction broker yet. Read projection is
-    // useful now; write authority remains fail-closed until that broker lands.
+    // The whole command list has a CAS broker, but a single extension binding
+    // has no binding-to-command patch planner yet. Keep per-binding writes
+    // fail-closed instead of pretending a semantic edit is lossless.
     writable: false,
     payload,
   };
@@ -217,6 +218,10 @@ function styleProperties(commandName: string, args: readonly string[]): JsonObje
     case 'SetLineThickness': return { lineThickness: Number(value[0]) || 0 };
     case 'SetPointSize': return { pointSize: Number(value[0]) || 0 };
     case 'SetLineStyle': return { lineStyle: Number(value[0]) || 0 };
+    case 'SetVisibleInView': return {
+      view: Number(value[0]) || 1,
+      visible: /^true$/iu.test(value[1] ?? ''),
+    };
     default: return { values: value };
   }
 }

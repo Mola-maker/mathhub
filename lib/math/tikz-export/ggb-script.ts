@@ -88,7 +88,7 @@ export function parseGgbScript(
     if (!line) continue;
 
     // styling commands modify an already-seen object
-    const sm = line.match(/^(SetColor|SetCaption|ShowLabel|SetLineThickness|SetPointSize|SetLineStyle)\s*\(([\s\S]*)\)\s*$/);
+    const sm = line.match(/^(SetColor|SetCaption|ShowLabel|SetLineThickness|SetPointSize|SetLineStyle|SetVisibleInView)\s*\(([\s\S]*)\)\s*$/);
     if (sm) {
       const [, fn, inner] = sm;
       const args = splitTopLevelArgs(inner);
@@ -99,6 +99,7 @@ export function parseGgbScript(
         else if (fn === 'ShowLabel') target.labelVisible = /true/i.test(args[1]);
         else if (fn === 'SetLineThickness') target.thickness = parseFloat(args[1]) || undefined;
         else if (fn === 'SetLineStyle') target.dashed = (parseFloat(args[1]) || 0) !== 0;
+        else if (fn === 'SetVisibleInView') target.visible = /true/i.test(args[2] ?? '');
       }
       continue;
     }

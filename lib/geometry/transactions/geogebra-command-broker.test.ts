@@ -3,6 +3,7 @@ import {
   GEOGEBRA_APPLIED_SCRIPT_RECEIPT_SCHEMA_VERSION,
   GeogebraCommandTransactionBroker,
   createGeogebraAppliedScriptReceipt,
+  createGeogebraObservedCommandSnapshotReceipt,
   createGeogebraReplaceScriptTransaction,
   geogebraCommandSourceHash,
   type GeogebraAppliedScriptReceipt,
@@ -164,6 +165,46 @@ describe('GeogebraCommandTransactionBroker', () => {
       commands,
       successfulCommandCount: commands.length - 1,
       failureCount: 1,
+    })).toBeNull();
+  });
+
+  it('commits a complete independently observed live command snapshot', () => {
+    const target = broker();
+    const request = createGeogebraReplaceScriptTransaction({
+      snapshot: target.snapshot(),
+      commands,
+      transactionId: 'transaction-observed',
+      origin: 'canvas',
+    });
+    const observed = createGeogebraObservedCommandSnapshotReceipt({
+      transactionId: request.transactionId,
+      snapshot: {
+        complete: true,
+        commands,
+        sourceHash: geogebraCommandSourceHash(commands),
+        objectCount: 3,
+      },
+      observedAt: 1_800_000_000_000,
+    });
+
+    expect(observed).not.toBeNull();
+    expect(target.commitObserved(request, observed!)).toMatchObject({
+      ok: true,
+      status: 'committed',
+      record: { evidence: 'observed-live-snapshot' },
+      snapshot: { commands },
+    });
+  });
+
+  it('refuses to mint an observed receipt for an incomplete snapshot', () => {
+    expect(createGeogebraObservedCommandSnapshotReceipt({
+      transactionId: 'transaction-observed-incomplete',
+      snapshot: {
+        complete: false,
+        commands,
+        sourceHash: geogebraCommandSourceHash(commands),
+        objectCount: 3,
+      },
     })).toBeNull();
   });
 });

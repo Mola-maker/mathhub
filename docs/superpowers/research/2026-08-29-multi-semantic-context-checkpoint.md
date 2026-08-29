@@ -86,7 +86,23 @@ the existing `GeometryDoc` truth lanes.
       hosted `deployggb.js`; it does not weaken the ECS production boundary;
     - React is deduplicated across the root and `mathhub` workspaces, and the
       desktop-first board disables automatic virtual-keyboard focus so the
-      construction surface is unobstructed.
+       construction surface is unobstructed.
+11. Native GeoGebra mutation transaction bridge
+    - official add/remove/update/rename/clear/client listeners mark the canvas
+      dirty; high-frequency drags are debounced and `dragEnd` is the preferred
+      commit boundary;
+    - a live construction is serialized with non-localized command strings,
+      bounded presentation commands and literal fallbacks only for genuinely
+      free points or scalar values;
+    - missing derived definitions make the observation incomplete. The host
+      restores the previous broker snapshot instead of accepting evaluated
+      coordinates as invented construction truth;
+    - native observations use a separate complete-snapshot receipt, then pass
+      through the same document/epoch/source/revision/hash CAS boundary as AI
+      scripts. AI render, repair, step replay and reset suppress their own
+      applet events so they cannot create duplicate commits;
+    - clearing chat no longer clears the canvas broker. Reset canvas is itself
+      a revisioned empty-snapshot transaction.
 
 ## External benchmark evidence
 
@@ -122,6 +138,12 @@ by the static preview instead of CSS-masking the applet keyboard:
 - <https://geogebra.github.io/docs/reference/en/GeoGebra_Apps_Embedding/>
 - <https://geogebra.github.io/docs/reference/en/GeoGebra_App_Parameters/>
 
+The Apps API additionally defines the listener pairs used by the native bridge,
+the non-localized `getCommandString(name, false)` serialization surface and the
+`dragEnd` client event used as the stable drag boundary:
+
+- <https://geogebra.github.io/docs/reference/en/GeoGebra_Apps_API/>
+
 ## Rights and admission boundary
 
 FormalGeo is still `research-reference-only`. Its current repository notice
@@ -134,8 +156,8 @@ stores only our own fixture and a pinned provenance URL.
 
 1. Move the neutral IR out of `lib/tikz/ir` after import-graph measurement;
    keep compatibility re-exports during the migration.
-2. Promote selected GeoGebra bindings from read-only only after native toolbar
-   mutations can be serialized back through the same command CAS boundary.
+2. Promote selected GeoGebra bindings from read-only only after a bounded,
+   lossless binding-to-command patch planner is available.
 3. Add cross-renderer long-horizon fixtures backed by independently authored
    TikZ and GeoGebra sources, rather than the current remapped semantic unit
    fixture.

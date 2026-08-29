@@ -45,9 +45,21 @@ import {
   type GeometryAgentContextCheckpoint,
 } from '@/lib/geometry/agent/conversation-context';
 import {
+  captureGeogebraLiveCommandSnapshot,
+  type GeogebraLiveCommandReader,
+} from '@/lib/geometry/adapters/geogebra-live-command-snapshot';
+import {
+  subscribeGeogebraLiveMutations,
+  type GeogebraLiveMutationApi,
+  type GeogebraLiveMutationEvent,
+  type GeogebraLiveMutationSubscription,
+} from '@/lib/geometry/adapters/geogebra-live-events';
+import {
   GeogebraCommandTransactionBroker,
   createGeogebraAppliedScriptReceipt,
+  createGeogebraObservedCommandSnapshotReceipt,
   createGeogebraReplaceScriptTransaction,
+  type GeogebraCommandSnapshot,
 } from '@/lib/geometry/transactions/geogebra-command-broker';
 
 type Provider = 'relay';
@@ -57,7 +69,12 @@ type ModelRow = { id: string; label: string };
 const MODEL_STORAGE_KEY = 'math-studio-draw-model';
 const MSG_VISIBLE = 12;
 
-type GGBApi = GgbApiLike & {
+function randomId(): string {
+  return globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+type GGBApi = GgbApiLike & GeogebraLiveMutationApi & {
   setErrorDialogsActive?: (flag: boolean) => void;
   setSize?: (w: number, h: number) => void;
   recalculateEnvironments?: () => void;
@@ -67,13 +84,16 @@ type GGBApi = GgbApiLike & {
   // only types the write/eval surface the renderer needs).
   getAllObjectNames?: () => string[];
   getObjectType?: (name: string) => string;
-  getCommandString?: (name: string) => string;
+  getCommandString?: (name: string, useLocalizedInput?: boolean) => string;
   getXcoord?: (name: string) => number;
   getYcoord?: (name: string) => number;
   getColor?: (name: string) => string;
   getLineThickness?: (name: string) => number;
   getLineStyle?: (name: string) => number;
+  getPointSize?: (name: string) => number;
+  getValue?: (name: string) => number;
   getVisible?: (name: string) => boolean;
+  exists?: (name: string) => boolean;
   isDefined?: (name: string) => boolean;
   getCaption?: (name: string) => string;
   getLabelVisible?: (name: string) => boolean;
@@ -204,6 +224,37 @@ type GeogebraProjectionSummary = {
   semanticComparable: boolean;
 };
 
+function projectionSummary(snapshot: GeogebraCommandSnapshot): GeogebraProjectionSummary {
+  const projection = snapshot.geometryDoc;
+  return {
+    documentId: projection.basis.documentId,
+    epoch: projection.basis.epoch,
+    revision: projection.basis.revision,
+    sourceId: projection.basis.sourceId!,
+    sourceHash: projection.basis.sourceHash,
+    status: projection.semantic.status,
+    entities: projection.semantic.ir.entities.length,
+    opaqueCommands: projection.construction.opaqueNodes.length,
+    semanticHash: snapshot.semanticSignature.semanticHash,
+    semanticComparable: snapshot.semanticSignature.comparable,
+  };
+}
+
+function appletCoordOf(api: GGBApi, name: string): { x: number; y: number } | null {
+  try {
+    const x = api.getXcoord?.(name);
+    const y = api.getYcoord?.(name);
+    return typeof x === 'number'
+      && Number.isFinite(x)
+      && typeof y === 'number'
+      && Number.isFinite(y)
+      ? { x, y }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function MathStudio({
   startOpen = false,
   staticPreview = false,
@@ -296,6 +347,12 @@ export function MathStudio({
   const lastSuccessfulRef = useRef<string[]>([]);
   /** Revision/source-hash CAS owner for the durable GeoGebra command truth. */
   const geometryBrokerRef = useRef<GeogebraCommandTransactionBroker | null>(null);
+  /** Prevent our own replay/repair/reset calls from being mistaken for toolbar edits. */
+  const nativeMutationSuppressionRef = useRef(0);
+  const nativeMutationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nativeMutationSubscriptionRef = useRef<GeogebraLiveMutationSubscription | null>(null);
+  const nativeMutationHandlerRef = useRef<(event: GeogebraLiveMutationEvent) => void>(() => {});
+  const stepIndexRef = useRef<number | null>(null);
   const runRenderRef = useRef<(cmds: string[], ctx: { problem: string; drawingCommand: DrawingCommand }) => void>(() => {});
   const lastRenderCtxRef = useRef<{ problem: string; drawingCommand: DrawingCommand }>({ problem: '', drawingCommand: 'draw' });
   const sendingRef = useRef(false);
@@ -336,6 +393,138 @@ export function MathStudio({
     api.setSize(w, h);
     api.recalculateEnvironments?.();
   }, [measureCanvas, perfMode]);
+
+  const runWithNativeMutationSuppressed = useCallback(async <T,>(
+    action: () => T | Promise<T>,
+  ): Promise<T> => {
+    if (nativeMutationTimerRef.current) {
+      clearTimeout(nativeMutationTimerRef.current);
+      nativeMutationTimerRef.current = null;
+    }
+    nativeMutationSuppressionRef.current += 1;
+    try {
+      return await action();
+    } finally {
+      // GeoGebra can deliver update events after evalCommand/newConstruction
+      // returns. Keep the guard through the next task, then refresh listeners.
+      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+      nativeMutationSuppressionRef.current = Math.max(0, nativeMutationSuppressionRef.current - 1);
+      if (nativeMutationSuppressionRef.current === 0) {
+        nativeMutationSubscriptionRef.current?.refresh();
+      }
+    }
+  }, []);
+
+  const publishGeogebraSnapshot = useCallback((
+    broker: GeogebraCommandTransactionBroker,
+    snapshot: GeogebraCommandSnapshot,
+  ) => {
+    geometryBrokerRef.current = broker;
+    lastSuccessfulRef.current = [...snapshot.commands];
+    setGeometryProjection(projectionSummary(snapshot));
+    setScriptVersion((version) => version + 1);
+  }, []);
+
+  const restoreGeogebraSnapshot = useCallback(async (
+    api: GGBApi,
+    snapshot: GeogebraCommandSnapshot,
+  ): Promise<void> => {
+    await runWithNativeMutationSuppressed(() => {
+      clearGgbConstruction(api);
+      const restored = runGeometryScript(api, [...snapshot.commands]);
+      if (restored.failures.length > 0) {
+        throw new Error(`恢复失败：${restored.failures[0]?.cmd ?? 'unknown command'}`);
+      }
+      api.recalculateEnvironments?.();
+    });
+  }, [runWithNativeMutationSuppressed]);
+
+  const commitLiveMutation = useCallback(async (event: GeogebraLiveMutationEvent) => {
+    if (nativeMutationSuppressionRef.current > 0) return;
+    const api = apiRef.current;
+    if (!api || typeof api.getAllObjectNames !== 'function') return;
+    const broker = geometryBrokerRef.current ?? new GeogebraCommandTransactionBroker({
+      documentId: `math-studio-${randomId()}`,
+      epoch: `epoch-${randomId()}`,
+    });
+    const before = broker.snapshot();
+
+    if (stepIndexRef.current !== null) {
+      try {
+        await restoreGeogebraSnapshot(api, before);
+        setError('步骤预览是只读视图；已恢复完整画板。请先退出步骤预览再编辑。');
+      } catch (restoreError) {
+        setError(`步骤预览恢复失败：${restoreError instanceof Error ? restoreError.message : 'unknown error'}`);
+      }
+      return;
+    }
+
+    try {
+      const observed = captureGeogebraLiveCommandSnapshot(api as GeogebraLiveCommandReader);
+      if (!observed.complete) {
+        const exclusion = observed.exclusions[0];
+        throw new Error(
+          exclusion
+            ? `${exclusion.objectName} (${exclusion.objectType})：${exclusion.reason}`
+            : '画布快照不完整',
+        );
+      }
+      const unchanged = observed.commands.length === before.commands.length
+        && observed.commands.every((command, index) => command === before.commands[index]);
+      if (unchanged) return;
+
+      const transactionId = `transaction-${randomId()}`;
+      const transaction = createGeogebraReplaceScriptTransaction({
+        snapshot: before,
+        commands: observed.commands,
+        transactionId,
+        origin: 'canvas',
+      });
+      const receipt = createGeogebraObservedCommandSnapshotReceipt({
+        transactionId,
+        snapshot: observed,
+      });
+      if (!receipt) throw new Error('原生画布观察收据不完整。');
+      const committed = broker.commitObserved(
+        transaction,
+        receipt,
+        (name) => appletCoordOf(api, name),
+      );
+      if (!committed.ok) throw new Error(`${committed.code}: ${committed.message}`);
+      publishGeogebraSnapshot(broker, committed.snapshot);
+      setError((current) => current.startsWith('原生画布') ? '' : current);
+    } catch (commitError) {
+      try {
+        await restoreGeogebraSnapshot(api, before);
+      } catch (restoreError) {
+        setError(
+          `原生画布变更未提交，且恢复失败：${restoreError instanceof Error ? restoreError.message : 'unknown error'}`,
+        );
+        return;
+      }
+      setError(
+        `原生画布变更未提交，已恢复到 r${before.geometryDoc.basis.revision}（${event.kind}）：${commitError instanceof Error ? commitError.message : 'unknown broker error'}`,
+      );
+    }
+  }, [publishGeogebraSnapshot, restoreGeogebraSnapshot]);
+
+  const scheduleLiveMutation = useCallback((event: GeogebraLiveMutationEvent) => {
+    if (nativeMutationSuppressionRef.current > 0) return;
+    if (nativeMutationTimerRef.current) clearTimeout(nativeMutationTimerRef.current);
+    const delay = event.kind === 'drag-end' ? 24 : event.kind === 'update' ? 260 : 80;
+    nativeMutationTimerRef.current = setTimeout(() => {
+      nativeMutationTimerRef.current = null;
+      void commitLiveMutation(event);
+    }, delay);
+  }, [commitLiveMutation]);
+
+  useEffect(() => { nativeMutationHandlerRef.current = scheduleLiveMutation; }, [scheduleLiveMutation]);
+  useEffect(() => { stepIndexRef.current = stepIndex; }, [stepIndex]);
+  useEffect(() => () => {
+    nativeMutationSubscriptionRef.current?.dispose();
+    nativeMutationSubscriptionRef.current = null;
+    if (nativeMutationTimerRef.current) clearTimeout(nativeMutationTimerRef.current);
+  }, []);
 
   const loadProviderModels = useCallback(async (p: Provider) => {
     const reqId = ++modelsReqRef.current;
@@ -534,7 +723,7 @@ export function MathStudio({
       } catch { return []; }
     };
 
-    const outcome = await renderWithRepair({
+    const outcome = await runWithNativeMutationSuppressed(() => renderWithRepair({
       api,
       commands,
       clear: () => clearGgbConstruction(api),
@@ -565,13 +754,11 @@ export function MathStudio({
         } catch { return []; }
       },
       maxRepairs: 2,
-    });
+    }));
 
     setGgbEvalStats({ ran: outcome.result.ran, total: outcome.result.total });
     setGgbRepairs(outcome.repairs);
     if (outcome.result.failures.length === 0 && outcome.commands.length > 0) {
-      const randomId = () => globalThis.crypto?.randomUUID?.()
-        ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const broker = geometryBrokerRef.current ?? new GeogebraCommandTransactionBroker({
         documentId: `math-studio-${randomId()}`,
         epoch: `epoch-${randomId()}`,
@@ -592,55 +779,44 @@ export function MathStudio({
           failureCount: outcome.result.failures.length,
         });
         if (!receipt) throw new Error('GeoGebra execution receipt was incomplete.');
-        const committed = broker.commitApplied(transaction, receipt, (name) => {
-          try {
-            const x = api.getXcoord?.(name);
-            const y = api.getYcoord?.(name);
-            return typeof x === 'number'
-              && Number.isFinite(x)
-              && typeof y === 'number'
-              && Number.isFinite(y)
-              ? { x, y }
-              : null;
-          } catch {
-            return null;
-          }
-        });
+        const committed = broker.commitApplied(
+          transaction,
+          receipt,
+          (name) => appletCoordOf(api, name),
+        );
         if (!committed.ok) {
           throw new Error(`${committed.code}: ${committed.message}`);
         }
-        geometryBrokerRef.current = broker;
-        lastSuccessfulRef.current = [...committed.snapshot.commands];
-        const projection = committed.snapshot.geometryDoc;
-        setGeometryProjection({
-          documentId: projection.basis.documentId,
-          epoch: projection.basis.epoch,
-          revision: projection.basis.revision,
-          sourceId: projection.basis.sourceId!,
-          sourceHash: projection.basis.sourceHash,
-          status: projection.semantic.status,
-          entities: projection.semantic.ir.entities.length,
-          opaqueCommands: projection.construction.opaqueNodes.length,
-          semanticHash: committed.snapshot.semanticSignature.semanticHash,
-          semanticComparable: committed.snapshot.semanticSignature.comparable,
-        });
-        setScriptVersion((v) => v + 1);
+        publishGeogebraSnapshot(broker, committed.snapshot);
         setError((prev) => (prev.startsWith('GeoGebra') ? '' : prev));
       } catch (commitError) {
-        clearGgbConstruction(api);
-        const restored = runGeometryScript(api, [...before.commands], fallbacks);
-        setGgbEvalStats({ ran: restored.ran, total: restored.total });
+        try {
+          await restoreGeogebraSnapshot(api, before);
+        } catch { /* the broker remains authoritative; surface the original commit error */ }
         setError(
           `语义事务未提交，画布已恢复到 r${before.geometryDoc.basis.revision}：${commitError instanceof Error ? commitError.message : 'unknown broker error'}`,
         );
       }
     } else if (outcome.result.failures.length > 0) {
+      const durable = geometryBrokerRef.current?.snapshot();
+      try {
+        if (durable) await restoreGeogebraSnapshot(api, durable);
+        else await runWithNativeMutationSuppressed(() => clearGgbConstruction(api));
+      } catch { /* keep the durable broker snapshot unchanged and report execution failure */ }
       const f = outcome.result.failures[0];
       setError(`GeoGebra：${outcome.result.ran}/${outcome.result.total} 条成功${outcome.repairs ? `（纠错 ${outcome.repairs} 次）` : ''}。例：${f.cmd} → ${f.error}`);
     }
     api.recalculateEnvironments?.();
     requestAnimationFrame(() => fitApplet());
-  }, [provider, selectedModel, streamMath, fitApplet]);
+  }, [
+    provider,
+    selectedModel,
+    streamMath,
+    fitApplet,
+    publishGeogebraSnapshot,
+    restoreGeogebraSnapshot,
+    runWithNativeMutationSuppressed,
+  ]);
 
   useEffect(() => { runRenderRef.current = runRenderInApplet; }, [runRenderInApplet]);
 
@@ -674,6 +850,8 @@ export function MathStudio({
     const fail = () => {
       if (cancelled) return;
       if (timer) clearTimeout(timer);
+      nativeMutationSubscriptionRef.current?.dispose();
+      nativeMutationSubscriptionRef.current = null;
       apiRef.current = null;
       document.getElementById(GGB_CONTAINER_ID)?.replaceChildren();
       if (ggbAttempt + 1 < ggbSources.length) setGgbAttempt(ggbAttempt + 1);
@@ -708,6 +886,11 @@ export function MathStudio({
             if (cancelled) return;
             if (timer) clearTimeout(timer);
             apiRef.current = api;
+            nativeMutationSubscriptionRef.current?.dispose();
+            nativeMutationSubscriptionRef.current = subscribeGeogebraLiveMutations(
+              api,
+              (event) => nativeMutationHandlerRef.current(event),
+            );
             try { api.setErrorDialogsActive?.(false); } catch { /* older bundle */ }
             setGgbReady(true);
             setGgbDrawReady(false);
@@ -754,6 +937,8 @@ export function MathStudio({
   }, [studioOpen]);
 
   const retryGgb = useCallback(() => {
+    nativeMutationSubscriptionRef.current?.dispose();
+    nativeMutationSubscriptionRef.current = null;
     setGgbError(null);
     setGgbReady(false);
     setGgbDrawReady(false);
@@ -822,14 +1007,14 @@ export function MathStudio({
   const resetCanvas = useCallback(() => {
     const api = apiRef.current;
     pendingCommandsRef.current = null;
-    lastSuccessfulRef.current = [];
     setGgbEvalStats(null);
     setGgbRepairs(0);
-    setGeometryProjection(null);
-    geometryBrokerRef.current = null;
     if (!api) return;
-    clearGgbConstruction(api);
-  }, []);
+    void (async () => {
+      await runWithNativeMutationSuppressed(() => clearGgbConstruction(api));
+      await commitLiveMutation({ kind: 'clear', objectNames: [] });
+    })();
+  }, [commitLiveMutation, runWithNativeMutationSuppressed]);
 
   const tikzResult = useMemo(() => {
     if (!tikzObjects) return null;
@@ -887,12 +1072,15 @@ export function MathStudio({
   const replayPrefix = useCallback((prefix: string[]) => {
     const api = apiRef.current;
     if (!api) return;
-    clearGgbConstruction(api);
-    runGeometryScript(api, prefix);
-    api.recalculateEnvironments?.();
-  }, []);
+    void runWithNativeMutationSuppressed(() => {
+      clearGgbConstruction(api);
+      runGeometryScript(api, prefix);
+      api.recalculateEnvironments?.();
+    });
+  }, [runWithNativeMutationSuppressed]);
 
   const goToStep = useCallback((k: number | null) => {
+    stepIndexRef.current = k;
     setStepIndex(k);
     if (k === null) replayPrefix(lastSuccessfulRef.current);
     else if (steps[k]) replayPrefix(steps[k].prefix);
@@ -903,6 +1091,7 @@ export function MathStudio({
     setStepsPlaying(false);
     // leave the full figure on the canvas, whatever step was showing
     if (stepIndex !== null) replayPrefix(lastSuccessfulRef.current);
+    stepIndexRef.current = null;
     setStepIndex(null);
   }, [stepIndex, replayPrefix]);
 
@@ -1108,9 +1297,6 @@ export function MathStudio({
     setShowAllMsgs(false);
     setGgbEvalStats(null);
     setGgbRepairs(0);
-    lastSuccessfulRef.current = [];
-    setGeometryProjection(null);
-    geometryBrokerRef.current = null;
   }, []);
 
   const openStudio = useCallback(() => { setStudioMounted(true); setStudioOpen(true); }, []);
