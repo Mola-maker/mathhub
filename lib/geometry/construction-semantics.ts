@@ -205,6 +205,7 @@ function altitudeEvidence(
     const definition = foot?.definition;
     if (
       !apex
+      || !foot
       || definition?.kind !== 'perpendicular-foot'
       || definition.pointName !== apexName
     ) continue;
@@ -481,6 +482,7 @@ export function inferConstructionSemanticConstraints(
       const rotation = direction?.definition;
       if (
         !touch
+        || !direction
         || rotation?.kind !== 'rotate'
         || rotation.centerName !== touchName
         || Math.abs(rotation.scale) <= EPSILON
@@ -511,7 +513,11 @@ export function inferConstructionSemanticConstraints(
     ] as const) {
       const translated = pointsByName.get(translatedName);
       const definition = translated?.definition;
-      if (definition?.kind !== 'translate' || definition.toName !== throughName) continue;
+      if (
+        !translated
+        || definition?.kind !== 'translate'
+        || definition.toName !== throughName
+      ) continue;
       const referenceKey = sortedPair(definition.fromName, definition.pointName).join('\u0000');
       const references = (segmentsByEndpoints.get(referenceKey) ?? [])
         .filter((candidate) => candidate.id !== segment.id);
