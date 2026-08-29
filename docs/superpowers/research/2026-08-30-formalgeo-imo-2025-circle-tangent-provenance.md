@@ -48,3 +48,17 @@ caches, fixtures, screenshots, or generated source.
   shared canonical spelling and argument order;
 - context compaction retains both mathematical and relationship hashes;
 - presentation differences remain reported separately from mathematical truth.
+
+## Implemented semantic core
+
+The first independently authored pair now covers the non-branch-ambiguous
+foundation of that chain: two center-radius circles, both named intersection
+outputs, and their common chord. TikZ `name path` records stay available as
+construction/source-binding helpers, while portable intersection relations
+target the real circle entities. The pair pins seven mathematical entities and
+three portable relations (two intersections and one segment incidence), and
+requires both the semantic and relation hashes to match GeoGebra.
+
+Tangent, parallel, point-on-circle, circumcenter, and orthocenter parity remain
+future gates. This initial pair must not be described as validating the full
+IMO-derived dependency shape.

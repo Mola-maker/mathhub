@@ -49,7 +49,7 @@ import { CONSTRUCTION_PLAN_FOOTPRINT_ABI_VERSION } from '../authoring/constructi
 import { CONSTRUCTION_CATALOG_DIGEST } from '../authoring/construction-catalog';
 
 export const TIKZ_SEMANTIC_ADAPTER_ID = 'mathgeo.tikz.semantic-adapter';
-export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.25.0';
+export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.26.0';
 export const TIKZ_PLUGIN_SET_DIGEST = [
   `${TIKZ_SEMANTIC_ADAPTER_ID}@${TIKZ_SEMANTIC_ADAPTER_VERSION}`,
   MANAGED_CONSTRUCTION_V3_ENVELOPE_SCHEMA,
@@ -632,6 +632,65 @@ function pathIncidenceRelations(
   });
 }
 
+/**
+ * Resolve a TikZ construction-only `name path` alias to the single geometry
+ * element emitted by the same source statement. Ambiguous multi-shape paths
+ * deliberately remain unresolved instead of inventing a mathematical owner.
+ */
+function namedPathElementIds(
+  input: TikzGeometryProjectionInput,
+  elements: readonly SceneElement[],
+): ReadonlyMap<string, string> {
+  const result = new Map<string, string>();
+  const seen = new Set<string>();
+  const ambiguous = new Set<string>();
+  for (const [statementIndex, statement] of (input.analysis.stmts ?? []).entries()) {
+    if (statement.kind !== 'path' || !statement.namePath) continue;
+    if (seen.has(statement.namePath)) {
+      result.delete(statement.namePath);
+      ambiguous.add(statement.namePath);
+      continue;
+    }
+    seen.add(statement.namePath);
+    const candidates = elements.filter((element) => element.stmtIndex === statementIndex);
+    if (candidates.length === 1 && !ambiguous.has(statement.namePath)) {
+      result.set(statement.namePath, candidates[0]!.stableId);
+    }
+  }
+  return result;
+}
+
+/**
+ * Promote `name intersections` output points to renderer-neutral intersection
+ * relations. The source dependency lane still targets the named-path helper;
+ * the portable lane targets the real circle/line entities behind those aliases.
+ */
+function pathIntersectionRelations(
+  points: readonly ScenePoint[],
+  namedPathElements: ReadonlyMap<string, string>,
+): GeometryRelation[] {
+  return points.flatMap((point) => {
+    const pathNames = [...new Set(point.dependsOn.flatMap((dependency) => (
+      dependency.startsWith('path:') ? [dependency.slice('path:'.length)] : []
+    )))];
+    if (pathNames.length !== 2) return [];
+    const inputs = pathNames.map((name) => namedPathElements.get(name));
+    if (!inputs.every((input): input is string => input !== undefined)) return [];
+    return [{
+      recordType: 'relation' as const,
+      id: `relation:intersection:${point.stableId}`,
+      kind: 'intersection',
+      directed: true,
+      participants: [
+        { role: 'result', entityId: point.stableId },
+        ...inputs.map((entityId) => ({ role: 'input', entityId })),
+      ],
+      sourceBindingIds: [`binding:${point.stableId}`],
+      metadata: { source: 'tikz-name-intersections' },
+    }];
+  });
+}
+
 function publicSemanticPoints(
   points: readonly ScenePoint[],
 ): ScenePoint[] {
@@ -682,7 +741,7 @@ function namedPathEntitiesOf(input: TikzGeometryProjectionInput): GeometryEntity
         statementIndex,
         geometryKinds: statement.specs.map((spec) => spec.type),
       },
-      tags: ['named-path', statement.command],
+      tags: ['named-path', 'construction-helper', statement.command],
       sourceBindingIds: [`binding:path:${statement.namePath}`],
     }];
   });
@@ -2327,6 +2386,7 @@ export function projectTikzAnalysisToGeometryTruth(
   const pointIdsByName = new Map(
     points.map((point) => [point.name, point.stableId] as const),
   );
+  const namedPathElements = namedPathElementIds(input, elements);
   const sourceEntityRanges = new Map<string, { start: number; end: number }>([
     ...points.flatMap((point) => {
       const range = statementRange(input.analysis, point.stmtIndex);
@@ -2435,6 +2495,15 @@ export function projectTikzAnalysisToGeometryTruth(
       ))
     )),
     ...pathIncidenceRelations(elements, pointIdsByName).filter((relation) => (
+      !managed.relationKeys.has(relationSemanticKey(
+        relation.kind,
+        relation.directed ?? false,
+        relation.participants.flatMap((participant) => (
+          participant.entityId ? [participant.entityId] : []
+        )),
+      ))
+    )),
+    ...pathIntersectionRelations(points, namedPathElements).filter((relation) => (
       !managed.relationKeys.has(relationSemanticKey(
         relation.kind,
         relation.directed ?? false,

@@ -12,7 +12,7 @@ import type {
 export const GEOMETRY_SEMANTIC_SIGNATURE_SCHEMA_VERSION =
   'geometry-semantic-signature/v1' as const;
 export const GEOMETRY_SEMANTIC_NORMALIZATION_PROFILE =
-  'named-dependency-topology/v1' as const;
+  'named-dependency-topology/v2' as const;
 
 export type GeometrySemanticSnapshotLike = Pick<GeometryDoc, 'basis' | 'semantic'>;
 
@@ -261,7 +261,11 @@ export function buildGeometrySemanticSignature(
 ): GeometrySemanticSignature {
   const sourceId = snapshot.basis.sourceId;
   if (!sourceId) throw new TypeError('Semantic signature requires a GeometryDoc sourceId.');
-  const entities = snapshot.semantic.ir.entities as readonly GeometryEntity[];
+  // Construction helpers such as TikZ `name path` aliases remain in GeometryIR
+  // for source bindings and dependency tracing, but are not mathematical
+  // entities and must not change cross-renderer semantic identity or coverage.
+  const entities = (snapshot.semantic.ir.entities as readonly GeometryEntity[])
+    .filter((entity) => !entity.tags?.includes('construction-helper'));
   const entitiesById = new Map(entities.map((entity) => [entity.id, entity] as const));
   const namedEntities = new Map<string, GeometryEntity[]>();
   for (const entity of entities) {

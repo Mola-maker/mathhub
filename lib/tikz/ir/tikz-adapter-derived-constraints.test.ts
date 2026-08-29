@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyze } from '../analyze';
+import { buildGeometrySemanticSignature } from '@/lib/geometry/semantic-signature';
 import { createGeometryDoc } from './geometry-doc';
 import { buildGeometrySourceMap } from './source-map';
 import {
@@ -74,5 +75,46 @@ describe('TikZ derived coordinate semantic constraints', () => {
         expect.objectContaining({ role: 'input', entityId: 'point:B' }),
       ],
     }));
+  });
+
+  it('binds named intersections to their real path geometry', () => {
+    const source = String.raw`\begin{tikzpicture}
+\coordinate (O1) at (0,0);
+\coordinate (O2) at (3,0);
+\draw[name path=c1] (O1) circle[radius=3];
+\draw[name path=c2] (O2) circle[radius=3];
+\path[name intersections={of=c1 and c2}]
+  (intersection-1) coordinate (P)
+  (intersection-2) coordinate (Q);
+\draw (P) -- (Q);
+\end{tikzpicture}`;
+    const document = geometryDoc(source);
+    const circles = document.semantic.ir.entities.filter((entity) => entity.kind === 'circle');
+    const circleIds = new Set(circles.map((entity) => entity.id));
+    const intersections = document.semantic.ir.relations.filter(
+      (relation) => relation.kind === 'intersection',
+    );
+
+    expect(circles).toHaveLength(2);
+    expect(intersections).toHaveLength(2);
+    expect(intersections.map((relation) => relation.participants[0]?.entityId).sort())
+      .toEqual(['point:P', 'point:Q']);
+    for (const relation of intersections) {
+      expect(relation.directed).toBe(true);
+      expect(relation.participants.slice(1).map((participant) => participant.entityId))
+        .toEqual(expect.arrayContaining([...circleIds]));
+    }
+
+    const namedPathHelpers = document.semantic.ir.entities.filter(
+      (entity) => entity.tags?.includes('named-path'),
+    );
+    expect(namedPathHelpers).toHaveLength(2);
+    expect(namedPathHelpers.every((entity) => entity.tags?.includes('construction-helper')))
+      .toBe(true);
+
+    const signature = buildGeometrySemanticSignature(document);
+    expect(signature.coverage.entities).toEqual({ portable: 7, total: 7 });
+    expect(signature.coverage.relations.portable).toBe(3);
+    expect(signature.canonical.entities).toHaveLength(7);
   });
 });

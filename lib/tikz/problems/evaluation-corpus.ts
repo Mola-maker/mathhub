@@ -359,8 +359,8 @@ export const GEOMETRY_EVALUATION_CORPUS: readonly GeometryEvaluationCase[] = [
     source: {
       disposition: 'research-reference-only',
       source: 'formalgeo',
-      recordId: 'formalgeo7k-v2:circle-tangent-chain-class',
-      sourceUrl: 'https://github.com/FormalGeo/FormalGeo/blob/e7d90421e809a129109286fdb03832d8014d390f/datasets.json#L2-L14',
+      recordId: 'formalgeo:imo-2025-p2-circle-tangent-structure',
+      sourceUrl: 'https://github.com/FormalGeo/FormalGeo/blob/e7d90421e809a129109286fdb03832d8014d390f/README.md#L224-L297',
       admission: 'not-admitted',
       attributionMode: 'gateway-record',
     },
@@ -369,7 +369,19 @@ export const GEOMETRY_EVALUATION_CORPUS: readonly GeometryEvaluationCase[] = [
       expectationProfile: 'formalgeo-circle-tangent-chain',
       authorship: 'independently-authored',
       sourceSha256: '03bcee1ff3e52428acf8194b0b1c9eece495a102d8d52e6445c4a1d0bc7d1f70',
-      expectationsSha256: 'a10e9116f4c5b90d9380aabc8f578317b5885f9b50b97a1db8f786ec26b2c2c0',
+      expectationsSha256: '21e9898b1e912726eebab7d9bc2052a5b6868beba94b15a75fbef43a52aa4c3b',
+      pairedSemanticFixture: {
+        schemaVersion: 'geometry-evaluation-paired-semantic-fixture/v1',
+        tikzFixturePath: 'evaluation/formalgeo-circle-intersections-semantic-core',
+        geogebraCommandsPath: 'evaluation/formalgeo-circle-intersections-semantic-core',
+        authorship: 'independently-authored',
+        tikzSourceSha256: '444f0fcdb2ba08a3e0828b364b77b3bc5e3a76f4e9a7b4d56db195f5ab1c8131',
+        geogebraCommandsSha256: '0530adb5acc687d7c9ebe7aa981accefbb2e012c4a304131af342b70b915d873',
+        minimumPortableEntityCount: 7,
+        minimumPortableConstraintCount: 0,
+        minimumPortableRelationCount: 3,
+        requireRelationMatch: true,
+      },
     },
     turns: [
       {

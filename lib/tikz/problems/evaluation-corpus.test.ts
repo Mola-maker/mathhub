@@ -136,7 +136,7 @@ describe('geometry evaluation corpus', () => {
     });
   });
 
-  it('pins an independently authored TikZ and GeoGebra semantic pair for the complex case', () => {
+  it('pins independently authored TikZ and GeoGebra semantic pairs for complex cases', () => {
     const mathNet = GEOMETRY_EVALUATION_CORPUS.find((entry) => (
       entry.caseId === 'mathnet-iran-2025-nine-point-cyclic'
     ));
@@ -146,6 +146,18 @@ describe('geometry evaluation corpus', () => {
       minimumPortableEntityCount: 19,
       minimumPortableConstraintCount: 7,
       minimumPortableRelationCount: 6,
+      requireRelationMatch: true,
+    });
+
+    const formalGeo = GEOMETRY_EVALUATION_CORPUS.find((entry) => (
+      entry.caseId === 'formalgeo-circle-tangent-chain'
+    ));
+    expect(formalGeo?.localFixture.pairedSemanticFixture).toMatchObject({
+      schemaVersion: 'geometry-evaluation-paired-semantic-fixture/v1',
+      authorship: 'independently-authored',
+      minimumPortableEntityCount: 7,
+      minimumPortableConstraintCount: 0,
+      minimumPortableRelationCount: 3,
       requireRelationMatch: true,
     });
   });

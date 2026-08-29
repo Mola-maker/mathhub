@@ -132,6 +132,14 @@ the existing `GeometryDoc` truth lanes.
     - both assistants explicitly treat compacted dialogue as advisory: TikZ
       recovers from the current source projection, while GeoGebra recovers from
       the current broker command snapshot instead of resurrecting old fences.
+14. FormalGeo circle-intersection semantic core
+    - TikZ named-path aliases remain revision-bound construction helpers but no
+      longer inflate renderer-neutral entity coverage;
+    - named-intersection outputs now emit portable relations against the real
+      circle/line entities, preserving source dependency bindings separately;
+    - an independently authored, SHA-256-pinned TikZ/GeoGebra pair requires
+      seven portable entities and three matching portable relations. Tangent
+      and parallel constraint parity remain deliberately pending.
 
 ## External benchmark evidence
 
@@ -187,9 +195,9 @@ stores only our own fixture and a pinned provenance URL.
    keep compatibility re-exports during the migration.
 2. Promote selected GeoGebra bindings from read-only only after a bounded,
    lossless binding-to-command patch planner is available.
-3. Add the independently re-authored FormalGeo circle/tangent seed documented
-   in `2026-08-30-formalgeo-imo-2025-circle-tangent-provenance.md`, then extend
-   the portable vocabulary to point-on-circle, tangent and branch-sensitive
-   intersection relations.
+3. Extend the independently re-authored FormalGeo semantic core documented in
+   `2026-08-30-formalgeo-imo-2025-circle-tangent-provenance.md` from its current
+   circle intersections/common chord into point-on-circle, tangent, parallel,
+   circumcenter, and orthocenter parity.
 4. Add explicit expiry/renewal policy for restore handles once a durable
    transcript store exists; continue emitting an empty handle list until then.

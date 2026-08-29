@@ -1,0 +1,7 @@
+O1=(0,0)
+O2=(3,0)
+c1=Circle(O1,3)
+c2=Circle(O2,3)
+P=Intersect(c1,c2,1)
+Q=Intersect(c1,c2,2)
+chord=Segment(P,Q)

@@ -633,6 +633,55 @@ describe('geometry evaluation runner', () => {
     }));
   });
 
+  it('matches the byte-pinned FormalGeo circle-intersection semantic core', async () => {
+    const execute = vi.fn();
+    const caseDefinition = GEOMETRY_EVALUATION_CORPUS.find((entry) => (
+      entry.caseId === 'formalgeo-circle-tangent-chain'
+    ));
+    if (!caseDefinition) throw new TypeError('FormalGeo circle/tangent case is unavailable.');
+    const report = await runGeometryEvaluationCase({
+      caseDefinition,
+      adapter: { capabilities: [], execute },
+    });
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(report.pairedSemantic).toMatchObject({
+      schemaVersion: 'geometry-evaluation-paired-semantic-report/v1',
+      passed: true,
+      tikz: {
+        sourceLanguage: 'tikz',
+        comparable: true,
+        coverage: {
+          entities: { portable: 7, total: 7 },
+          constraints: { portable: 0, total: 0 },
+          relations: { portable: 3 },
+        },
+      },
+      geogebra: {
+        sourceLanguage: 'geogebra-command',
+        comparable: true,
+        coverage: {
+          entities: { portable: 7, total: 7 },
+          constraints: { portable: 0, total: 0 },
+          relations: { portable: 3 },
+        },
+      },
+      comparison: {
+        equivalent: true,
+        semanticHashMatches: true,
+        relationHashMatches: true,
+      },
+    });
+    expect(report.pairedSemantic?.assertions).toContainEqual(expect.objectContaining({
+      id: 'paired-semantic:minimum-portable-relations',
+      passed: true,
+    }));
+    expect(report.pairedSemantic?.assertions).toContainEqual(expect.objectContaining({
+      id: 'paired-semantic:relation-equivalence',
+      passed: true,
+    }));
+  });
+
   it('runs the MathNet nine-point answer, construction, style-label set, and dual-render chain', async () => {
     const caseDefinition = GEOMETRY_EVALUATION_CORPUS.find((entry) => (
       entry.caseId === 'mathnet-iran-2025-nine-point-cyclic'
