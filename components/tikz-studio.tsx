@@ -768,10 +768,14 @@ export function TikzStudio({
   startOpen = false,
   initialSelectionRefs = [],
   initialStmtIndex = null,
+  staticPreview = false,
+  homeHref = '/',
 }: {
   startOpen?: boolean;
   initialSelectionRefs?: readonly string[];
   initialStmtIndex?: number | null;
+  staticPreview?: boolean;
+  homeHref?: string;
 }) {
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(startOpen);
@@ -1086,6 +1090,12 @@ export function TikzStudio({
   }, [engine.interactiveWritebackSafe]);
 
   useEffect(() => {
+    if (staticPreview) {
+      setProviders([]);
+      setVisualAuditAvailable(false);
+      setCatalogError('GitHub Pages 静态预览：画板编辑可用，AI、题库与精确编译需在完整站点使用。');
+      return;
+    }
     const controller = new AbortController();
     fetch('/api/tikz/providers', { signal: controller.signal })
       .then((response) => {
@@ -1114,9 +1124,15 @@ export function TikzStudio({
         setCatalogError('模型服务目录暂不可用');
       });
     return () => controller.abort();
-  }, []);
+  }, [staticPreview]);
 
   useEffect(() => {
+    if (staticPreview) {
+      setModels([]);
+      setModel('');
+      setModelCatalogLoading(false);
+      return;
+    }
     if (!providers.includes(provider)) {
       setModels([]);
       setModel('');
@@ -1172,7 +1188,7 @@ export function TikzStudio({
       disposed = true;
       controller.abort();
     };
-  }, [modelCatalogRequest, provider, providers]);
+  }, [modelCatalogRequest, provider, providers, staticPreview]);
 
   const repairCode = useCallback(async (code: string) => {
     if (repairing) return;
@@ -1278,12 +1294,12 @@ export function TikzStudio({
     problemConstructionControllerRef.current = null;
     pendingProblemConstructionRef.current = null;
     if (startOpen) {
-      window.location.assign('/');
+      window.location.assign(homeHref);
       return;
     }
     setPureMode(false);
     setOpen(false);
-  }, [startOpen]);
+  }, [homeHref, startOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -1358,6 +1374,10 @@ export function TikzStudio({
   }, [closeStudio, commandRegistry, open]);
 
   const sendProblem = useCallback(async () => {
+    if (staticPreview) {
+      setCatalogError('GitHub Pages 仅提供本地画板预览；AI 构图需要服务端 API。');
+      return;
+    }
     const problem = input.trim();
     if (!problem || streaming || agentTurnAdmissionRef.current) return;
     if (!pendingProblemInspectionRef.current) {
@@ -2392,7 +2412,7 @@ export function TikzStudio({
         agentTurnAdmissionRef.current = null;
       }
     }
-  }, [engine, input, messages, model, provider, providers, streaming, visualAuditAvailable]);
+  }, [engine, input, messages, model, provider, providers, staticPreview, streaming, visualAuditAvailable]);
 
   const studioContent = open
     ? (
@@ -2439,7 +2459,9 @@ export function TikzStudio({
           </div>
           {providers.length === 0 ? (
             <div className="tz-catalog-error" role="status">
-              请在 .env.local 配置 LLM_RELAY_API_KEY，然后重启开发服务器。
+              {staticPreview
+                ? '静态预览模式：可直接使用 Canvas、源码编辑、构造工具与步骤面板。'
+                : '请在 .env.local 配置 LLM_RELAY_API_KEY，然后重启开发服务器。'}
             </div>
           ) : null}
           <label className="tz-model">
@@ -2580,8 +2602,11 @@ export function TikzStudio({
               ref={composerInputRef}
               className="tz-input"
               value={input}
+              disabled={staticPreview}
               aria-label="几何构造描述"
-              placeholder="描述一个几何构造，如：作三角形 ABC 的外接圆并标出外心"
+              placeholder={staticPreview
+                ? 'GitHub Pages 静态预览不连接 AI 服务'
+                : '描述一个几何构造，如：作三角形 ABC 的外接圆并标出外心'}
               onChange={(event) => {
                 // Preserve a pending Host receipt. If the user edits its fixed
                 // draft, sendProblem rejects once instead of silently sending
@@ -2606,7 +2631,7 @@ export function TikzStudio({
                 if (streaming) stopAgentRun();
                 else void sendProblem();
               }}
-              disabled={!streaming && (!input.trim() || !model)}
+              disabled={staticPreview || (!streaming && (!input.trim() || !model))}
               title={streaming ? '停止当前 Agent 运行' : '发送请求'}
             >
               {streaming ? '停止 ■' : '发送 ↵'}
@@ -2625,7 +2650,13 @@ export function TikzStudio({
             stepsOpen={stepsOpen}
             onToggleSteps={() => setStepsOpen((value) => !value)}
             exactMode={exactMode}
-            onToggleExact={() => setExactMode((value) => !value)}
+            onToggleExact={() => {
+              if (staticPreview) {
+                setCatalogError('精确 TeX/TikZ 编译需要完整站点的隔离编译服务。');
+                return;
+              }
+              setExactMode((value) => !value);
+            }}
           />
           <TikzToolPalette
             engine={engine}

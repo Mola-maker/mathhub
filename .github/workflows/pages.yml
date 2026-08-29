@@ -37,7 +37,7 @@ jobs:
         run: npm ci
 
       - name: Build the static MathHub entry
-        run: npm run build:mathhub
+        run: npm run build:pages
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6

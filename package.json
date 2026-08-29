@@ -11,6 +11,7 @@
     "dev:compiler:native": "node services/tikz-compiler/local-dev-server.mjs",
     "dev:mathhub": "npm run dev --workspace mathhub",
     "build:mathhub": "npm run build --workspace mathhub",
+    "build:pages": "npm run build:pages --workspace mathhub",
     "build": "npm run build:mathhub && next build",
     "build:sites": "vinext build",
     "start": "next start",
