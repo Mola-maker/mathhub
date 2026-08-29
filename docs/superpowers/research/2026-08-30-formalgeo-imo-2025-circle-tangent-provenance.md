@@ -51,19 +51,27 @@ caches, fixtures, screenshots, or generated source.
 
 ## Implemented semantic core
 
-The extended independently authored pair covers the non-branch-ambiguous
-foundation of that chain: two center-radius circles, both named intersection
-outputs, their common chord, a tangent derived by rotating one radius direction
-through 90 degrees, and a second segment whose direction is copied by vector
-translation. TikZ `name path` records and GeoGebra `Vector` commands stay
-available as construction/source-binding helpers without inflating portable
-entity coverage. Both adapters recover the same tangent and parallel
-constraints from ordinary source constructions rather than coordinate
-coincidence or managed metadata.
+The extended independently authored pair now connects the two-circle foundation
+to a triangle-center and cyclic chain. It contains both named circle
+intersections, their common chord, a quarter-turn tangent, a vector-translation
+parallel segment, the perpendicular-bisector construction of the circumcenter
+of `O1O2P`, two altitude constructions meeting at its orthocenter, an explicit
+circumcircle, and a fourth point obtained by a radius-preserving rotation.
 
-The pair pins eleven mathematical entities, two portable constraints, and five
-portable relations (two intersections and three segment incidences), and
-requires both the semantic and relation hashes to match. An explicit
-point-on-circle constraint plus circumcenter and orthocenter parity remain
-future gates, so this pair still must not be described as validating the full
-IMO-derived dependency shape.
+TikZ `name path` records and GeoGebra `Vector` commands stay available as
+construction/source-binding helpers without inflating portable entity coverage.
+Both adapters project their ordinary source graphs into one shared,
+renderer-neutral topology inference layer. That layer recovers tangent,
+parallel, circumcenter, orthocenter, point-on-circle, and concyclic constraints
+without coordinate coincidence or managed metadata. Three-point circles remain
+centerless topology records, and inferred evidence is exposed through inspection-only
+source-map reverse links without weakening raw-circle adoption bindings.
+
+The pair pins twenty-six mathematical entities, seventeen portable constraints,
+and twelve portable relations. The constraint set includes four direct
+midpoint/foot facts, eight explicit circle-membership facts, and five recovered
+higher-order facts; the relation set contains four intersections and eight
+segment incidences. Both semantic and relation hashes must match. The original
+problem's full center-line/secant/derived-circle dependency chain and joint
+parallel-tangent goal remain future gates, so this pair still must not be
+described as validating the complete IMO-derived configuration.

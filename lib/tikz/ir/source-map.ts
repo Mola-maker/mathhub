@@ -1,5 +1,4 @@
 import type {
-  ConstructionBinding,
   GeometryBindableRecordReference,
   GeometryConstraint,
   GeometryRelation,
@@ -55,13 +54,13 @@ function unique(values: readonly string[]): string[] {
   return [...new Set(values)].sort();
 }
 
-function entityIdsForBinding(
-  binding: ConstructionBinding,
+function entityIdsForTargets(
+  targets: readonly GeometryBindableRecordReference[],
   constraints: ReadonlyMap<string, GeometryConstraint>,
   relations: ReadonlyMap<string, GeometryRelation>,
   styles: ReadonlyMap<string, GeometryStyle>,
 ): string[] {
-  return unique(binding.targets.flatMap((target) => {
+  return unique(targets.flatMap((target) => {
     if (target.recordType === 'entity') return [target.id];
     if (target.recordType === 'constraint') {
       return constraints.get(target.id)?.arguments.flatMap((argument) =>
@@ -94,10 +93,33 @@ export function buildGeometrySourceMap(
   const styles = new Map(
     truths.semantic.ir.styles.map((style) => [style.id, style]),
   );
+  const constraintTargetsByBindingId = new Map<
+    string,
+    GeometryBindableRecordReference[]
+  >();
+  for (const constraint of truths.semantic.ir.constraints) {
+    for (const sourceBindingId of constraint.sourceBindingIds ?? []) {
+      const previous = constraintTargetsByBindingId.get(sourceBindingId) ?? [];
+      constraintTargetsByBindingId.set(sourceBindingId, [
+        ...previous,
+        { recordType: 'constraint', id: constraint.id },
+      ]);
+    }
+  }
 
   const entries = truths.construction.bindings.map((binding) => {
-    const entityIds = entityIdsForBinding(
-      binding,
+    const semanticTargets = [...new Map([
+      ...binding.targets,
+      ...(constraintTargetsByBindingId.get(binding.id) ?? []),
+    ].map((target) => [
+      `${target.recordType}\u0000${target.id}`,
+      target,
+    ] as const)).values()];
+    // Reverse semantic evidence is inspection-only. Entity/render ownership
+    // must stay on the binding's explicit targets so a derived constraint does
+    // not make every participating point look like the circle's source owner.
+    const entityIds = entityIdsForTargets(
+      binding.targets,
       constraints,
       relations,
       styles,
@@ -123,7 +145,7 @@ export function buildGeometrySourceMap(
       sourceId: binding.source.document.sourceId,
       range: { ...binding.source.range },
       writable: binding.writable,
-      semanticTargets: binding.targets.map((target) => ({ ...target })),
+      semanticTargets: semanticTargets.map((target) => ({ ...target })),
       entityIds,
       renderTargets,
       metadata: {

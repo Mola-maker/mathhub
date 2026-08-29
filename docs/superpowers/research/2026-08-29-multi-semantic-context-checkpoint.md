@@ -132,7 +132,7 @@ the existing `GeometryDoc` truth lanes.
     - both assistants explicitly treat compacted dialogue as advisory: TikZ
       recovers from the current source projection, while GeoGebra recovers from
       the current broker command snapshot instead of resurrecting old fences.
-14. FormalGeo tangent-parallel semantic core
+14. FormalGeo centers-and-cyclic semantic core
     - TikZ named-path aliases remain revision-bound construction helpers but no
       longer inflate renderer-neutral entity coverage;
     - named-intersection outputs now emit portable relations against the real
@@ -141,9 +141,19 @@ the existing `GeometryDoc` truth lanes.
       portable tangent constraint in both TikZ and GeoGebra;
     - vector-translation constructions now normalize to a portable parallel
       constraint without promoting construction-only vector helpers;
+    - perpendicular-bisector intersections and altitude intersections now
+      recover circumcenter and orthocenter facts in a shared renderer-neutral
+      construction-topology layer;
+    - circle intersections, center-through circles, circumcenter membership,
+      and radius-preserving rotations now close explicit point-on-circle sets
+      and recover a concyclic fact without numerical coincidence checks;
+    - GeoGebra three-point circles contribute member evidence without inventing
+      a center, including a fail-closed path for unresolved members;
+    - inferred constraints reverse-link through the source map without changing
+      single-target writable entity bindings or raw-circle adoption ownership;
     - an independently authored, SHA-256-pinned TikZ/GeoGebra pair requires
-      eleven portable entities, two matching portable constraints, and five
-      matching portable relations.
+      twenty-six portable entities, seventeen matching portable constraints,
+      and twelve matching portable relations.
 
 ## External benchmark evidence
 
@@ -201,7 +211,7 @@ stores only our own fixture and a pinned provenance URL.
    lossless binding-to-command patch planner is available.
 3. Extend the independently re-authored FormalGeo semantic core documented in
    `2026-08-30-formalgeo-imo-2025-circle-tangent-provenance.md` from its current
-   circle intersections, common chord, tangent, and parallel chain into an
-   explicit point-on-circle constraint plus circumcenter and orthocenter parity.
+   circle intersections, tangent/parallel, centers, and cyclic chain into the
+   full center-line, secant, derived-circle, and joint parallel-tangent goal.
 4. Add explicit expiry/renewal policy for restore handles once a durable
    transcript store exists; continue emitting an empty handle list until then.

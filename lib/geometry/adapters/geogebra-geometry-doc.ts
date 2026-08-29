@@ -26,6 +26,11 @@ import {
   buildGeometrySemanticSignature,
   type GeometrySemanticSignature,
 } from '@/lib/geometry/semantic-signature';
+import {
+  inferConstructionSemanticConstraints,
+  type ConstructionPointDefinition,
+  type ConstructionSemanticTopology,
+} from '@/lib/geometry/construction-semantics';
 
 /**
  * Migration adapter: the neutral IR still lives under lib/tikz/ir, while this
@@ -34,7 +39,7 @@ import {
 export const GEOGEBRA_GEOMETRY_PROJECTION_SCHEMA_VERSION =
   'geogebra-geometry-projection/v1' as const;
 export const GEOGEBRA_PLUGIN_SET_DIGEST =
-  'geogebra-command-projector/v2' as const;
+  'geogebra-command-projector/v3' as const;
 
 export interface GeogebraProjectionIdentity {
   readonly documentId: string;
@@ -171,128 +176,150 @@ function relationArguments(outputId: string, inputs: readonly string[]): Geometr
   ];
 }
 
-function unorderedNames(left: string, right: string): string {
-  return left.localeCompare(right) <= 0
-    ? `${left}\u0000${right}`
-    : `${right}\u0000${left}`;
+function topologyPointDefinition(
+  definition: ProjectedDefinition,
+  commandsByName: ReadonlyMap<string, ParsedSourceCommand>,
+): ConstructionPointDefinition | undefined {
+  if (definition.commandName === 'Midpoint' && definition.args.length === 2) {
+    return {
+      kind: 'midpoint',
+      startName: definition.args[0]!,
+      endName: definition.args[1]!,
+    };
+  }
+  if (definition.commandName === 'Foot' && definition.args.length === 3) {
+    return {
+      kind: 'perpendicular-foot',
+      pointName: definition.args[0]!,
+      lineStartName: definition.args[1]!,
+      lineEndName: definition.args[2]!,
+    };
+  }
+  if (definition.commandName === 'Rotate' && definition.args.length === 3) {
+    const angleDegrees = angleToDegrees(definition.args[1]!);
+    return angleDegrees === null
+      ? undefined
+      : {
+          kind: 'rotate',
+          pointName: definition.args[0]!,
+          centerName: definition.args[2]!,
+          scale: 1,
+          angleDegrees,
+        };
+  }
+  if (definition.commandName === 'Translate' && definition.args.length === 2) {
+    const vector = commandsByName.get(definition.args[1]!);
+    return vector?.commandName === 'Vector' && vector.args.length === 2
+      ? {
+          kind: 'translate',
+          pointName: definition.args[0]!,
+          fromName: vector.args[0]!,
+          toName: vector.args[1]!,
+        }
+      : undefined;
+  }
+  return undefined;
 }
 
-function isQuarterTurnLiteral(value: string): boolean {
-  const angle = angleToDegrees(value);
-  if (angle === null) return false;
-  const normalized = ((angle % 180) + 180) % 180;
-  return Math.abs(normalized - 90) <= 1e-9;
-}
-
-/**
- * Recover renderer-neutral constraints from ordinary GeoGebra construction
- * commands. Vector is construction-only here: it drives Translate but does not
- * become an extra mathematical entity in the paired drawing signature.
- */
-function inferredGeometricConstraints(
+function constructionSemanticTopology(
   definitions: readonly ProjectedDefinition[],
   sourceCommands: readonly ParsedSourceCommand[],
-): Array<{ readonly constraint: GeometryConstraint; readonly statementIndex: number }> {
+): ConstructionSemanticTopology {
   const definitionsByName = new Map(
     definitions.map((definition) => [definition.object.name, definition] as const),
   );
   const commandsByName = new Map(
     sourceCommands.map((command) => [command.name, command] as const),
   );
-  const segmentsByEndpoints = new Map<string, ProjectedDefinition[]>();
-  for (const definition of definitions) {
-    if (definition.commandName !== 'Segment' || definition.args.length !== 2) continue;
-    const key = unorderedNames(definition.args[0]!, definition.args[1]!);
-    segmentsByEndpoints.set(key, [...(segmentsByEndpoints.get(key) ?? []), definition]);
-  }
+  return {
+    points: definitions.flatMap((definition) => {
+      if (definition.object.type !== 'point') return [];
+      const pointDefinition = topologyPointDefinition(definition, commandsByName);
+      const vector = definition.commandName === 'Translate'
+        ? commandsByName.get(definition.args[1] ?? '')
+        : undefined;
+      const incidentEntityIds = (
+        definition.commandName === 'Intersect' || definition.commandName === 'Point'
+      )
+        ? definition.args.flatMap((name) => {
+            const candidate = definitionsByName.get(name);
+            return candidate ? [candidate.entity.id] : [];
+          })
+        : [];
+      return [{
+        id: definition.entity.id,
+        name: definition.object.name,
+        ...(pointDefinition ? { definition: pointDefinition } : {}),
+        incidentEntityIds,
+        sourceBindingIds: [...new Set([
+          bindingId(definition.statement.index),
+          ...(vector?.commandName === 'Vector'
+            ? [bindingId(vector.statement.index)]
+            : []),
+        ])],
+      }];
+    }),
+    segments: definitions.flatMap((definition) => (
+      definition.commandName === 'Segment' && definition.args.length === 2
+        ? [{
+            id: definition.entity.id,
+            endpointNames: [definition.args[0]!, definition.args[1]!] as const,
+            sourceBindingIds: [bindingId(definition.statement.index)],
+          }]
+        : []
+    )),
+    circles: definitions.flatMap((definition) => {
+      if (definition.commandName !== 'Circle' || definition.args.length < 2) return [];
+      if (definition.args.length === 3) {
+        const threePointMembers = definition.args.every((name) => (
+          definitionsByName.get(name)?.object.type === 'point'
+        ))
+          ? definition.args
+          : undefined;
+        return [{
+          id: definition.entity.id,
+          ...(threePointMembers ? { memberNames: threePointMembers } : {}),
+          sourceBindingIds: [bindingId(definition.statement.index)],
+        }];
+      }
+      if (definition.args.length !== 2) {
+        return [{
+          id: definition.entity.id,
+          sourceBindingIds: [bindingId(definition.statement.index)],
+        }];
+      }
+      const through = definitionsByName.get(definition.args[1]!);
+      return [{
+        id: definition.entity.id,
+        centerName: definition.args[0]!,
+        ...(through?.object.type === 'point'
+          ? { throughName: through.object.name }
+          : {}),
+        sourceBindingIds: [bindingId(definition.statement.index)],
+      }];
+    }),
+  };
+}
 
-  const output: Array<{ constraint: GeometryConstraint; statementIndex: number }> = [];
-  const seen = new Set<string>();
-  for (const line of definitions) {
-    if (line.commandName !== 'Segment' || line.args.length !== 2) continue;
-    for (const [touchName, directionName] of [
-      [line.args[0]!, line.args[1]!],
-      [line.args[1]!, line.args[0]!],
-    ] as const) {
-      const rotation = commandsByName.get(directionName);
-      if (
-        rotation?.commandName !== 'Rotate'
-        || rotation.args.length !== 3
-        || rotation.args[2] !== touchName
-        || !isQuarterTurnLiteral(rotation.args[1]!)
-      ) continue;
-      const circles = definitions.filter((definition) => (
-        definition.commandName === 'Circle'
-        && definition.args[0] === rotation.args[0]
-        && (
-          definitionsByName.get(touchName)?.commandName === 'Intersect'
-            ? definitionsByName.get(touchName)!.args.includes(definition.object.name)
-            : definition.args.includes(touchName)
-        )
-      ));
-      if (circles.length !== 1) continue;
-      const touch = definitionsByName.get(touchName)?.entity;
-      if (!touch) continue;
-      const key = [
-        'tangent',
-        line.entity.id,
-        touch.id,
-        circles[0]!.entity.id,
-      ].join('\u0000');
-      if (seen.has(key)) continue;
-      seen.add(key);
-      output.push({
-        statementIndex: line.statement.index,
-        constraint: {
-          recordType: 'constraint',
-          id: `ggb:constraint:inferred-tangent-${line.statement.index}`,
-          kind: 'tangent',
-          arguments: relationArguments(line.entity.id, [touch.id, circles[0]!.entity.id]),
-          strength: 'required',
-          enabled: true,
-          sourceBindingIds: [bindingId(line.statement.index)],
-          metadata: { source: 'geogebra-quarter-turn-radius' },
-        },
-      });
-    }
-
-    for (const [throughName, translatedName] of [
-      [line.args[0]!, line.args[1]!],
-      [line.args[1]!, line.args[0]!],
-    ] as const) {
-      const translation = commandsByName.get(translatedName);
-      if (translation?.commandName !== 'Translate' || translation.args.length !== 2) continue;
-      const vector = commandsByName.get(translation.args[1]!);
-      if (
-        vector?.commandName !== 'Vector'
-        || vector.args.length !== 2
-        || vector.args[1] !== throughName
-      ) continue;
-      const references = segmentsByEndpoints.get(unorderedNames(
-        vector.args[0]!,
-        translation.args[0]!,
-      ))?.filter((candidate) => candidate.entity.id !== line.entity.id) ?? [];
-      if (references.length !== 1) continue;
-      const reference = references[0]!;
-      const key = ['parallel', line.entity.id, reference.entity.id].sort().join('\u0000');
-      if (seen.has(key)) continue;
-      seen.add(key);
-      output.push({
-        statementIndex: line.statement.index,
-        constraint: {
-          recordType: 'constraint',
-          id: `ggb:constraint:inferred-parallel-${line.statement.index}`,
-          kind: 'parallel',
-          arguments: relationArguments(line.entity.id, [reference.entity.id]),
-          strength: 'required',
-          enabled: true,
-          sourceBindingIds: [bindingId(line.statement.index)],
-          metadata: { source: 'geogebra-vector-translation' },
-        },
-      });
-    }
-  }
-  return output;
+function inferredGeometricConstraints(
+  definitions: readonly ProjectedDefinition[],
+  sourceCommands: readonly ParsedSourceCommand[],
+): GeometryConstraint[] {
+  return inferConstructionSemanticConstraints(
+    constructionSemanticTopology(definitions, sourceCommands),
+  ).map((fact) => ({
+    recordType: 'constraint',
+    id: `ggb:constraint:inferred:${fact.kind}:${hashSource(fact.semanticKey)}`,
+    kind: fact.kind,
+    arguments: fact.arguments,
+    strength: 'required',
+    enabled: true,
+    sourceBindingIds: fact.sourceBindingIds,
+    metadata: {
+      source: 'renderer-neutral-construction-topology',
+      evidenceKinds: fact.evidenceKinds,
+    },
+  }));
 }
 
 function sourceReference(source: SourceDocument, statement: SourceStatement) {
@@ -516,13 +543,12 @@ export function projectGeogebraCommandsToGeometryDoc(input: {
     return { ...definition, entity, relation, constraint };
   });
   const inferredConstraints = inferredGeometricConstraints(definitions, sourceCommands);
-  const inferredConstraintIdsByStatement = new Map<number, string[]>();
-  for (const inferred of inferredConstraints) {
-    const ids = inferredConstraintIdsByStatement.get(inferred.statementIndex) ?? [];
-    inferredConstraintIdsByStatement.set(
-      inferred.statementIndex,
-      [...ids, inferred.constraint.id],
-    );
+  const inferredConstraintIdsByBinding = new Map<string, string[]>();
+  for (const constraint of inferredConstraints) {
+    for (const sourceBindingId of constraint.sourceBindingIds ?? []) {
+      const ids = inferredConstraintIdsByBinding.get(sourceBindingId) ?? [];
+      inferredConstraintIdsByBinding.set(sourceBindingId, [...new Set([...ids, constraint.id])]);
+    }
   }
 
   const styles: GeometryStyle[] = [];
@@ -574,7 +600,7 @@ export function projectGeogebraCommandsToGeometryDoc(input: {
       ...(definition.constraint
         ? [{ recordType: 'constraint' as const, id: definition.constraint.id }]
         : []),
-      ...(inferredConstraintIdsByStatement.get(definition.statement.index) ?? []).map((id) => ({
+      ...(inferredConstraintIdsByBinding.get(bindingId(definition.statement.index)) ?? []).map((id) => ({
         recordType: 'constraint' as const,
         id,
       })),
@@ -587,7 +613,8 @@ export function projectGeogebraCommandsToGeometryDoc(input: {
     commandName: definition.commandName,
     args: definition.args,
     assignmentName: definition.name,
-    targets: [],
+    targets: (inferredConstraintIdsByBinding.get(bindingId(definition.statement.index)) ?? [])
+      .map((id) => ({ recordType: 'constraint' as const, id })),
   }));
   const bindings = [...definitionBindings, ...auxiliaryBindings, ...styleBindings]
     .sort((left, right) => left.source.range.start - right.source.range.start);
@@ -606,7 +633,7 @@ export function projectGeogebraCommandsToGeometryDoc(input: {
   const relations = definitions.flatMap((item) => item.relation ? [item.relation] : []);
   const constraints = [
     ...definitions.flatMap((item) => item.constraint ? [item.constraint] : []),
-    ...inferredConstraints.map((item) => item.constraint),
+    ...inferredConstraints,
   ];
   const kernelHash = hashSource(JSON.stringify({ entities, relations, constraints, styles }));
   const basis: GeometryRevisionBasis = {

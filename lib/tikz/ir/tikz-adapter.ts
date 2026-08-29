@@ -47,9 +47,14 @@ import {
 import { MANAGED_CONSTRUCTION_V3_ENVELOPE_SCHEMA } from '../semantics/managed-construction-v3';
 import { CONSTRUCTION_PLAN_FOOTPRINT_ABI_VERSION } from '../authoring/construction-plan-footprint';
 import { CONSTRUCTION_CATALOG_DIGEST } from '../authoring/construction-catalog';
+import {
+  inferConstructionSemanticConstraints,
+  type ConstructionPointDefinition,
+  type ConstructionSemanticTopology,
+} from '@/lib/geometry/construction-semantics';
 
 export const TIKZ_SEMANTIC_ADAPTER_ID = 'mathgeo.tikz.semantic-adapter';
-export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.27.0';
+export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.28.0';
 export const TIKZ_PLUGIN_SET_DIGEST = [
   `${TIKZ_SEMANTIC_ADAPTER_ID}@${TIKZ_SEMANTIC_ADAPTER_VERSION}`,
   MANAGED_CONSTRUCTION_V3_ENVELOPE_SCHEMA,
@@ -701,133 +706,91 @@ function pathIntersectionRelations(
   });
 }
 
-function isQuarterTurn(angleDegrees: number): boolean {
-  const normalized = ((angleDegrees % 180) + 180) % 180;
-  return Math.abs(normalized - 90) <= 1e-9;
+function topologyPointDefinition(point: ScenePoint): ConstructionPointDefinition | undefined {
+  const definition = point.definition;
+  if (!definition) return undefined;
+  switch (definition.kind) {
+    case 'interpolate':
+      return Math.abs(definition.t - 0.5) <= 1e-12
+        ? {
+            kind: 'midpoint',
+            startName: definition.startName,
+            endName: definition.endName,
+          }
+        : undefined;
+    case 'perpendicular-foot':
+    case 'rotate':
+    case 'translate':
+      return { ...definition };
+    case 'reference':
+      return undefined;
+  }
 }
 
-/**
- * A segment from P to a 90-degree rotation of a circle's radius direction is
- * a source-derived tangent, not a coordinate coincidence. The touch point must
- * itself depend on that named circle path so the inference remains topological.
- */
-function rotationDerivedTangentConstraints(
+function constructionSemanticTopology(
   points: readonly ScenePoint[],
   elements: readonly SceneElement[],
   namedPathElements: ReadonlyMap<string, string>,
-): GeometryConstraint[] {
-  const pointsByName = new Map(points.map((point) => [point.name, point] as const));
-  const elementsById = new Map(elements.map((element) => [element.stableId, element] as const));
-  const seen = new Set<string>();
-  const result: GeometryConstraint[] = [];
-
-  for (const line of elements) {
-    if (line.kind !== 'polyline' || line.cycle || line.refs.length !== 2) continue;
-    for (const [touchName, directionName] of [
-      [line.refs[0]!, line.refs[1]!],
-      [line.refs[1]!, line.refs[0]!],
-    ] as const) {
-      const touch = pointsByName.get(touchName);
-      const direction = pointsByName.get(directionName);
-      const rotation = direction?.definition;
-      if (
-        !touch
-        || rotation?.kind !== 'rotate'
-        || rotation.centerName !== touchName
-        || Math.abs(rotation.scale) <= 1e-12
-        || !isQuarterTurn(rotation.angleDegrees)
-      ) continue;
-      const circleIds = [...new Set(touch.dependsOn.flatMap((dependency) => {
-        if (!dependency.startsWith('path:')) return [];
-        const elementId = namedPathElements.get(dependency.slice('path:'.length));
-        const element = elementId ? elementsById.get(elementId) : undefined;
-        return element?.kind === 'circle'
-          && element.definition?.centerName === rotation.pointName
-          ? [element.stableId]
-          : [];
-      }))];
-      if (circleIds.length !== 1) continue;
-      const key = `${line.stableId}\u0000${touch.stableId}\u0000${circleIds[0]}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      result.push({
-        recordType: 'constraint',
-        id: `constraint:tangent:${line.stableId}:${touch.stableId}`,
-        kind: 'tangent',
-        strength: 'required',
-        enabled: true,
-        arguments: [
-          { role: 'line', entityId: line.stableId },
-          { role: 'touch-point', entityId: touch.stableId },
-          { role: 'circle', entityId: circleIds[0]! },
-        ],
-        sourceBindingIds: [`binding:${line.stableId}`],
-        metadata: { source: 'tikz-quarter-turn-radius' },
-      });
-    }
-  }
-  return result;
+  directPathDependenciesByPointName: ReadonlyMap<string, readonly string[]>,
+): ConstructionSemanticTopology {
+  return {
+    points: points.map((point) => {
+      const definition = topologyPointDefinition(point);
+      return {
+        id: point.stableId,
+        name: point.name,
+        ...(definition ? { definition } : {}),
+        incidentEntityIds: [...new Set(
+          (directPathDependenciesByPointName.get(point.name) ?? []).flatMap((dependency) => {
+            if (!dependency.startsWith('path:')) return [];
+            const entityId = namedPathElements.get(dependency.slice('path:'.length));
+            return entityId ? [entityId] : [];
+          }),
+        )],
+        sourceBindingIds: [`binding:${point.stableId}`],
+      };
+    }),
+    segments: elements.flatMap((element) => (
+      element.kind === 'polyline' && !element.cycle && element.refs.length === 2
+        ? [{
+            id: element.stableId,
+            endpointNames: [element.refs[0]!, element.refs[1]!] as const,
+            sourceBindingIds: [`binding:${element.stableId}`],
+          }]
+        : []
+    )),
+    circles: elements.flatMap((element) => (
+      element.kind === 'circle' && element.definition
+        ? [{
+            id: element.stableId,
+            centerName: element.definition.centerName,
+            ...(element.definition.kind === 'center-through'
+              ? { throughName: element.definition.throughName }
+              : {}),
+            sourceBindingIds: [`binding:${element.stableId}`],
+          }]
+        : []
+    )),
+  };
 }
 
-function unorderedPointPair(left: string, right: string): string {
-  return left.localeCompare(right) <= 0
-    ? `${left}\u0000${right}`
-    : `${right}\u0000${left}`;
-}
-
-/**
- * If V = U + (Q - P), then segment QV copies segment PU's direction exactly.
- * Preserve this construction fact as a portable parallel constraint.
- */
-function translationDerivedParallelConstraints(
-  points: readonly ScenePoint[],
-  elements: readonly SceneElement[],
+function inferredConstructionConstraints(
+  topology: ConstructionSemanticTopology,
 ): GeometryConstraint[] {
-  const pointsByName = new Map(points.map((point) => [point.name, point] as const));
-  const segmentsByEndpoints = new Map<string, SceneElement[]>();
-  for (const element of elements) {
-    if (element.kind !== 'polyline' || element.cycle || element.refs.length !== 2) continue;
-    const key = unorderedPointPair(element.refs[0]!, element.refs[1]!);
-    segmentsByEndpoints.set(key, [...(segmentsByEndpoints.get(key) ?? []), element]);
-  }
-  const seen = new Set<string>();
-  const result: GeometryConstraint[] = [];
-  for (const line of elements) {
-    if (line.kind !== 'polyline' || line.cycle || line.refs.length !== 2) continue;
-    for (const [throughName, translatedName] of [
-      [line.refs[0]!, line.refs[1]!],
-      [line.refs[1]!, line.refs[0]!],
-    ] as const) {
-      const definition = pointsByName.get(translatedName)?.definition;
-      if (definition?.kind !== 'translate' || definition.toName !== throughName) continue;
-      const referenceCandidates = segmentsByEndpoints.get(unorderedPointPair(
-        definition.fromName,
-        definition.pointName,
-      )) ?? [];
-      const references = referenceCandidates.filter((candidate) => (
-        candidate.stableId !== line.stableId
-      ));
-      if (references.length !== 1) continue;
-      const reference = references[0]!;
-      const key = [line.stableId, reference.stableId].sort().join('\u0000');
-      if (seen.has(key)) continue;
-      seen.add(key);
-      result.push({
-        recordType: 'constraint',
-        id: `constraint:parallel:${line.stableId}:${reference.stableId}`,
-        kind: 'parallel',
-        strength: 'required',
-        enabled: true,
-        arguments: [
-          { role: 'line', entityId: line.stableId },
-          { role: 'reference', entityId: reference.stableId },
-        ],
-        sourceBindingIds: [`binding:${line.stableId}`],
-        metadata: { source: 'tikz-vector-translation' },
-      });
-    }
-  }
-  return result;
+  return inferConstructionSemanticConstraints(topology)
+    .map((fact) => ({
+      recordType: 'constraint',
+      id: `constraint:inferred:${fact.kind}:${hashSource(fact.semanticKey)}`,
+      kind: fact.kind,
+      strength: 'required',
+      enabled: true,
+      arguments: fact.arguments,
+      sourceBindingIds: fact.sourceBindingIds,
+      metadata: {
+        source: 'renderer-neutral-construction-topology',
+        evidenceKinds: fact.evidenceKinds,
+      },
+    }));
 }
 
 function duplicatesManagedConstraint(
@@ -838,19 +801,26 @@ function duplicatesManagedConstraint(
     argument.entityId ? [argument.entityId] : []
   ));
   return managed.some((constraint) => {
-    const kind = constraint.kind === 'tangent-at-point' ? 'tangent' : constraint.kind;
+    const kind = constraint.kind === 'tangent-at-point'
+      ? 'tangent'
+      : constraint.kind === 'on-circle'
+        ? 'point-on-circle'
+        : constraint.kind === 'cyclic' || constraint.kind === 'cyclic-quadrilateral'
+          ? 'concyclic'
+          : constraint.kind;
     if (kind !== inferred.kind) return false;
     const managedIds = constraint.arguments.flatMap((argument) => (
       argument.entityId ? [argument.entityId] : []
     ));
     if (kind === 'tangent') {
-      return inferredIds.every((entityId, index) => managedIds[index] === entityId);
+      return inferredIds.every((entityId) => managedIds.includes(entityId));
     }
-    if (kind === 'parallel') {
+    if (kind === 'parallel' || kind === 'concyclic') {
       return inferredIds.length === managedIds.length
         && inferredIds.every((entityId) => managedIds.includes(entityId));
     }
-    return false;
+    return inferredIds.length === managedIds.length
+      && inferredIds.every((entityId, index) => managedIds[index] === entityId);
   });
 }
 
@@ -951,7 +921,10 @@ function pointConstraints(
     }
 
     const constraint = point.constraint;
-    if (constraint) {
+    if (constraint && definition?.kind !== 'rotate') {
+      // A rotation remains first-class construction evidence, but it is not a
+      // portable reference to a named circle. The shared topology projector
+      // emits point-on-circle only when the source also provides that circle.
       result.push({
         recordType: 'constraint',
         id: `constraint:on-circle:${point.stableId}`,
@@ -2530,8 +2503,17 @@ export function projectTikzAnalysisToGeometryTruth(
   // Scene.stableId may be replaced by the UI-only EntityIdentityRegistry to
   // preserve selection continuity. GeometryDoc identities must instead be a
   // deterministic function of source so an isolated Broker can replay them.
+  const scenePoints = input.analysis.scene
+    ? [...input.analysis.scene.points.values()]
+    : [];
+  const directPathDependenciesByPointName = new Map(
+    scenePoints.map((point) => [
+      point.name,
+      point.dependsOn.filter((dependency) => dependency.startsWith('path:')),
+    ] as const),
+  );
   const points = input.analysis.scene
-    ? publicSemanticPoints([...input.analysis.scene.points.values()]).map((point) => ({
+    ? publicSemanticPoints(scenePoints).map((point) => ({
       ...point,
       stableId: `point:${point.name}`,
     }))
@@ -2636,10 +2618,14 @@ export function projectTikzAnalysisToGeometryTruth(
   const entitiesById = new Map(
     entities.map((entity) => [entity.id, entity] as const),
   );
-  const inferredConstraints = [
-    ...rotationDerivedTangentConstraints(points, elements, namedPathElements),
-    ...translationDerivedParallelConstraints(points, elements),
-  ].filter((constraint) => !duplicatesManagedConstraint(constraint, managed.constraints));
+  const inferredConstraints = inferredConstructionConstraints(
+    constructionSemanticTopology(
+      points,
+      elements,
+      namedPathElements,
+      directPathDependenciesByPointName,
+    ),
+  ).filter((constraint) => !duplicatesManagedConstraint(constraint, managed.constraints));
   const constraints = [
     ...pointConstraints(points, pointIdsByName).filter((constraint) => {
       // Inferred constraints always place their constrained/result entity

@@ -1,0 +1,31 @@
+\begin{tikzpicture}
+\coordinate (O1) at (0,0);
+\coordinate (O2) at (3,0);
+\draw[name path=c1] (O1) circle[radius=3];
+\draw[name path=c2] (O2) circle[radius=3];
+\path[name intersections={of=c1 and c2}]
+  (intersection-1) coordinate (P)
+  (intersection-2) coordinate (Q);
+\draw (P) -- (Q);
+\coordinate (U) at ($(P)!1!90:(O1)$);
+\draw (P) -- (U);
+\coordinate (V) at ($(U)+(Q)-(P)$);
+\draw (Q) -- (V);
+\coordinate (M12) at ($(O1)!0.5!(O2)$);
+\coordinate (M1P) at ($(O1)!0.5!(P)$);
+\coordinate (R12) at ($(M12)!1!90:(O2)$);
+\coordinate (R1P) at ($(M1P)!1!90:(O1)$);
+\draw[name path=bis12] (M12) -- (R12);
+\draw[name path=bis1P] (M1P) -- (R1P);
+\path[name intersections={of=bis12 and bis1P}]
+  (intersection-1) coordinate (C0);
+\coordinate (D) at ($(O2)!(O1)!(P)$);
+\coordinate (E) at ($(P)!(O2)!(O1)$);
+\draw[name path=alt1] (O1) -- (D);
+\draw[name path=alt2] (O2) -- (E);
+\path[name intersections={of=alt1 and alt2}]
+  (intersection-1) coordinate (H0);
+\draw[name path=omega] (C0) circle through (O1);
+\coordinate (L) at ($(C0)!1!45:(O1)$);
+\draw (O1) -- (L);
+\end{tikzpicture}
