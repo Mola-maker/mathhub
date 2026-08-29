@@ -154,6 +154,19 @@ the existing `GeometryDoc` truth lanes.
     - an independently authored, SHA-256-pinned TikZ/GeoGebra pair requires
       twenty-six portable entities, seventeen matching portable constraints,
       and twelve matching portable relations.
+15. Native GeoGebra center and circumcircle normalization
+    - `Circumcenter(A,B,C)` and `Orthocenter(A,B,C)` now enter the same shared
+      construction topology used by derived TikZ and GeoGebra center proofs;
+    - `Circumcircle(A,B,C)` contributes three explicit circle memberships while
+      remaining centerless unless the source itself declares a center;
+    - all three promotions require three distinct, already projected point
+      references; malformed or unresolved commands remain source definitions
+      but contribute no higher-order semantic fact;
+    - circumcenter, orthocenter, and concyclic constraints now have conservative
+      structural-planning DoF weights, so their components no longer become
+      unknown solely because the semantic vocabulary was extended;
+    - adapter digests advance when these projection/diagnostic semantics change,
+      preserving stale-checkpoint rejection across context compaction.
 
 ## External benchmark evidence
 

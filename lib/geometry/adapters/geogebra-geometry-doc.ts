@@ -39,7 +39,7 @@ import {
 export const GEOGEBRA_GEOMETRY_PROJECTION_SCHEMA_VERSION =
   'geogebra-geometry-projection/v1' as const;
 export const GEOGEBRA_PLUGIN_SET_DIGEST =
-  'geogebra-command-projector/v3' as const;
+  'geogebra-command-projector/v4' as const;
 
 export interface GeogebraProjectionIdentity {
   readonly documentId: string;
@@ -176,9 +176,33 @@ function relationArguments(outputId: string, inputs: readonly string[]): Geometr
   ];
 }
 
+function resolvedPointTriple(
+  args: readonly string[],
+  definitionsByName: ReadonlyMap<string, ProjectedDefinition>,
+  definitionCountsByName: ReadonlyMap<string, number>,
+  outputName: string,
+): readonly [string, string, string] | null {
+  if (args.length !== 3) return null;
+  const [first, second, third] = args.map((argument) => argument.trim());
+  if (!first || !second || !third) return null;
+  const names = [first, second, third] as const;
+  if (
+    definitionCountsByName.get(outputName) !== 1
+    || new Set(names).size !== 3
+    || names.includes(outputName)
+    || names.some((name) => definitionCountsByName.get(name) !== 1)
+    || !names.every((name) => definitionsByName.get(name)?.object.type === 'point')
+  ) {
+    return null;
+  }
+  return names;
+}
+
 function topologyPointDefinition(
   definition: ProjectedDefinition,
   commandsByName: ReadonlyMap<string, ParsedSourceCommand>,
+  definitionsByName: ReadonlyMap<string, ProjectedDefinition>,
+  definitionCountsByName: ReadonlyMap<string, number>,
 ): ConstructionPointDefinition | undefined {
   if (definition.commandName === 'Midpoint' && definition.args.length === 2) {
     return {
@@ -218,6 +242,24 @@ function topologyPointDefinition(
         }
       : undefined;
   }
+  if (
+    definition.commandName === 'Circumcenter'
+    || definition.commandName === 'Orthocenter'
+  ) {
+    const vertexNames = resolvedPointTriple(
+      definition.args,
+      definitionsByName,
+      definitionCountsByName,
+      definition.object.name,
+    );
+    if (!vertexNames) return undefined;
+    return {
+      kind: definition.commandName === 'Circumcenter'
+        ? 'circumcenter'
+        : 'orthocenter',
+      vertexNames,
+    };
+  }
   return undefined;
 }
 
@@ -228,13 +270,23 @@ function constructionSemanticTopology(
   const definitionsByName = new Map(
     definitions.map((definition) => [definition.object.name, definition] as const),
   );
+  const definitionCountsByName = new Map<string, number>();
+  for (const definition of definitions) {
+    const name = definition.object.name;
+    definitionCountsByName.set(name, (definitionCountsByName.get(name) ?? 0) + 1);
+  }
   const commandsByName = new Map(
     sourceCommands.map((command) => [command.name, command] as const),
   );
   return {
     points: definitions.flatMap((definition) => {
       if (definition.object.type !== 'point') return [];
-      const pointDefinition = topologyPointDefinition(definition, commandsByName);
+      const pointDefinition = topologyPointDefinition(
+        definition,
+        commandsByName,
+        definitionsByName,
+        definitionCountsByName,
+      );
       const vector = definition.commandName === 'Translate'
         ? commandsByName.get(definition.args[1] ?? '')
         : undefined;
@@ -269,13 +321,17 @@ function constructionSemanticTopology(
         : []
     )),
     circles: definitions.flatMap((definition) => {
-      if (definition.commandName !== 'Circle' || definition.args.length < 2) return [];
-      if (definition.args.length === 3) {
-        const threePointMembers = definition.args.every((name) => (
-          definitionsByName.get(name)?.object.type === 'point'
-        ))
-          ? definition.args
-          : undefined;
+      if (
+        definition.commandName !== 'Circle'
+        && definition.commandName !== 'Circumcircle'
+      ) return [];
+      if (definition.commandName === 'Circumcircle' || definition.args.length === 3) {
+        const threePointMembers = resolvedPointTriple(
+          definition.args,
+          definitionsByName,
+          definitionCountsByName,
+          definition.object.name,
+        );
         return [{
           id: definition.entity.id,
           ...(threePointMembers ? { memberNames: threePointMembers } : {}),

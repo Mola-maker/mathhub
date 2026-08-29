@@ -54,7 +54,7 @@ import {
 } from '@/lib/geometry/construction-semantics';
 
 export const TIKZ_SEMANTIC_ADAPTER_ID = 'mathgeo.tikz.semantic-adapter';
-export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.28.0';
+export const TIKZ_SEMANTIC_ADAPTER_VERSION = '1.29.0';
 export const TIKZ_PLUGIN_SET_DIGEST = [
   `${TIKZ_SEMANTIC_ADAPTER_ID}@${TIKZ_SEMANTIC_ADAPTER_VERSION}`,
   MANAGED_CONSTRUCTION_V3_ENVELOPE_SCHEMA,

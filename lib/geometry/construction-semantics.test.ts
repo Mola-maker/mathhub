@@ -152,4 +152,79 @@ describe('renderer-neutral construction semantics', () => {
       .toHaveLength(3);
     expect(constraints.some((constraint) => constraint.kind === 'tangent')).toBe(false);
   });
+
+  it('promotes explicit triangle-center definitions and rejects unresolved triples', () => {
+    const constraints = inferConstructionSemanticConstraints({
+      points: [
+        point('A', { sourceBindingIds: ['binding:A'] }),
+        point('B', { sourceBindingIds: ['binding:B'] }),
+        point('C', { sourceBindingIds: ['binding:C'] }),
+        point('O', {
+          definition: {
+            kind: 'circumcenter',
+            vertexNames: ['A', 'B', 'C'],
+          },
+          sourceBindingIds: ['binding:O'],
+        }),
+        point('H', {
+          definition: {
+            kind: 'orthocenter',
+            vertexNames: ['C', 'A', 'B'],
+          },
+          sourceBindingIds: ['binding:H'],
+        }),
+        point('unresolved', {
+          definition: {
+            kind: 'circumcenter',
+            vertexNames: ['A', 'B', 'Missing'],
+          },
+        }),
+        point('selfReference', {
+          definition: {
+            kind: 'orthocenter',
+            vertexNames: ['selfReference', 'A', 'B'],
+          },
+        }),
+        point('duplicate', {
+          definition: {
+            kind: 'circumcenter',
+            vertexNames: ['A', 'B', 'C'],
+          },
+        }),
+        point('duplicate'),
+      ],
+      segments: [],
+      circles: [{ id: 'circle:omega', memberNames: ['A', 'B', 'C'] }],
+    });
+    const centers = constraints.filter((constraint) => (
+      constraint.kind === 'circumcenter' || constraint.kind === 'orthocenter'
+    ));
+
+    expect(centers).toHaveLength(2);
+    expect(centers.find((constraint) => constraint.kind === 'circumcenter')?.arguments).toEqual(
+      [
+        { role: 'center', entityId: 'point:O' },
+        { role: 'vertex-1', entityId: 'point:A' },
+        { role: 'vertex-2', entityId: 'point:B' },
+        { role: 'vertex-3', entityId: 'point:C' },
+      ],
+    );
+    expect(centers.find((constraint) => constraint.kind === 'orthocenter')?.arguments).toEqual(
+      [
+        { role: 'center', entityId: 'point:H' },
+        { role: 'vertex-1', entityId: 'point:A' },
+        { role: 'vertex-2', entityId: 'point:B' },
+        { role: 'vertex-3', entityId: 'point:C' },
+      ],
+    );
+    expect(centers.find((constraint) => constraint.kind === 'circumcenter')?.evidenceKinds)
+      .toEqual(['explicit-circumcenter-command']);
+    expect(centers.find((constraint) => constraint.kind === 'orthocenter')?.evidenceKinds)
+      .toEqual(['explicit-orthocenter-command']);
+    expect(centers.some((constraint) => constraint.arguments.some((argument) => (
+      argument.entityId === 'point:unresolved'
+      || argument.entityId === 'point:selfReference'
+      || argument.entityId === 'point:duplicate'
+    )))).toBe(false);
+  });
 });

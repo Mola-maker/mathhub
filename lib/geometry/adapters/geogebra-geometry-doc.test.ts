@@ -131,6 +131,94 @@ describe('projectGeogebraCommandsToGeometryDoc', () => {
     expect(constraints.some((constraint) => constraint.kind === 'tangent')).toBe(false);
   });
 
+  it('projects native triangle-center and circumcircle commands fail-closed', () => {
+    const result = projectGeogebraCommandsToGeometryDoc({
+      identity,
+      commands: [
+        'A=(0,0)',
+        'B=(5,0)',
+        'C=(1,3)',
+        'O=Circumcenter(A,B,C)',
+        'H=Orthocenter(A,B,C)',
+        'omega=Circumcircle(A,B,C)',
+        'unresolvedCenter=Circumcenter(A,B,Missing)',
+        'unresolvedCircle=Circumcircle(A,B,Missing)',
+        'lineAB=Line(A,B)',
+        'wrongTypeCenter=Orthocenter(A,B,lineAB)',
+        'duplicateVertexCircle=Circumcircle(A,B,A)',
+        'selfReference=Circumcenter(selfReference,B,C)',
+        'ambiguousPoint=(2,2)',
+        'ambiguousPoint=(3,3)',
+        'ambiguousInputCenter=Orthocenter(A,B,ambiguousPoint)',
+        'duplicateOutputCenter=(2,1)',
+        'duplicateOutputCenter=Circumcenter(A,B,C)',
+      ],
+    });
+    const constraints = result.geometryDoc.semantic.ir.constraints;
+    const centers = constraints.filter((constraint) => (
+      constraint.kind === 'circumcenter' || constraint.kind === 'orthocenter'
+    ));
+    const memberships = constraints.filter((constraint) => (
+      constraint.kind === 'point-on-circle'
+    ));
+
+    expect(result.opaqueCommandCount).toBe(0);
+    expect(centers).toHaveLength(2);
+    expect(centers.find((constraint) => constraint.kind === 'circumcenter')?.arguments).toEqual(
+      [
+        { role: 'center', entityId: 'ggb:entity:O' },
+        { role: 'vertex-1', entityId: 'ggb:entity:A' },
+        { role: 'vertex-2', entityId: 'ggb:entity:B' },
+        { role: 'vertex-3', entityId: 'ggb:entity:C' },
+      ],
+    );
+    expect(centers.find((constraint) => constraint.kind === 'orthocenter')?.arguments).toEqual(
+      [
+        { role: 'center', entityId: 'ggb:entity:H' },
+        { role: 'vertex-1', entityId: 'ggb:entity:A' },
+        { role: 'vertex-2', entityId: 'ggb:entity:B' },
+        { role: 'vertex-3', entityId: 'ggb:entity:C' },
+      ],
+    );
+    expect(memberships).toHaveLength(3);
+    expect(memberships.map((constraint) => constraint.arguments.find((argument) => (
+      argument.role === 'point'
+    ))?.entityId).sort()).toEqual([
+      'ggb:entity:A',
+      'ggb:entity:B',
+      'ggb:entity:C',
+    ]);
+    expect(memberships.every((constraint) => constraint.arguments.some((argument) => (
+      argument.role === 'circle' && argument.entityId === 'ggb:entity:omega'
+    )))).toBe(true);
+    expect(constraints.some((constraint) => constraint.arguments.some((argument) => (
+      argument.entityId === 'ggb:entity:unresolvedCenter'
+      || argument.entityId === 'ggb:entity:unresolvedCircle'
+      || argument.entityId === 'ggb:entity:wrongTypeCenter'
+      || argument.entityId === 'ggb:entity:duplicateVertexCircle'
+      || argument.entityId === 'ggb:entity:selfReference'
+      || argument.entityId === 'ggb:entity:ambiguousInputCenter'
+      || argument.entityId === 'ggb:entity:duplicateOutputCenter'
+    )))).toBe(false);
+    expect(result.geometryDoc.semantic.ir.entities.find((entity) => entity.name === 'O'))
+      .toMatchObject({ kind: 'point', dimension: 0 });
+    expect(result.geometryDoc.semantic.ir.entities.find((entity) => entity.name === 'H'))
+      .toMatchObject({ kind: 'point', dimension: 0 });
+    expect(result.geometryDoc.semantic.ir.entities.find((entity) => entity.name === 'omega'))
+      .toMatchObject({ kind: 'circle', dimension: 1 });
+    const relationKindFor = (entityId: string): string | undefined => (
+      result.geometryDoc.semantic.ir.relations.find((relation) => (
+        relation.participants.some((argument) => (
+          argument.role === 'result' && argument.entityId === entityId
+        ))
+      ))?.kind
+    );
+    expect(relationKindFor('ggb:entity:O')).toBe('center-definition');
+    expect(relationKindFor('ggb:entity:H')).toBe('center-definition');
+    expect(relationKindFor('ggb:entity:omega')).toBe('circle-definition');
+    expect(result.semanticSignature.coverage.constraints).toEqual({ portable: 5, total: 5 });
+  });
+
   it('recovers triangle centers and cyclic structure from ordinary commands', () => {
     const result = projectGeogebraCommandsToGeometryDoc({
       identity,

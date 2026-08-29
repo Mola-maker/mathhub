@@ -73,7 +73,17 @@ const constraintDof: Record<string, number> = {
   // Line incidence plus circle incidence; excluding the known point chooses a
   // discrete branch and therefore does not change the continuous count.
   'line-circle-other-intersection': 2,
-  inversion: 2, cyclic: 1, collinear: 1, 'complete-quadrilateral': 1,
+  inversion: 2,
+  // A named triangle center is fixed by two independent scalar equations.
+  circumcenter: 2,
+  orthocenter: 2,
+  // Every supported n-ary fact (n >= 4) contains at least the quadrilateral
+  // codimension-one condition. Weight 1 is exact for n=4 and conservative for
+  // larger point sets.
+  cyclic: 1,
+  concyclic: 1,
+  collinear: 1,
+  'complete-quadrilateral': 1,
 };
 
 function refs(args: readonly { entityId?: string }[]): string[] {

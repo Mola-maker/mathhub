@@ -30,6 +30,14 @@ export type ConstructionPointDefinition =
     readonly pointName: string;
     readonly fromName: string;
     readonly toName: string;
+  }
+  | {
+    readonly kind: 'circumcenter';
+    readonly vertexNames: readonly [string, string, string];
+  }
+  | {
+    readonly kind: 'orthocenter';
+    readonly vertexNames: readonly [string, string, string];
   };
 
 export interface ConstructionTopologyPoint {
@@ -217,6 +225,42 @@ function altitudeEvidence(
   return null;
 }
 
+function explicitTriangleCenterEvidence(
+  center: ConstructionTopologyPoint,
+  pointsByName: ReadonlyMap<string, ConstructionTopologyPoint>,
+): TriangleCenterEvidence | null {
+  const definition = center.definition;
+  if (
+    definition?.kind !== 'circumcenter'
+    && definition?.kind !== 'orthocenter'
+  ) return null;
+  const vertexNames = sortedTriple(definition.vertexNames);
+  if (
+    !vertexNames
+    || vertexNames.includes(center.name)
+    || pointsByName.get(center.name)?.id !== center.id
+  ) return null;
+  const first = pointsByName.get(vertexNames[0]);
+  const second = pointsByName.get(vertexNames[1]);
+  const third = pointsByName.get(vertexNames[2]);
+  if (!first || !second || !third) return null;
+  const vertices = [first, second, third] as const;
+  if (new Set([center.id, ...vertices.map((vertex) => vertex.id)]).size !== 4) {
+    return null;
+  }
+  return {
+    kind: definition.kind,
+    center,
+    vertexNames,
+    sourceBindingIds: bindingsOf(center, ...vertices),
+    evidenceEntityIds: unique([
+      center.id,
+      ...vertices.map((vertex) => vertex.id),
+    ]),
+    evidenceKind: `explicit-${definition.kind}-command`,
+  };
+}
+
 function triangleCenterEvidence(
   topology: ConstructionSemanticTopology,
   pointsByName: ReadonlyMap<string, ConstructionTopologyPoint>,
@@ -224,6 +268,9 @@ function triangleCenterEvidence(
 ): TriangleCenterEvidence[] {
   const result: TriangleCenterEvidence[] = [];
   for (const center of topology.points) {
+    const explicitEvidence = explicitTriangleCenterEvidence(center, pointsByName);
+    if (explicitEvidence) result.push(explicitEvidence);
+
     const incidentSegments = unique(center.incidentEntityIds ?? [])
       .flatMap((id) => segmentsById.get(id) ?? []);
     const bisectors = incidentSegments.flatMap((segment) => {
@@ -289,10 +336,32 @@ function triangleCenterEvidence(
   return result;
 }
 
+function pointIdsForTriple(
+  names: readonly [string, string, string],
+  pointsByName: ReadonlyMap<string, ConstructionTopologyPoint>,
+): readonly [string, string, string] | null {
+  const first = pointsByName.get(names[0]);
+  const second = pointsByName.get(names[1]);
+  const third = pointsByName.get(names[2]);
+  return first && second && third
+    ? [first.id, second.id, third.id]
+    : null;
+}
+
 export function inferConstructionSemanticConstraints(
   topology: ConstructionSemanticTopology,
 ): InferredConstructionSemanticConstraint[] {
-  const pointsByName = new Map(topology.points.map((point) => [point.name, point] as const));
+  const pointNameCounts = new Map<string, number>();
+  for (const point of topology.points) {
+    pointNameCounts.set(point.name, (pointNameCounts.get(point.name) ?? 0) + 1);
+  }
+  // Source-level name ambiguity is never resolved by "last definition wins".
+  // Removing duplicates from the lookup makes every downstream proof fail closed.
+  const pointsByName = new Map(topology.points.flatMap((point) => (
+    pointNameCounts.get(point.name) === 1
+      ? [[point.name, point] as const]
+      : []
+  )));
   const segmentsById = new Map(topology.segments.map((segment) => [segment.id, segment] as const));
   const circlesById = new Map(topology.circles.map((circle) => [circle.id, circle] as const));
   const segmentsByEndpoints = new Map<string, ConstructionTopologySegment[]>();
@@ -317,13 +386,13 @@ export function inferConstructionSemanticConstraints(
 
   const centerEvidence = triangleCenterEvidence(topology, pointsByName, segmentsById);
   for (const evidence of centerEvidence) {
-    const vertexIds = evidence.vertexNames.map((name) => pointsByName.get(name)?.id);
-    if (vertexIds.some((id) => !id)) continue;
+    const vertexIds = pointIdsForTriple(evidence.vertexNames, pointsByName);
+    if (!vertexIds) continue;
     addFact({
       kind: evidence.kind,
       arguments: [
         { role: 'center', entityId: evidence.center.id },
-        ...(vertexIds as string[]).map((entityId, index) => ({
+        ...vertexIds.map((entityId, index) => ({
           role: `vertex-${index + 1}`,
           entityId,
         })),

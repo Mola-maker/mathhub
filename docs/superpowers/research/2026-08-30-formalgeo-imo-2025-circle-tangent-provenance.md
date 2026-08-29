@@ -64,8 +64,14 @@ Both adapters project their ordinary source graphs into one shared,
 renderer-neutral topology inference layer. That layer recovers tangent,
 parallel, circumcenter, orthocenter, point-on-circle, and concyclic constraints
 without coordinate coincidence or managed metadata. Three-point circles remain
-centerless topology records, and inferred evidence is exposed through inspection-only
-source-map reverse links without weakening raw-circle adoption bindings.
+centerless topology records, and inferred evidence is exposed through
+inspection-only source-map reverse links without weakening raw-circle adoption
+bindings. GeoGebra's named `Circumcenter`, `Orthocenter`, and `Circumcircle`
+commands normalize through this same layer when all three arguments resolve to
+distinct projected points; otherwise their higher-order promotion fails closed.
+The corresponding center and concyclic records also retain conservative
+structural-planning DoF estimates instead of degrading the component to an
+unknown weight.
 
 The pair pins twenty-six mathematical entities, seventeen portable constraints,
 and twelve portable relations. The constraint set includes four direct
