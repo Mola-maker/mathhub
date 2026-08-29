@@ -2,6 +2,15 @@ import {
   isTikzAgentEvent,
   type TikzAgentEvent,
 } from './protocol';
+import {
+  isTikzAgentRunBasisTransition,
+  isTikzAgentRunCheckpoint,
+  sameTikzAgentReplayBasis,
+  sameTikzAgentRunBasis,
+  type TikzAgentReplayBasis,
+  type TikzAgentRunCheckpoint,
+  type TikzAgentRunBasisTransition,
+} from './run-checkpoint';
 
 /**
  * The replay endpoint is deliberately a read-only recovery lane.  Keep this
@@ -26,8 +35,13 @@ export interface TikzAgentReplayProposalSummary {
 }
 
 export interface TikzAgentReplayResult {
-  readonly schemaVersion: 'tikz-agent-run-replay/v1';
+  readonly schemaVersion: 'tikz-agent-run-replay/v2';
   readonly runId: string;
+  readonly basis: TikzAgentReplayBasis;
+  readonly basisPhase: 'running' | 'proposal-pending' | 'verification-pending' | 'terminal';
+  readonly runCheckpoint: TikzAgentRunCheckpoint;
+  readonly basisTransition?: TikzAgentRunBasisTransition;
+  readonly earliestSequence?: number;
   /** Events are validated, bounded, run-scoped, and strictly increasing. */
   readonly events: readonly TikzAgentEvent[];
   /**
@@ -75,6 +89,24 @@ function boundedRevision(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
+function parseReplayBasis(value: unknown): TikzAgentReplayBasis | null {
+  if (!record(value)) return null;
+  if (
+    !boundedText(value.documentId)
+    || !boundedText(value.epoch)
+    || !boundedText(value.sourceId)
+    || !boundedRevision(value.revision)
+    || !boundedText(value.sourceHash)
+  ) return null;
+  return {
+    documentId: value.documentId,
+    epoch: value.epoch,
+    sourceId: value.sourceId,
+    revision: value.revision,
+    sourceHash: value.sourceHash,
+  };
+}
+
 function parseProposalSummary(
   value: unknown,
   expectedRunId: string,
@@ -113,12 +145,55 @@ function parseReplay(
   value: unknown,
   expectedRunId: string,
   afterSequence: number,
+  expectedBasis: TikzAgentReplayBasis,
 ): TikzAgentReplayResult {
-  if (!record(value) || value.schemaVersion !== 'tikz-agent-run-replay/v1') {
+  if (!record(value) || value.schemaVersion !== 'tikz-agent-run-replay/v2') {
     throw new TikzAgentReplayError('invalid', 'Agent replay payload schema is invalid');
   }
   if (value.runId !== expectedRunId) {
     throw new TikzAgentReplayError('invalid', 'Agent replay run identity does not match');
+  }
+  const basis = parseReplayBasis(value.basis);
+  const phases: readonly TikzAgentReplayResult['basisPhase'][] = [
+    'running',
+    'proposal-pending',
+    'verification-pending',
+    'terminal',
+  ];
+  const runCheckpoint = value.runCheckpoint;
+  const basisTransition = value.basisTransition === null
+    || value.basisTransition === undefined
+    ? undefined
+    : value.basisTransition;
+  if (
+    !basis
+    || !sameTikzAgentReplayBasis(basis, expectedBasis)
+    || !isTikzAgentRunCheckpoint(runCheckpoint)
+    || runCheckpoint.runId !== expectedRunId
+    || typeof value.basisPhase !== 'string'
+    || !phases.includes(value.basisPhase as TikzAgentReplayResult['basisPhase'])
+    || (
+      basisTransition !== undefined
+      && (
+        !isTikzAgentRunBasisTransition(basisTransition)
+        || basisTransition.runId !== expectedRunId
+        || !sameTikzAgentRunBasis(runCheckpoint.basis, basisTransition.before)
+      )
+    )
+  ) {
+    throw new TikzAgentReplayError('invalid', 'Agent replay GeometryDoc checkpoint is invalid');
+  }
+  const earliestSequence = value.earliestSequence === null
+    ? undefined
+    : value.earliestSequence;
+  if (
+    earliestSequence !== undefined
+    && (
+      !boundedRevision(earliestSequence)
+      || afterSequence < earliestSequence - 1
+    )
+  ) {
+    throw new TikzAgentReplayError('invalid', 'Agent replay event window is incomplete');
   }
   if (!Array.isArray(value.events) || value.events.length > MAX_TIKZ_AGENT_REPLAY_EVENTS) {
     throw new TikzAgentReplayError('invalid', 'Agent replay event batch is invalid or too large');
@@ -153,7 +228,14 @@ function parseReplay(
       throw new TikzAgentReplayError('invalid', 'Agent replay terminal event is invalid');
     }
     terminal = value.terminal;
-    if (terminal.sequence > afterSequence && !eventIds.has(terminal.eventId)) {
+    const replayedTerminal = events.find((event) => event.eventId === terminal?.eventId);
+    if (
+      replayedTerminal
+      && JSON.stringify(replayedTerminal) !== JSON.stringify(terminal)
+    ) {
+      throw new TikzAgentReplayError('invalid', 'Agent replay terminal identity is inconsistent');
+    }
+    if (terminal.sequence > afterSequence && !replayedTerminal) {
       if (terminal.sequence <= lastSequence) {
         throw new TikzAgentReplayError('invalid', 'Agent replay terminal ordering is invalid');
       }
@@ -164,15 +246,66 @@ function parseReplay(
   }
 
   const proposal = parseProposalSummary(value.proposal, expectedRunId);
+  if (value.proposal !== null && value.proposal !== undefined && !proposal) {
+    throw new TikzAgentReplayError('invalid', 'Agent replay proposal checkpoint is invalid');
+  }
   if (
     value.verificationPending !== undefined
     && typeof value.verificationPending !== 'boolean'
   ) {
     throw new TikzAgentReplayError('invalid', 'Agent replay verification state is invalid');
   }
+  const basisPhase = value.basisPhase as TikzAgentReplayResult['basisPhase'];
+  const phaseBasisValid = basisPhase === 'running'
+    ? sameTikzAgentReplayBasis(basis, runCheckpoint.basis)
+      && proposal === undefined
+      && value.verificationPending !== true
+      && terminal === undefined
+    : basisPhase === 'proposal-pending'
+      ? Boolean(
+          proposal
+          && basisTransition
+          && proposal.transactionId === basisTransition.transactionId
+          && proposal.documentId === basisTransition.before.documentId
+          && proposal.epoch === basisTransition.before.epoch
+          && proposal.sourceId === basisTransition.before.sourceId
+          && proposal.beforeRevision === basisTransition.before.revision
+          && proposal.beforeSourceHash === basisTransition.before.sourceHash
+          && proposal.afterRevision === basisTransition.after.revision
+          && proposal.afterSourceHash === basisTransition.after.sourceHash
+          && (
+            sameTikzAgentReplayBasis(basis, basisTransition.before)
+            || sameTikzAgentReplayBasis(basis, basisTransition.after)
+          ),
+        )
+      : basisPhase === 'verification-pending'
+        ? Boolean(
+            basisTransition
+            && value.verificationPending === true
+            && proposal === undefined
+            && terminal === undefined
+            && sameTikzAgentReplayBasis(basis, basisTransition.after),
+          )
+        : Boolean(
+            terminal
+            && (
+              terminal.outcome === 'mutation'
+                ? basisTransition
+                  && sameTikzAgentReplayBasis(basis, basisTransition.after)
+                : sameTikzAgentReplayBasis(basis, runCheckpoint.basis)
+            ),
+          );
+  if (!phaseBasisValid) {
+    throw new TikzAgentReplayError('invalid', 'Agent replay basis phase is inconsistent');
+  }
   return {
-    schemaVersion: 'tikz-agent-run-replay/v1',
+    schemaVersion: 'tikz-agent-run-replay/v2',
     runId: expectedRunId,
+    basis,
+    basisPhase,
+    runCheckpoint,
+    ...(basisTransition ? { basisTransition } : {}),
+    ...(earliestSequence !== undefined ? { earliestSequence } : {}),
     events,
     ...(proposal ? { proposal } : {}),
     verificationPending: value.verificationPending === true,
@@ -229,19 +362,31 @@ export async function fetchTikzAgentRunReplay(options: {
   readonly runId: string;
   readonly resumeToken: string;
   readonly afterSequence: number;
+  readonly expectedBasis: TikzAgentReplayBasis;
   readonly signal?: AbortSignal;
   readonly fetchImpl?: typeof fetch;
 }): Promise<TikzAgentReplayResult> {
-  const { runId, resumeToken, afterSequence, signal } = options;
+  const { runId, resumeToken, afterSequence, expectedBasis, signal } = options;
   if (!boundedText(runId) || !boundedText(resumeToken, 512)) {
     throw new TikzAgentReplayError('invalid', 'Agent replay identity is invalid');
   }
   if (!Number.isSafeInteger(afterSequence) || afterSequence < -1) {
     throw new TikzAgentReplayError('invalid', 'Agent replay cursor is invalid');
   }
+  if (!parseReplayBasis(expectedBasis)) {
+    throw new TikzAgentReplayError('invalid', 'Agent replay GeometryDoc basis is invalid');
+  }
   // The capability is sent only as an Authorization header.  In particular,
   // never put it in a query string, URL, history entry, or diagnostic string.
-  const url = `/api/tikz/runs/${encodeURIComponent(runId)}?afterSequence=${afterSequence}`;
+  const params = new URLSearchParams({
+    afterSequence: String(afterSequence),
+    documentId: expectedBasis.documentId,
+    epoch: expectedBasis.epoch,
+    revision: String(expectedBasis.revision),
+    sourceId: expectedBasis.sourceId,
+    sourceHash: expectedBasis.sourceHash,
+  });
+  const url = `/api/tikz/runs/${encodeURIComponent(runId)}?${params.toString()}`;
   const fetchImpl = options.fetchImpl ?? fetch;
   const response = await fetchImpl(url, {
     method: 'GET',
@@ -264,7 +409,7 @@ export async function fetchTikzAgentRunReplay(options: {
     if (error instanceof TikzAgentReplayError) throw error;
     throw new TikzAgentReplayError('invalid', 'Agent replay response is not valid JSON');
   }
-  return parseReplay(payload, runId, afterSequence);
+  return parseReplay(payload, runId, afterSequence, expectedBasis);
 }
 
 async function resolveTikzAgentProposal(options: {
@@ -388,10 +533,16 @@ export function acknowledgeTikzAgentProposalCommit(options: {
 export function parseTikzAgentRunReplay(
   value: unknown,
   expectedRunId: string,
+  expectedBasis: TikzAgentReplayBasis,
   afterSequence = -1,
 ): TikzAgentReplayResult {
-  if (!boundedText(expectedRunId) || !Number.isSafeInteger(afterSequence) || afterSequence < -1) {
+  if (
+    !boundedText(expectedRunId)
+    || !parseReplayBasis(expectedBasis)
+    || !Number.isSafeInteger(afterSequence)
+    || afterSequence < -1
+  ) {
     throw new TikzAgentReplayError('invalid', 'Agent replay identity or cursor is invalid');
   }
-  return parseReplay(value, expectedRunId, afterSequence);
+  return parseReplay(value, expectedRunId, afterSequence, expectedBasis);
 }

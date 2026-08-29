@@ -558,6 +558,8 @@ describe('TikzStudio', () => {
   it('stops the active Agent turn and recovers its durable cancellation terminal', async () => {
     let buildSignal: AbortSignal | undefined;
     let replayCalls = 0;
+    let replayBasis: Record<string, unknown> | null = null;
+    let runCheckpoint: Record<string, unknown> | null = null;
     vi.stubGlobal('fetch', vi.fn(async (
       url: string | URL | Request,
       init?: RequestInit,
@@ -577,6 +579,7 @@ describe('TikzStudio', () => {
         });
       }
       if (path.includes('/api/tikz/runs/run-cancel')) {
+        if (!replayBasis || !runCheckpoint) throw new Error('missing mocked run checkpoint');
         replayCalls += 1;
         const terminal = tikzAgentEvent('run-cancel', 1, {
           type: 'run.completed',
@@ -584,14 +587,82 @@ describe('TikzStudio', () => {
           outcome: 'unapplied-candidate',
         });
         return Response.json({
-          schemaVersion: 'tikz-agent-run-replay/v1',
+          schemaVersion: 'tikz-agent-run-replay/v2',
           runId: 'run-cancel',
+          basis: replayBasis,
+          basisPhase: replayCalls === 1 ? 'running' : 'terminal',
+          runCheckpoint,
+          basisTransition: null,
+          earliestSequence: 0,
           events: replayCalls === 1 ? [] : [terminal],
           proposal: null,
           verificationPending: false,
           terminal: replayCalls === 1 ? null : terminal,
         });
       }
+      const requestPayload = JSON.parse(String(init?.body)) as {
+        semanticKernel?: {
+          basis?: {
+            documentId?: string;
+            epoch?: string;
+            sourceId?: string;
+            revision?: number;
+            sourceHash?: string;
+            pluginSetDigest?: string;
+          };
+        };
+      };
+      const requestBasis = requestPayload.semanticKernel?.basis;
+      if (
+        !requestBasis?.documentId
+        || !requestBasis.epoch
+        || !requestBasis.sourceId
+        || requestBasis.revision === undefined
+        || !requestBasis.sourceHash
+      ) throw new Error('missing mocked GeometryDoc basis');
+      replayBasis = {
+        schemaVersion: 'tikz-agent-run-basis/v1',
+        documentId: requestBasis.documentId,
+        epoch: requestBasis.epoch,
+        sourceId: requestBasis.sourceId,
+        revision: requestBasis.revision,
+        sourceHash: requestBasis.sourceHash,
+        ...(requestBasis.pluginSetDigest
+          ? { pluginSetDigest: requestBasis.pluginSetDigest }
+          : {}),
+      };
+      const contextBasis = {
+        lane: 'tikz',
+        documentId: requestBasis.documentId,
+        epoch: requestBasis.epoch,
+        sourceId: requestBasis.sourceId,
+        revision: requestBasis.revision,
+        sourceHash: requestBasis.sourceHash,
+        attestation: 'server-attested',
+      };
+      runCheckpoint = {
+        schemaVersion: 'tikz-agent-run-checkpoint/v1',
+        runId: 'run-cancel',
+        basis: replayBasis,
+        contextCheckpoint: {
+          schemaVersion: 'geometry-agent-context-checkpoint/v1',
+          lane: 'tikz',
+          truthPolicy: 'current-source-projection-only',
+          summaryPromotedToTruth: false,
+          inputMessageCount: 1,
+          eligibleMessageCount: 1,
+          retainedMessageCount: 1,
+          droppedMessageCount: 0,
+          inputChars: 4,
+          retainedChars: 4,
+          compactedMessageCount: 0,
+          droppedStructuredBlockCount: 0,
+          loss: [],
+          restoreHandles: [],
+          basis: contextBasis,
+        },
+        createdAt: 1_000,
+      };
       buildSignal = init?.signal ?? undefined;
       const started = tikzAgentEvent('run-cancel', 0, {
         type: 'run.started',
@@ -603,9 +674,10 @@ describe('TikzStudio', () => {
             `data: ${JSON.stringify({
               agentEvent: started,
               agentRunRecovery: {
-                schemaVersion: 'tikz-agent-run-recovery/v1',
+                schemaVersion: 'tikz-agent-run-recovery/v2',
                 runId: 'run-cancel',
                 resumeToken: 'resume-token',
+                basis: replayBasis,
               },
             })}\n\n`,
           ));

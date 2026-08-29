@@ -1,6 +1,8 @@
 import { createClient, type RedisClientType } from 'redis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { tikzAgentEvent } from './protocol';
+import { compactGeometryConversationContext } from '@/lib/geometry/agent/conversation-context';
+import { createTikzAgentRunCheckpoint } from './run-checkpoint';
 import {
   createRedisTikzAgentRunStore,
   TIKZ_AGENT_PROPOSAL_CHECKPOINT_SCHEMA_VERSION,
@@ -64,14 +66,33 @@ function proposalCheckpoint(
   };
 }
 
-function readyEvent(runId: string, eventId: string) {
-  return {
-    ...tikzAgentEvent(runId, 1, {
-      type: 'proposal.ready' as const,
-      title: 'proposal ready',
-    }),
-    eventId,
-  };
+function readyEvent(runId: string) {
+  return tikzAgentEvent(runId, 1, {
+    type: 'proposal.ready' as const,
+    title: 'proposal ready',
+  });
+}
+
+function durableRunCheckpoint(runId: string) {
+  const documentId = `${runId}-document`;
+  return createTikzAgentRunCheckpoint({
+    runId,
+    contextCheckpoint: compactGeometryConversationContext([
+      { role: 'user', content: 'construct the geometry' },
+    ], {
+      lane: 'tikz',
+      basis: {
+        lane: 'tikz',
+        documentId,
+        epoch: 'epoch-1',
+        sourceId: `${documentId}:tikz`,
+        revision: 3,
+        sourceHash: '1111111111111111',
+        attestation: 'server-attested',
+      },
+    }).checkpoint,
+    createdAt: 1_000,
+  })!;
 }
 
 describe('TikzAgentRunStore Redis integration contract', () => {
@@ -115,13 +136,17 @@ describe('TikzAgentRunStore Redis integration contract', () => {
         title: 'started',
       });
       const checkpoint = proposalCheckpoint(runId, 'proposal-lifecycle');
-      const ready = readyEvent(runId, `${runId}:proposal-ready`);
+      const ready = readyEvent(runId);
       const terminal = tikzAgentEvent(runId, 2, {
         type: 'run.completed',
         title: 'verified',
         outcome: 'mutation',
       });
 
+      expect(await runStore.checkpointRun(durableRunCheckpoint(runId))).toEqual({
+        ok: true,
+        stored: true,
+      });
       expect(await runStore.appendEvent(started)).toEqual({ ok: true, stored: true });
       expect(await runStore.publishProposal(checkpoint, ready)).toEqual({
         ok: true,
@@ -142,6 +167,9 @@ describe('TikzAgentRunStore Redis integration contract', () => {
         expect(replayBeforeClaim.value?.proposal?.transactionId).toBe(
           checkpoint.transactionId,
         );
+        expect(replayBeforeClaim.value?.runCheckpoint?.basis.revision).toBe(3);
+        expect(replayBeforeClaim.value?.basisTransition?.after.revision).toBe(4);
+        expect(replayBeforeClaim.value?.earliestSequence).toBe(0);
       }
 
       expect(await runStore.claimProposal(checkpoint)).toEqual({ ok: true, stored: true });
@@ -179,7 +207,7 @@ describe('TikzAgentRunStore Redis integration contract', () => {
         const proposal = proposalCheckpoint(runId, `proposal-race-${index}`);
         return runStore.publishProposal(
           proposal,
-          readyEvent(runId, `${runId}:proposal-ready:${index}`),
+          readyEvent(runId),
         );
       });
       const results = await Promise.all(contenders);
@@ -260,7 +288,7 @@ describe('TikzAgentRunStore Redis integration contract', () => {
       const runId = nextRunId('disposition-race');
       const runStore = getStore();
       const pending = proposalCheckpoint(runId, 'proposal-disposition');
-      await runStore.publishProposal(pending, readyEvent(runId, `${runId}:ready`));
+      await runStore.publishProposal(pending, readyEvent(runId));
       const contenders = Array.from({ length: 16 }, (_, index) => {
         const disposition = tikzAgentEvent(runId, 3_000_000, {
           type: index % 2 === 0 ? 'commit.rejected' : 'commit.completed',

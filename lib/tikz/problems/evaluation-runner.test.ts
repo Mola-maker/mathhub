@@ -65,7 +65,7 @@ function evaluationCase(
       expectationProfile: profile,
       authorship: 'independently-authored',
       sourceSha256: '0a8c9750ee69f072328e69d1c0b2a8428290d25d3966c1b125a9543a16e323f4',
-      expectationsSha256: '2834e22cdc0f635392d9336d5c3a3c33a2efad7a72ebda809bc53064ecc68052',
+      expectationsSha256: 'df8ebf5671e4158243561077962540705ab8b7d7bcb670e8bd868d53ec4aa253',
     },
     turns,
   };
@@ -125,6 +125,11 @@ const allLaneCase = evaluationCase([
       { kind: 'source-unchanged' },
       { kind: 'render-artifacts-attested', lanes: ['interactive', 'exact'] },
       { kind: 'render-read-only' },
+      {
+        kind: 'context-checkpoint-current',
+        requiredLosses: ['older-dialogue-dropped'],
+        maximumRetainedMessages: 4,
+      },
     ],
   },
 ]);
@@ -687,6 +692,24 @@ describe('geometry evaluation runner', () => {
       id: 'capability:dependency-preserving-transform',
       passed: true,
     }));
+  });
+
+  it('attests bounded long-horizon context against the current pre-turn source basis', async () => {
+    const report = await runGeometryEvaluationCase({
+      caseDefinition: allLaneCase,
+      initialSource,
+      adapter: realLocalAdapter(),
+      exactRenderVerifier: ({ artifact, snapshot }) => (
+        artifact.source === snapshot.source
+        && artifact.sourceHash === snapshot.manifest.sourceHash
+      ),
+    });
+
+    expect(report.passed).toBe(true);
+    expect(report.lanes.at(-1)?.assertions).toContainEqual({
+      id: 'invariant:context-checkpoint-current',
+      passed: true,
+    });
   });
 
   it('is deterministic for the same fixture and real local adapter', async () => {

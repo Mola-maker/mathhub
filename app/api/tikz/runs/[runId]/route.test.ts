@@ -9,6 +9,8 @@ vi.mock('@/lib/rate-limit', () => ({
 }));
 
 import { tikzAgentEvent } from '@/lib/tikz/agent/protocol';
+import { compactGeometryConversationContext } from '@/lib/geometry/agent/conversation-context';
+import { createTikzAgentRunCheckpoint, type TikzAgentReplayBasis } from '@/lib/tikz/agent/run-checkpoint';
 import { createTikzAgentRunResumeToken } from '@/lib/tikz/agent/run-resume-token';
 import {
   getTikzAgentRunStore,
@@ -17,6 +19,43 @@ import {
 } from '@/lib/tikz/agent/run-store';
 import { GET, POST } from './route';
 
+const replayBasis: TikzAgentReplayBasis = {
+  documentId: 'document-1',
+  epoch: 'epoch-1',
+  sourceId: 'document-1:tikz',
+  revision: 0,
+  sourceHash: '1111111111111111',
+};
+
+function runCheckpoint(runId: string) {
+  return createTikzAgentRunCheckpoint({
+    runId,
+    contextCheckpoint: compactGeometryConversationContext([
+      { role: 'user', content: 'explain the diagram' },
+    ], {
+      lane: 'tikz',
+      basis: {
+        lane: 'tikz',
+        ...replayBasis,
+        attestation: 'server-attested',
+      },
+    }).checkpoint,
+    createdAt: 1_000,
+  })!;
+}
+
+function replayUrl(runId: string, afterSequence?: number): string {
+  const params = new URLSearchParams({
+    ...(afterSequence !== undefined ? { afterSequence: String(afterSequence) } : {}),
+    documentId: replayBasis.documentId,
+    epoch: replayBasis.epoch,
+    revision: String(replayBasis.revision),
+    sourceId: replayBasis.sourceId,
+    sourceHash: replayBasis.sourceHash,
+  });
+  return `http://localhost/api/tikz/runs/${runId}?${params.toString()}`;
+}
+
 describe('GET /api/tikz/runs/[runId]', () => {
   beforeEach(() => resetMemoryTikzAgentRunStore());
 
@@ -24,6 +63,7 @@ describe('GET /api/tikz/runs/[runId]', () => {
     const resolved = await getTikzAgentRunStore();
     expect(resolved.ok).toBe(true);
     if (!resolved.ok) throw new Error(resolved.message);
+    await resolved.store.checkpointRun(runCheckpoint('tikz-run-replay-1'));
     await resolved.store.appendEvent(tikzAgentEvent('tikz-run-replay-1', 0, {
       type: 'run.started',
       title: 'started',
@@ -54,7 +94,7 @@ describe('GET /api/tikz/runs/[runId]', () => {
     });
 
     const response = await GET(
-      new NextRequest('http://localhost/api/tikz/runs/tikz-run-replay-1?afterSequence=0', {
+      new NextRequest(replayUrl('tikz-run-replay-1', 0), {
         headers: {
           Authorization: `Bearer ${createTikzAgentRunResumeToken('tikz-run-replay-1')}`,
         },
@@ -63,15 +103,18 @@ describe('GET /api/tikz/runs/[runId]', () => {
     );
     expect(response.status).toBe(200);
     const body = await response.json() as Record<string, unknown>;
-    expect(body.schemaVersion).toBe('tikz-agent-run-replay/v1');
+    expect(body.schemaVersion).toBe('tikz-agent-run-replay/v2');
+    expect(body.basis).toEqual(replayBasis);
     expect(body.events).toEqual([expect.objectContaining({ sequence: 1 })]);
     expect(body.proposal).toEqual(expect.objectContaining({ transactionId: 'transaction-1' }));
+    expect(body.proposal).not.toHaveProperty('proposal');
+    expect(body.proposal).not.toHaveProperty('transactionAttestation');
     expect(response.headers.get('cache-control')).toContain('no-store');
   });
 
   it('returns 404 for an expired or unknown run', async () => {
     const response = await GET(
-      new NextRequest('http://localhost/api/tikz/runs/tikz-run-missing', {
+      new NextRequest(replayUrl('tikz-run-missing'), {
         headers: {
           Authorization: `Bearer ${createTikzAgentRunResumeToken('tikz-run-missing')}`,
         },
@@ -79,6 +122,60 @@ describe('GET /api/tikz/runs/[runId]', () => {
       { params: Promise.resolve({ runId: 'tikz-run-missing' }) },
     );
     expect(response.status).toBe(404);
+  });
+
+  it('fails closed when the caller canvas basis no longer matches the run', async () => {
+    const runId = 'tikz-run-stale-basis';
+    const resolved = await getTikzAgentRunStore();
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) throw new Error(resolved.message);
+    await resolved.store.checkpointRun(runCheckpoint(runId));
+    await resolved.store.appendEvent(tikzAgentEvent(runId, 0, {
+      type: 'run.started',
+      title: 'started',
+    }));
+
+    const staleUrl = new URL(replayUrl(runId));
+    staleUrl.searchParams.set('sourceHash', '9999999999999999');
+    const response = await GET(
+      new NextRequest(staleUrl, {
+        headers: {
+          Authorization: `Bearer ${createTikzAgentRunResumeToken(runId)}`,
+        },
+      }),
+      { params: Promise.resolve({ runId }) },
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'STALE_GEOMETRY_BASIS',
+    });
+  });
+
+  it('fails closed when the requested cursor predates the retained event window', async () => {
+    const runId = 'tikz-run-expired-window';
+    const resolved = await getTikzAgentRunStore();
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) throw new Error(resolved.message);
+    await resolved.store.checkpointRun(runCheckpoint(runId));
+    for (let sequence = 0; sequence < 70; sequence += 1) {
+      await resolved.store.appendEvent(tikzAgentEvent(runId, sequence, {
+        type: 'context.read',
+        title: `event ${sequence}`,
+      }));
+    }
+
+    const response = await GET(
+      new NextRequest(replayUrl(runId, -1), {
+        headers: {
+          Authorization: `Bearer ${createTikzAgentRunResumeToken(runId)}`,
+        },
+      }),
+      { params: Promise.resolve({ runId }) },
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'REPLAY_WINDOW_EXPIRED',
+    });
   });
 
   it('does not expose a pending proposal without its separate recovery capability', async () => {

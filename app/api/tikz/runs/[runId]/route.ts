@@ -5,6 +5,11 @@ import { BoundedJsonError, readBoundedJson } from '@/lib/http/read-bounded-json'
 import { tikzAgentEvent } from '@/lib/tikz/agent/protocol';
 import { getTikzAgentRunStore } from '@/lib/tikz/agent/run-store';
 import { verifyTikzAgentRunResumeToken } from '@/lib/tikz/agent/run-resume-token';
+import {
+  sameTikzAgentReplayBasis,
+  sameTikzAgentRunBasis,
+  type TikzAgentReplayBasis,
+} from '@/lib/tikz/agent/run-checkpoint';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,6 +17,32 @@ export const dynamic = 'force-dynamic';
 const RUN_ID = /^[A-Za-z0-9._:-]{1,256}$/u;
 const TRANSACTION_ID = /^[A-Za-z0-9._:-]{1,256}$/u;
 const MAX_DISPOSITION_BODY_BYTES = 16 * 1024;
+
+function boundedBasisText(value: string | null): value is string {
+  return value !== null
+    && value.length > 0
+    && value.length <= 256
+    && value.trim().length > 0
+    && !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
+function requestedReplayBasis(request: NextRequest): TikzAgentReplayBasis | null {
+  const documentId = request.nextUrl.searchParams.get('documentId');
+  const epoch = request.nextUrl.searchParams.get('epoch');
+  const sourceId = request.nextUrl.searchParams.get('sourceId');
+  const sourceHash = request.nextUrl.searchParams.get('sourceHash');
+  const revisionRaw = request.nextUrl.searchParams.get('revision');
+  const revision = revisionRaw === null ? Number.NaN : Number(revisionRaw);
+  if (
+    !boundedBasisText(documentId)
+    || !boundedBasisText(epoch)
+    || !boundedBasisText(sourceId)
+    || !boundedBasisText(sourceHash)
+    || !Number.isSafeInteger(revision)
+    || revision < 0
+  ) return null;
+  return { documentId, epoch, sourceId, revision, sourceHash };
+}
 
 function resumeTokenFor(request: NextRequest, runId: string): string | null {
   const authorization = request.headers.get('authorization');
@@ -41,6 +72,13 @@ export async function GET(
   const afterSequence = afterRaw === null ? -1 : Number(afterRaw);
   if (!Number.isSafeInteger(afterSequence) || afterSequence < -1) {
     return Response.json({ error: 'invalid Agent run cursor' }, { status: 400 });
+  }
+  const requestedBasis = requestedReplayBasis(request);
+  if (!requestedBasis) {
+    return Response.json({ error: 'valid GeometryDoc replay basis is required' }, {
+      status: 400,
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
   }
 
   const rate = await checkRate(`tikz-agent-run:${await clientIp()}`, 60, 60_000);
@@ -80,11 +118,98 @@ export async function GET(
       headers: { 'Cache-Control': 'no-store' },
     });
   }
+  const runCheckpoint = snapshot.value.runCheckpoint;
+  const transition = snapshot.value.basisTransition;
+  if (
+    !runCheckpoint
+    || (
+      transition
+      && !sameTikzAgentRunBasis(runCheckpoint.basis, transition.before)
+    )
+    || (snapshot.value.proposal && !transition)
+    || (snapshot.value.verificationPending && !transition)
+  ) {
+    return Response.json({ error: 'Agent run has no valid durable GeometryDoc checkpoint' }, {
+      status: 503,
+      headers: { 'Retry-After': '1', 'Cache-Control': 'private, no-store' },
+    });
+  }
+  const terminalMutation = snapshot.value.terminal?.outcome === 'mutation';
+  const allowedBases: Array<{
+    basis: TikzAgentReplayBasis;
+    phase: 'running' | 'proposal-pending' | 'verification-pending' | 'terminal';
+  }> = snapshot.value.terminal
+    ? [{
+        basis: terminalMutation && transition ? transition.after : runCheckpoint.basis,
+        phase: 'terminal',
+      }]
+    : snapshot.value.verificationPending && transition
+      ? [{ basis: transition.after, phase: 'verification-pending' }]
+      : snapshot.value.proposal && transition
+        ? [
+            { basis: transition.before, phase: 'proposal-pending' },
+            { basis: transition.after, phase: 'proposal-pending' },
+          ]
+        : [{ basis: runCheckpoint.basis, phase: 'running' }];
+  const matchedBasis = allowedBases.find((candidate) => (
+    sameTikzAgentReplayBasis(candidate.basis, requestedBasis)
+  ));
+  if (!matchedBasis) {
+    return Response.json({
+      error: 'Agent run belongs to a stale GeometryDoc basis',
+      code: 'STALE_GEOMETRY_BASIS',
+    }, {
+      status: 409,
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
+  }
+  if (
+    snapshot.value.earliestSequence !== undefined
+    && afterSequence < snapshot.value.earliestSequence - 1
+  ) {
+    return Response.json({
+      error: 'Agent replay cursor is older than the retained event window',
+      code: 'REPLAY_WINDOW_EXPIRED',
+    }, {
+      status: 409,
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
+  }
+  const responseBasis: TikzAgentReplayBasis = {
+    documentId: matchedBasis.basis.documentId,
+    epoch: matchedBasis.basis.epoch,
+    sourceId: matchedBasis.basis.sourceId,
+    revision: matchedBasis.basis.revision,
+    sourceHash: matchedBasis.basis.sourceHash,
+  };
+  const pendingProposal = snapshot.value.proposal;
+  const proposalSummary = pendingProposal
+    ? {
+        schemaVersion: pendingProposal.schemaVersion,
+        runId: pendingProposal.runId,
+        transactionId: pendingProposal.transactionId,
+        documentId: pendingProposal.documentId,
+        epoch: pendingProposal.epoch,
+        sourceId: pendingProposal.sourceId,
+        beforeRevision: pendingProposal.beforeRevision,
+        beforeSourceHash: pendingProposal.beforeSourceHash,
+        afterRevision: pendingProposal.afterRevision,
+        afterSourceHash: pendingProposal.afterSourceHash,
+      }
+    : null;
   return Response.json({
-    schemaVersion: 'tikz-agent-run-replay/v1',
+    schemaVersion: 'tikz-agent-run-replay/v2',
     runId,
+    basis: responseBasis,
+    basisPhase: matchedBasis.phase,
+    runCheckpoint,
+    basisTransition: transition ?? null,
+    earliestSequence: snapshot.value.earliestSequence ?? null,
     events: snapshot.value.events,
-    proposal: snapshot.value.proposal ?? null,
+    // Read-only recovery reveals proposal identity only. The typed proposal
+    // body remains inside RunStore and can be consumed solely by the explicit
+    // disposition/verification endpoints.
+    proposal: proposalSummary,
     verificationPending: snapshot.value.verificationPending === true,
     terminal: snapshot.value.terminal ?? null,
   }, {

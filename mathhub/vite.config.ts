@@ -8,10 +8,16 @@ export default defineConfig(({ mode }) => {
   return {
     base: '/mathhub/',
     plugins: [react()],
+    define: {
+      'process.env.NEXT_PUBLIC_GEOGEBRA_BASE_URL': JSON.stringify(
+        process.env.NEXT_PUBLIC_GEOGEBRA_BASE_URL ?? '',
+      ),
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('../', import.meta.url)),
       },
+      dedupe: ['react', 'react-dom'],
     },
     build: {
       outDir: fileURLToPath(new URL('../public/mathhub', import.meta.url)),
@@ -20,6 +26,7 @@ export default defineConfig(({ mode }) => {
         ? {
             input: {
               home: fileURLToPath(new URL('./index.html', import.meta.url)),
+              math: fileURLToPath(new URL('./math/index.html', import.meta.url)),
               tikz: fileURLToPath(new URL('./tikz/index.html', import.meta.url)),
             },
           }

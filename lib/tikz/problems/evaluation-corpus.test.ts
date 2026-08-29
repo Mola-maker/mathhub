@@ -93,10 +93,22 @@ describe('geometry evaluation corpus', () => {
       'external-impact-acknowledged',
       'render-artifacts-attested',
       'render-read-only',
+      'context-checkpoint-current',
     ]);
     const invariants = GEOMETRY_EVALUATION_CORPUS.flatMap((entry) => (
       entry.turns.flatMap((turn) => turn.invariants)
     ));
     expect(invariants.every((invariant) => allowed.has(invariant.kind))).toBe(true);
+  });
+
+  it('requires the complex multi-turn case to expose bounded-context loss', () => {
+    const formalGeo = GEOMETRY_EVALUATION_CORPUS.find((entry) => (
+      entry.caseId === 'formalgeo-circle-tangent-chain'
+    ));
+    expect(formalGeo?.turns.at(-1)?.invariants).toContainEqual({
+      kind: 'context-checkpoint-current',
+      requiredLosses: ['older-dialogue-dropped'],
+      maximumRetainedMessages: 4,
+    });
   });
 });

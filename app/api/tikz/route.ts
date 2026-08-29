@@ -46,7 +46,11 @@ import {
   type GeometryIntentProofObservation,
 } from '@/lib/tikz/agent/geometry-intent';
 import { requiresGeometryProofObservation } from '@/lib/tikz/agent/proof-intent-policy';
-import { compactTikzConversationHistory } from '@/lib/tikz/agent/conversation-history';
+import {
+  compactGeometryConversationContext,
+  type GeometryAgentContextBasis,
+  type GeometryConversationContext,
+} from '@/lib/geometry/agent/conversation-context';
 import { geometryProblemSearchWidget } from '@/lib/tikz/agent/problem-search-widget';
 import {
   problemInspectionDraft,
@@ -81,6 +85,10 @@ import {
   tikzAgentResumeTokenConfigured,
   verifyTikzAgentRunResumeToken,
 } from '@/lib/tikz/agent/run-resume-token';
+import {
+  createTikzAgentRunCheckpoint,
+  sameTikzAgentRunBasis,
+} from '@/lib/tikz/agent/run-checkpoint';
 import { parseManagedConstructionBlocks } from '@/lib/tikz/semantics/managed-construction';
 import type { GeometryProofState } from '@/lib/tikz/semantics/geometry-proof-state';
 import type { GeometryProofPlanArtifact } from '@/lib/tikz/semantics/geometry-proof-plan';
@@ -151,14 +159,23 @@ function jsonError(error: string, status: number, headers?: HeadersInit): Respon
   return Response.json({ error }, { status, headers });
 }
 
-function normalizedHistory(history: TikzRequest['history']): Message[] {
-  if (!Array.isArray(history)) return [];
-  return compactTikzConversationHistory(history
+function normalizedHistory(
+  history: TikzRequest['history'],
+  basis?: GeometryAgentContextBasis,
+): GeometryConversationContext {
+  const normalized = Array.isArray(history) ? history
     .filter((item) => item && (item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string')
     .map((item) => ({
       role: item.role as 'user' | 'assistant',
       content: item.content!,
-    })));
+    })) : [];
+  return compactGeometryConversationContext(normalized, {
+    lane: 'tikz',
+    basis,
+    maxMessages: 6,
+    maxMessageChars: 3_000,
+    maxTotalChars: 12_000,
+  });
 }
 
 function emitCode(full: string, sendEvent: (event: Record<string, unknown>) => void): void {
@@ -1478,6 +1495,28 @@ export async function POST(req: NextRequest): Promise<Response> {
         409,
       );
     }
+    const runSnapshot = await agentRunStore.read(commitObservation!.runId as string);
+    if (!runSnapshot.ok) {
+      return jsonError('Agent run checkpoint is unavailable', 503, {
+        'Retry-After': '1',
+        'Cache-Control': 'no-store',
+      });
+    }
+    const runCheckpoint = runSnapshot.value?.runCheckpoint;
+    const basisTransition = runSnapshot.value?.basisTransition;
+    if (
+      !runCheckpoint
+      || !basisTransition
+      || basisTransition.transactionId !== checkpoint.transactionId
+      || !sameTikzAgentRunBasis(runCheckpoint.basis, basisTransition.before)
+      || basisTransition.after.documentId !== proposalIdentity!.documentId
+      || basisTransition.after.epoch !== proposalIdentity!.epoch
+      || basisTransition.after.sourceId !== proposalIdentity!.sourceId
+      || basisTransition.after.revision !== body.sourceRevision
+      || basisTransition.after.sourceHash !== body.sourceHash
+    ) {
+      return jsonError('Agent run basis transition is missing or stale', 409);
+    }
     const claimed = await agentRunStore.claimProposal(checkpoint);
     if (!claimed.ok) {
       return jsonError('Agent proposal verification claim is unavailable', 503, {
@@ -1561,8 +1600,22 @@ export async function POST(req: NextRequest): Promise<Response> {
         ].join('\n')
       : '',
   ].filter(Boolean).join('\n\n');
+  const conversationContext = normalizedHistory(
+    body.history,
+    proposalIdentity
+      ? {
+          lane: 'tikz',
+          documentId: proposalIdentity.documentId,
+          epoch: proposalIdentity.epoch,
+          revision: body.sourceRevision as number,
+          sourceId: proposalIdentity.sourceId,
+          sourceHash: body.sourceHash as string,
+          attestation: 'server-attested',
+        }
+      : undefined,
+  );
   const messages: Message[] = [
-    ...normalizedHistory(body.history),
+    ...conversationContext.messages,
     { role: 'user', content: currentTurn },
   ];
   return makeSseStream(async (send, sendEvent, signal) => {
@@ -1572,6 +1625,22 @@ export async function POST(req: NextRequest): Promise<Response> {
     const runResumeToken = verifyCommit
       ? commitObservation!.resumeToken as string
       : createTikzAgentRunResumeToken(runId);
+    const durableRunCheckpoint = !verifyCommit
+      ? createTikzAgentRunCheckpoint({
+          runId,
+          contextCheckpoint: conversationContext.checkpoint,
+          pluginSetDigest: proposalIdentity?.pluginSetDigest,
+        })
+      : null;
+    if (!verifyCommit && durableRunCheckpoint) {
+      const checkpointed = await agentRunStore.checkpointRun(durableRunCheckpoint);
+      if (!checkpointed.ok) {
+        throw new Error(`Agent RunStore checkpoint: ${checkpointed.message}`);
+      }
+      if (!checkpointed.stored) {
+        throw new Error('Agent RunStore checkpoint identity conflict');
+      }
+    }
     let eventSequence = verifyCommit ? 2_000_000 : 0;
     const nextSequence = () => eventSequence++;
     const persistAndSendEvent: PersistTikzAgentEvent = async (event, payload = {}) => {
@@ -1586,15 +1655,19 @@ export async function POST(req: NextRequest): Promise<Response> {
       await persistAndSendEvent(tikzAgentEvent(runId, nextSequence(), {
         type: 'run.started',
         title: '正在理解你的请求',
-      }), {
-        agentRunRecovery: {
-          schemaVersion: 'tikz-agent-run-recovery/v1',
-          runId,
-          resumeToken: runResumeToken,
-        },
-      });
+      }), durableRunCheckpoint
+        ? {
+            agentRunRecovery: {
+              schemaVersion: 'tikz-agent-run-recovery/v2',
+              runId,
+              resumeToken: runResumeToken,
+              basis: durableRunCheckpoint.basis,
+            },
+          }
+        : {});
     }
     sendEvent({ model });
+    sendEvent({ agentContextCheckpoint: conversationContext.checkpoint });
     const requestCacheIdentity = tikzAgentRequestCacheIdentity({
       provider,
       model,

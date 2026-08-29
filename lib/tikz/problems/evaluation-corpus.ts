@@ -1,5 +1,6 @@
 import type { TikzAgentEventType } from '../agent/protocol';
 import type { GeometryProblemSourceId } from './source-catalog';
+import type { GeometryAgentContextLoss } from '@/lib/geometry/agent/conversation-context';
 
 export const GEOMETRY_EVALUATION_CORPUS_SCHEMA_VERSION =
   'geometry-evaluation-corpus/v3' as const;
@@ -69,7 +70,12 @@ export type GeometryEvaluationInvariant =
     readonly kind: 'render-artifacts-attested';
     readonly lanes: readonly ('interactive' | 'exact')[];
   }
-  | { readonly kind: 'render-read-only' };
+  | { readonly kind: 'render-read-only' }
+  | {
+    readonly kind: 'context-checkpoint-current';
+    readonly requiredLosses?: readonly GeometryAgentContextLoss[];
+    readonly maximumRetainedMessages?: number;
+  };
 
 export interface GeometryEvaluationResearchReference {
   readonly disposition: 'research-reference-only';
@@ -313,6 +319,97 @@ export const GEOMETRY_EVALUATION_CORPUS: readonly GeometryEvaluationCase[] = [
           { kind: 'source-unchanged' },
           { kind: 'render-artifacts-attested', lanes: ['interactive', 'exact'] },
           { kind: 'render-read-only' },
+        ],
+      },
+    ],
+  },
+  {
+    schemaVersion: GEOMETRY_EVALUATION_CORPUS_SCHEMA_VERSION,
+    caseId: 'formalgeo-circle-tangent-chain',
+    title: 'Circle intersections, radical axis and tangent-parallel chain',
+    source: {
+      disposition: 'research-reference-only',
+      source: 'formalgeo',
+      recordId: 'formalgeo7k-v2:circle-tangent-chain-class',
+      sourceUrl: 'https://github.com/FormalGeo/FormalGeo/blob/e7d90421e809a129109286fdb03832d8014d390f/datasets.json#L2-L14',
+      admission: 'not-admitted',
+      attributionMode: 'gateway-record',
+    },
+    localFixture: {
+      fixturePath: 'evaluation/formalgeo-circle-tangent-chain',
+      expectationProfile: 'formalgeo-circle-tangent-chain',
+      authorship: 'independently-authored',
+      sourceSha256: '03bcee1ff3e52428acf8194b0b1c9eece495a102d8d52e6445c4a1d0bc7d1f70',
+      expectationsSha256: 'a10e9116f4c5b90d9380aabc8f578317b5885f9b50b97a1db8f786ec26b2c2c0',
+    },
+    turns: [
+      {
+        lane: 'answer-only',
+        instruction: '解释两圆交点 P、Q 与连心线 O1O2 的关系，并说明为什么公共弦 PQ 垂直平分 O1O2；不要修改画板。',
+        expectedCapabilities: ['semantic-read'],
+        invariants: [
+          { kind: 'source-unchanged' },
+          {
+            kind: 'agent-terminal',
+            outcome: 'answer',
+            requiredEventTypes: ['context.read', 'run.completed'],
+          },
+          {
+            kind: 'grounding-resolves',
+            minimumRefs: 6,
+            recordTypes: ['entity', 'constraint', 'relation'],
+          },
+        ],
+      },
+      {
+        lane: 'construct',
+        instruction: '分别构造两圆在 P 点的切线，再构造一条经过 Q 且与 O1 圆切线平行的直线；把依赖关系作为一次原子构造提交。',
+        expectedCapabilities: ['atomic-construction'],
+        invariants: [
+          { kind: 'single-broker-commit' },
+          {
+            kind: 'proposal-schema',
+            allowed: [
+              'construction-plan-proposal/v1',
+              'ai-construction-dag-intent/v1',
+              'ai-construction-intent-batch-proposal/v1',
+              'canvas-construction-batch-proposal/v1',
+            ],
+          },
+          { kind: 'semantic-entity-delta', minimum: 3 },
+          { kind: 'post-commit-basis-current' },
+          {
+            kind: 'agent-terminal',
+            outcome: 'mutation',
+            requiredEventTypes: ['proposal.ready', 'commit.completed', 'commit.verified'],
+          },
+        ],
+      },
+      {
+        lane: 'modify-existing',
+        instruction: '把公共弦 PQ 改为紫色虚线，把两条切线改为橙色粗线，把新构造的平行线改为绿色，并给这些线添加标签。',
+        expectedCapabilities: ['binding-scoped-style', 'label-intent'],
+        invariants: [
+          { kind: 'single-broker-commit' },
+          { kind: 'binding-scoped-write' },
+          { kind: 'semantic-style-changed' },
+          { kind: 'label-entity-delta', minimum: 3 },
+          { kind: 'post-commit-basis-current' },
+        ],
+      },
+      {
+        lane: 'verify-rendering',
+        instruction: '比较交互画板与精准 TikZ 产物中的两圆交点、公共弦、切线和平行线，报告可见偏差但不要写入源码。',
+        expectedCapabilities: ['interactive-render', 'exact-render'],
+        invariants: [
+          { kind: 'source-unchanged' },
+          { kind: 'render-artifacts-attested', lanes: ['interactive', 'exact'] },
+          { kind: 'render-read-only' },
+          {
+            kind: 'context-checkpoint-current',
+            requiredLosses: ['older-dialogue-dropped'],
+            maximumRetainedMessages: 4,
+          },
         ],
       },
     ],

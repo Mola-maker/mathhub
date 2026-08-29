@@ -6,6 +6,10 @@ on:
       - main
     paths:
       - ".github/workflows/pages.yml"
+      - "app/globals.css"
+      - "app/studio.css"
+      - "components/**"
+      - "lib/**"
       - "mathhub/**"
       - "package.json"
       - "package-lock.json"

@@ -70,7 +70,8 @@
           "invariants": [
             { "kind": "source-unchanged" },
             { "kind": "render-artifacts-attested", "lanes": ["interactive", "exact"] },
-            { "kind": "render-read-only" }
+            { "kind": "render-read-only" },
+            { "kind": "context-checkpoint-current", "requiredLosses": ["older-dialogue-dropped"], "maximumRetainedMessages": 4 }
           ]
         }
       ]

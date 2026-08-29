@@ -40,6 +40,15 @@ import {
   formatConstructionProtocol,
   type ConstructionStep,
 } from '@/lib/math/geometry-render/steps';
+import {
+  isGeometryAgentContextCheckpoint,
+  type GeometryAgentContextCheckpoint,
+} from '@/lib/geometry/agent/conversation-context';
+import {
+  GeogebraCommandTransactionBroker,
+  createGeogebraAppliedScriptReceipt,
+  createGeogebraReplaceScriptTransaction,
+} from '@/lib/geometry/transactions/geogebra-command-broker';
 
 type Provider = 'relay';
 type Message = { role: 'user' | 'assistant'; content: string };
@@ -138,13 +147,17 @@ const PROVIDER_LABELS: Record<Provider, string> = { relay: 'api.molamaker.cn' };
 const GGB_CONTAINER_ID = 'wp-ggb-applet';
 const GGB_SCALE_CLASS = 'wp-ggb-scale';
 const GGB_SELF = process.env.NEXT_PUBLIC_GEOGEBRA_BASE_URL?.replace(/\/+$/, '') || '/geogebra';
+const GGB_OFFICIAL_CDN = 'https://www.geogebra.org/apps';
 // Try the configured (CDN) source first, then fall back to the same-origin
 // /geogebra bundle (public/geogebra, served by ECS) if the CDN copy is missing
 // or incomplete — so a bad/partial CDN upload can't take the whole panel down.
-const GGB_SOURCES: Array<{ url: string; selfHosted: boolean }> = [
-  { url: GGB_SELF, selfHosted: true },
-  ...(GGB_SELF !== '/geogebra' ? [{ url: '/geogebra', selfHosted: true }] : []),
-];
+function geogebraSources(staticPreview: boolean): Array<{ url: string; selfHosted: boolean }> {
+  if (staticPreview) return [{ url: GGB_OFFICIAL_CDN, selfHosted: false }];
+  return [
+    { url: GGB_SELF, selfHosted: true },
+    ...(GGB_SELF !== '/geogebra' ? [{ url: '/geogebra', selfHosted: true }] : []),
+  ];
+}
 
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user';
@@ -178,8 +191,28 @@ function MessageBubble({ msg }: { msg: Message }) {
 }
 
 type StreamResult = { commands: string[]; fullText: string; serverError: string };
+type GeogebraProjectionSummary = {
+  documentId: string;
+  epoch: string;
+  revision: number;
+  sourceId: string;
+  sourceHash: string;
+  status: 'complete' | 'partial' | 'invalid';
+  entities: number;
+  opaqueCommands: number;
+  semanticHash: string;
+  semanticComparable: boolean;
+};
 
-export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
+export function MathStudio({
+  startOpen = false,
+  staticPreview = false,
+  homeHref = '/',
+}: {
+  startOpen?: boolean;
+  staticPreview?: boolean;
+  homeHref?: string;
+}) {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [provider, setProvider] = useState<Provider>('relay');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -194,6 +227,8 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
   const [ggbLookup, setGgbLookup] = useState<{ count: number; commands: string[] } | null>(null);
   const [ggbEvalStats, setGgbEvalStats] = useState<{ ran: number; total: number } | null>(null);
   const [ggbRepairs, setGgbRepairs] = useState(0);
+  const [contextCheckpoint, setContextCheckpoint] = useState<GeometryAgentContextCheckpoint | null>(null);
+  const [geometryProjection, setGeometryProjection] = useState<GeogebraProjectionSummary | null>(null);
   const [catalogModels, setCatalogModels] = useState<ModelRow[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -232,6 +267,7 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
   const [scriptVersion, setScriptVersion] = useState(0);
   // TikZ export: prepend the construction protocol as LaTeX comments.
   const [tikzStepComments, setTikzStepComments] = useState(true);
+  const ggbSources = useMemo(() => geogebraSources(staticPreview), [staticPreview]);
 
   const slashQuery = useMemo(() => {
     const t = input;
@@ -258,6 +294,8 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
   const fallbackBatchRef = useRef(0);
   /** Last fully-successful script — context for /continue + modify turns. */
   const lastSuccessfulRef = useRef<string[]>([]);
+  /** Revision/source-hash CAS owner for the durable GeoGebra command truth. */
+  const geometryBrokerRef = useRef<GeogebraCommandTransactionBroker | null>(null);
   const runRenderRef = useRef<(cmds: string[], ctx: { problem: string; drawingCommand: DrawingCommand }) => void>(() => {});
   const lastRenderCtxRef = useRef<{ problem: string; drawingCommand: DrawingCommand }>({ problem: '', drawingCommand: 'draw' });
   const sendingRef = useRef(false);
@@ -354,6 +392,14 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
   }, []);
 
   useEffect(() => {
+    if (staticPreview) {
+      setProviders([]);
+      setCatalogModels([]);
+      setSelectedModel('');
+      setModelsSource('unavailable');
+      setModelsError('GitHub Pages 静态预览：原生几何画板可用，AI 生成需要完整站点。');
+      return;
+    }
     fetch('/api/math/providers')
       .then((r) => r.json())
       .then((j: { available?: string[] }) => {
@@ -363,7 +409,7 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [staticPreview]);
 
   useEffect(() => {
     if (!providers.includes(provider)) return;
@@ -439,11 +485,16 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
             error?: string;
             ggbLookup?: { count: number; commands: string[] };
             ggbCommands?: { count: number; commands: string[] };
+            agentContextCheckpoint?: GeometryAgentContextCheckpoint;
           };
           if (typeof frame.model === 'string') { setActiveModel(frame.model); continue; }
           if (typeof frame.error === 'string' && frame.error) { serverError = frame.error; continue; }
           if (frame.ggbLookup) { if (captureLookup) setGgbLookup({ count: frame.ggbLookup.count, commands: frame.ggbLookup.commands ?? [] }); continue; }
           if (frame.ggbCommands?.commands) { commands = frame.ggbCommands.commands; continue; }
+          if (isGeometryAgentContextCheckpoint(frame.agentContextCheckpoint)) {
+            setContextCheckpoint(frame.agentContextCheckpoint);
+            continue;
+          }
           if (typeof frame.token === 'string') { fullText += frame.token; onToken(fullText); continue; }
         } catch { /* skip malformed frame */ }
       }
@@ -519,9 +570,70 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
     setGgbEvalStats({ ran: outcome.result.ran, total: outcome.result.total });
     setGgbRepairs(outcome.repairs);
     if (outcome.result.failures.length === 0 && outcome.commands.length > 0) {
-      lastSuccessfulRef.current = outcome.commands;
-      setScriptVersion((v) => v + 1);
-      setError((prev) => (prev.startsWith('GeoGebra') ? '' : prev));
+      const randomId = () => globalThis.crypto?.randomUUID?.()
+        ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const broker = geometryBrokerRef.current ?? new GeogebraCommandTransactionBroker({
+        documentId: `math-studio-${randomId()}`,
+        epoch: `epoch-${randomId()}`,
+      });
+      const before = broker.snapshot();
+      try {
+        const transactionId = `transaction-${randomId()}`;
+        const transaction = createGeogebraReplaceScriptTransaction({
+          snapshot: before,
+          commands: outcome.commands,
+          transactionId,
+          origin: outcome.repairs > 0 ? 'repair' : 'ai',
+        });
+        const receipt = createGeogebraAppliedScriptReceipt({
+          transactionId,
+          commands: outcome.commands,
+          successfulCommandCount: outcome.result.ran,
+          failureCount: outcome.result.failures.length,
+        });
+        if (!receipt) throw new Error('GeoGebra execution receipt was incomplete.');
+        const committed = broker.commitApplied(transaction, receipt, (name) => {
+          try {
+            const x = api.getXcoord?.(name);
+            const y = api.getYcoord?.(name);
+            return typeof x === 'number'
+              && Number.isFinite(x)
+              && typeof y === 'number'
+              && Number.isFinite(y)
+              ? { x, y }
+              : null;
+          } catch {
+            return null;
+          }
+        });
+        if (!committed.ok) {
+          throw new Error(`${committed.code}: ${committed.message}`);
+        }
+        geometryBrokerRef.current = broker;
+        lastSuccessfulRef.current = [...committed.snapshot.commands];
+        const projection = committed.snapshot.geometryDoc;
+        setGeometryProjection({
+          documentId: projection.basis.documentId,
+          epoch: projection.basis.epoch,
+          revision: projection.basis.revision,
+          sourceId: projection.basis.sourceId!,
+          sourceHash: projection.basis.sourceHash,
+          status: projection.semantic.status,
+          entities: projection.semantic.ir.entities.length,
+          opaqueCommands: projection.construction.opaqueNodes.length,
+          semanticHash: committed.snapshot.semanticSignature.semanticHash,
+          semanticComparable: committed.snapshot.semanticSignature.comparable,
+        });
+        setScriptVersion((v) => v + 1);
+        setError((prev) => (prev.startsWith('GeoGebra') ? '' : prev));
+      } catch (commitError) {
+        clearGgbConstruction(api);
+        const restored = runGeometryScript(api, [...before.commands], fallbacks);
+        setGgbEvalStats({ ran: restored.ran, total: restored.total });
+        setError(
+          `语义事务未提交，画布已恢复到 r${before.geometryDoc.basis.revision}：${commitError instanceof Error ? commitError.message : 'unknown broker error'}`,
+        );
+      }
     } else if (outcome.result.failures.length > 0) {
       const f = outcome.result.failures[0];
       setError(`GeoGebra：${outcome.result.ran}/${outcome.result.total} 条成功${outcome.repairs ? `（纠错 ${outcome.repairs} 次）` : ''}。例：${f.cmd} → ${f.error}`);
@@ -546,7 +658,7 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
         setHTML5Codebase?: (path: string) => void;
       };
     };
-    const source = GGB_SOURCES[ggbAttempt];
+    const source = ggbSources[ggbAttempt];
     let cancelled = false;
     const timer = setTimeout(() => { if (!cancelled && !apiRef.current) fail(); }, 15_000);
 
@@ -564,10 +676,12 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
       if (timer) clearTimeout(timer);
       apiRef.current = null;
       document.getElementById(GGB_CONTAINER_ID)?.replaceChildren();
-      if (ggbAttempt + 1 < GGB_SOURCES.length) setGgbAttempt(ggbAttempt + 1);
+      if (ggbAttempt + 1 < ggbSources.length) setGgbAttempt(ggbAttempt + 1);
       else setGgbError(
-        '无法加载 GeoGebra。请确认 public/geogebra/ 已解压 Math Apps Bundle（见 deploy/geogebra/SETUP.md），'
-        + '或设置 NEXT_PUBLIC_GEOGEBRA_BASE_URL 指向可访问的镜像，然后重启 dev server 并 Retry。',
+        staticPreview
+          ? '无法从 GeoGebra 官方 CDN 加载画板，请检查网络后 Retry。'
+          : '无法加载 GeoGebra。请确认 public/geogebra/ 已解压 Math Apps Bundle（见 deploy/geogebra/SETUP.md），'
+            + '或设置 NEXT_PUBLIC_GEOGEBRA_BASE_URL 指向可访问的镜像，然后重启 dev server 并 Retry。',
       );
     };
 
@@ -589,6 +703,7 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
           enableRightClick: true, enableLabelDrags: true, enableShiftDragZoom: true,
           showZoomButtons: true, allowStyleBar: true, showFullscreenButton: false,
           border: false, detachKeyboard: true,
+          preventFocus: true, showKeyboardOnFocus: false,
           appletOnLoad: (api: GGBApi) => {
             if (cancelled) return;
             if (timer) clearTimeout(timer);
@@ -631,7 +746,7 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
       if (timer) clearTimeout(timer);
       if (warmupTimerRef.current) clearTimeout(warmupTimerRef.current);
     };
-  }, [studioMounted, studioOpen, ggbAttempt, fitApplet, afterLayout, measureCanvas]);
+  }, [studioMounted, studioOpen, ggbAttempt, ggbSources, staticPreview, fitApplet, afterLayout, measureCanvas]);
 
   useEffect(() => {
     if (studioOpen) return;
@@ -684,7 +799,7 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
       if (pureModeRef.current) { setPureMode(false); return; }
       if (stepsOpenRef.current) { setStepsOpen(false); return; }
       if (startOpen) {
-        window.location.assign('/');
+        window.location.assign(homeHref);
         return;
       }
       setStudioOpen(false);
@@ -693,7 +808,7 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
-  }, [startOpen, studioOpen]);
+  }, [homeHref, startOpen, studioOpen]);
 
   // Pure mode resizes the stage to the viewport — refit the applet after the
   // CSS transition settles (both directions).
@@ -710,6 +825,8 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
     lastSuccessfulRef.current = [];
     setGgbEvalStats(null);
     setGgbRepairs(0);
+    setGeometryProjection(null);
+    geometryBrokerRef.current = null;
     if (!api) return;
     clearGgbConstruction(api);
   }, []);
@@ -909,8 +1026,12 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
       : extractLastGgbCommandsFromHistory(messages);
 
     const displayUser = parsed.kind === 'drawing' ? raw : (problemBody || raw);
-    const history: Message[] = [...messages, { role: 'user', content: displayUser }];
-    setMessages([...history, { role: 'assistant', content: '' }]);
+    const displayHistory: Message[] = [...messages, { role: 'user', content: displayUser }];
+    const history: Message[] = [
+      ...messages.slice(-15),
+      { role: 'user', content: displayUser },
+    ];
+    setMessages([...displayHistory, { role: 'assistant', content: '' }]);
     setStreaming(true);
 
     let res: StreamResult | null = null;
@@ -919,6 +1040,16 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
       const payload: Record<string, unknown> = { mode: 'build', problem: problemBody, history, provider, drawingCommand };
       if (selectedModel) payload.model = selectedModel;
       if (continueDrawing && previousGgbCommands.length > 0) payload.previousGgbCommands = previousGgbCommands;
+      if (geometryProjection) {
+        payload.contextBasis = {
+          lane: 'geogebra',
+          documentId: geometryProjection.documentId,
+          epoch: geometryProjection.epoch,
+          revision: geometryProjection.revision,
+          sourceId: geometryProjection.sourceId,
+          sourceHash: geometryProjection.sourceHash,
+        };
+      }
 
       res = await streamMath(payload, (txt) => {
         setMessages((m) => { const last = m[m.length - 1]; return [...m.slice(0, -1), { ...last, content: txt }]; });
@@ -949,7 +1080,7 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
     } else if (!serverError) {
       setError('未能从回复中解析出 GeoGebra 命令。请重试或更换模型。');
     }
-  }, [input, streaming, provider, selectedModel, messages, streamMath, runRenderInApplet, ggbReady, ggbDrawReady, ggbLookup, activeModel]);
+  }, [input, streaming, provider, selectedModel, messages, streamMath, runRenderInApplet, ggbReady, ggbDrawReady, ggbLookup, activeModel, geometryProjection]);
 
   const applyPaletteCommand = useCallback((name: string) => {
     setInput(`/${name} `);
@@ -978,6 +1109,8 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
     setGgbEvalStats(null);
     setGgbRepairs(0);
     lastSuccessfulRef.current = [];
+    setGeometryProjection(null);
+    geometryBrokerRef.current = null;
   }, []);
 
   const openStudio = useCallback(() => { setStudioMounted(true); setStudioOpen(true); }, []);
@@ -985,11 +1118,17 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
   useEffect(() => { setActiveModel(null); setGgbLookup(null); setGgbEvalStats(null); setGgbRepairs(0); }, [provider]);
 
   const statusKind = error ? 'error' : streaming ? 'busy' : 'ready';
-  const statusText = error ? 'error' : streaming ? 'thinking…' : 'ready';
+  const statusText = error
+    ? 'error'
+    : staticPreview
+      ? 'preview'
+      : streaming ? 'thinking…' : 'ready';
   const studioStatus = (
     <div className={`wp-math__status wp-math__status--${statusKind}`} aria-live="polite">
       <span className="wp-math__status-dot" aria-hidden="true" />
-      <span className="wp-math__status-provider">{PROVIDER_LABELS[provider]}</span>
+      <span className="wp-math__status-provider">
+        {staticPreview ? 'GeoGebra tools' : PROVIDER_LABELS[provider]}
+      </span>
       {activeModel && <span className="wp-math__status-model" title={activeModel}>{activeModel}</span>}
       {ggbLookup && ggbLookup.count > 0 && (
         <span className="wp-math__status-ggb" title={ggbLookup.commands.slice(0, 24).join(', ')}>
@@ -1001,6 +1140,23 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
           eval:{ggbEvalStats.ran}/{ggbEvalStats.total}{ggbRepairs > 0 ? ` ·fix:${ggbRepairs}` : ''}
         </span>
       )}
+      {contextCheckpoint && (
+        <span
+          className="wp-math__status-ggb"
+          title={`上下文保留 ${contextCheckpoint.retainedChars}/${contextCheckpoint.inputChars} 字符；对话摘要不会成为几何真相`}
+        >
+          ctx:{contextCheckpoint.retainedMessageCount}/{contextCheckpoint.eligibleMessageCount}
+        </span>
+      )}
+      {geometryProjection && (
+        <span
+          className="wp-math__status-ggb"
+          title={`GeoGebra GeometryDoc · ${geometryProjection.status} · ${geometryProjection.entities} 个实体 · ${geometryProjection.opaqueCommands} 条 opaque 命令 · renderer-neutral ${geometryProjection.semanticHash}`}
+        >
+          geo:r{geometryProjection.revision} ·sig:{geometryProjection.semanticHash.slice(0, 6)}
+          {!geometryProjection.semanticComparable ? '?' : ''}
+        </span>
+      )}
       <span className="wp-math__status-text">{statusText}</span>
     </div>
   );
@@ -1010,9 +1166,9 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
       <button
         className={`wp-math__pill${providers.includes(provider) ? ' wp-math__pill--active' : ''}`}
         disabled
-        title="所有请求统一通过 api.molamaker.cn"
+        title={staticPreview ? 'GitHub Pages 静态预览不连接 AI 服务' : '所有请求统一通过 api.molamaker.cn'}
       >
-        {PROVIDER_LABELS[provider]}
+        {staticPreview ? 'static preview' : PROVIDER_LABELS[provider]}
       </button>
     </div>
   );
@@ -1078,7 +1234,11 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
             </button>
           </div>
           {providers.length === 0 && (
-            <span className="wp-math__launch-note">请在 .env.local 配置 LLM_RELAY_API_KEY，然后重启开发服务器。</span>
+            <span className="wp-math__launch-note">
+              {staticPreview
+                ? '静态预览：GeoGebra 原生工具可用；AI 助手需要完整站点。'
+                : '请在 .env.local 配置 LLM_RELAY_API_KEY，然后重启开发服务器。'}
+            </span>
           )}
         </div>
       ) : null}
@@ -1111,9 +1271,18 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
             <div className="wp-studio__messages" ref={chatRef}>
               {messages.length === 0 && (
                 <div className="wp-math__hint">
-                  <div>输入题目，或先敲 <code>/</code> 查看斜杠命令。</div>
-                  <div style={{ marginTop: 6, opacity: 0.6 }}>默认 <code>/draw</code> — 完整精确作图。例：<code>/draw 锐角三角形 ABC，外接圆 Γ，I 为内心…</code></div>
-                  <div style={{ marginTop: 6, opacity: 0.6 }}>渲染后用 <code>/continue</code> 在当前图形上修改。</div>
+                  {staticPreview ? (
+                    <>
+                      <div>静态预览已就绪。使用右侧工具栏或代数输入直接构造几何图形。</div>
+                      <div style={{ marginTop: 6, opacity: 0.6 }}>AI 助手、模型目录和服务端修复只在完整站点启用。</div>
+                    </>
+                  ) : (
+                    <>
+                      <div>输入题目，或先敲 <code>/</code> 查看斜杠命令。</div>
+                      <div style={{ marginTop: 6, opacity: 0.6 }}>默认 <code>/draw</code> — 完整精确作图。例：<code>/draw 锐角三角形 ABC，外接圆 Γ，I 为内心…</code></div>
+                      <div style={{ marginTop: 6, opacity: 0.6 }}>渲染后用 <code>/continue</code> 在当前图形上修改。</div>
+                    </>
+                  )}
                 </div>
               )}
               {!showAllMsgs && messages.length > MSG_VISIBLE && (
@@ -1156,11 +1325,13 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
                 value={input}
                 onChange={(e) => { setInput(e.target.value); setPaletteIndex(0); }}
                 onKeyDown={handleInputKeyDown}
-                placeholder="/draw 题目… 或输入 / 唤起命令（Enter 发送）"
-                disabled={streaming}
+                placeholder={staticPreview
+                  ? 'GitHub Pages 静态预览不连接 AI 服务，可直接使用右侧 GeoGebra 工具'
+                  : '/draw 题目… 或输入 / 唤起命令（Enter 发送）'}
+                disabled={staticPreview || streaming}
                 rows={2}
               />
-              <button className="wp-math__send" onClick={send} disabled={streaming || !input.trim() || !selectedModel}>
+              <button className="wp-math__send" onClick={send} disabled={staticPreview || streaming || !input.trim() || !selectedModel}>
                 {streaming ? '…' : '↵'}
               </button>
             </div>
@@ -1218,7 +1389,7 @@ export function MathStudio({ startOpen = false }: { startOpen?: boolean }) {
                   className="wp-studio__close"
                   onClick={() => {
                     if (startOpen) {
-                      window.location.assign('/');
+                      window.location.assign(homeHref);
                       return;
                     }
                     setStudioOpen(false);

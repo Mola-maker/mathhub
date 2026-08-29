@@ -1,0 +1,14 @@
+\begin{tikzpicture}
+\coordinate (O1) at (0,0);
+\coordinate (O2) at (3,0);
+\coordinate (P) at (1.5,2.598076);
+\coordinate (Q) at (1.5,-2.598076);
+\draw (O1) circle[radius=3];
+\draw (O2) circle[radius=3];
+\draw[dashed] (P) -- (Q);
+\draw (O1) -- (P) -- (O2);
+\node[below] at (O1) {$O_1$};
+\node[below] at (O2) {$O_2$};
+\node[above] at (P) {$P$};
+\node[below] at (Q) {$Q$};
+\end{tikzpicture}

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { tikzAgentEvent } from './protocol';
+import { compactGeometryConversationContext } from '@/lib/geometry/agent/conversation-context';
+import {
+  createTikzAgentRunBasisTransition,
+  createTikzAgentRunCheckpoint,
+  type TikzAgentReplayBasis,
+} from './run-checkpoint';
 import {
   acknowledgeTikzAgentProposalCommit,
   fetchTikzAgentRunReplay,
@@ -9,11 +15,54 @@ import {
 } from './run-replay-client';
 
 const runId = 'tikz-run-recovery-1';
+const expectedBasis: TikzAgentReplayBasis = {
+  documentId: 'document-1',
+  epoch: 'epoch-1',
+  sourceId: 'document-1:tikz',
+  revision: 0,
+  sourceHash: '1111111111111111',
+};
+const runCheckpoint = createTikzAgentRunCheckpoint({
+  runId,
+  contextCheckpoint: compactGeometryConversationContext([
+    { role: 'user', content: 'construct the circle' },
+  ], {
+    lane: 'tikz',
+    basis: {
+      lane: 'tikz',
+      ...expectedBasis,
+      attestation: 'server-attested',
+    },
+  }).checkpoint,
+  createdAt: 1_000,
+})!;
+const afterBasis: TikzAgentReplayBasis = {
+  ...expectedBasis,
+  revision: 1,
+  sourceHash: '2222222222222222',
+};
+const basisTransition = createTikzAgentRunBasisTransition({
+  runId,
+  transactionId: 'transaction-1',
+  documentId: expectedBasis.documentId,
+  epoch: expectedBasis.epoch,
+  sourceId: expectedBasis.sourceId,
+  beforeRevision: expectedBasis.revision,
+  beforeSourceHash: expectedBasis.sourceHash,
+  afterRevision: afterBasis.revision,
+  afterSourceHash: afterBasis.sourceHash,
+  createdAt: 1_001,
+})!;
 
 function replayPayload(overrides: Record<string, unknown> = {}) {
   return {
-    schemaVersion: 'tikz-agent-run-replay/v1',
+    schemaVersion: 'tikz-agent-run-replay/v2',
     runId,
+    basis: expectedBasis,
+    basisPhase: 'proposal-pending',
+    runCheckpoint,
+    basisTransition,
+    earliestSequence: 0,
     events: [
       tikzAgentEvent(runId, 0, { type: 'run.started', title: 'started' }),
       tikzAgentEvent(runId, 1, { type: 'proposal.ready', title: 'proposal' }),
@@ -46,7 +95,7 @@ function replayPayload(overrides: Record<string, unknown> = {}) {
 
 describe('TikZ Agent replay client', () => {
   it('accepts only strictly increasing events for the requested run', () => {
-    const result = parseTikzAgentRunReplay(replayPayload(), runId, -1);
+    const result = parseTikzAgentRunReplay(replayPayload(), runId, expectedBasis, -1);
     expect(result.events.map((event) => event.sequence)).toEqual([0, 1]);
     expect(result.lastSequence).toBe(1);
     expect(result.verificationPending).toBe(false);
@@ -63,6 +112,7 @@ describe('TikZ Agent replay client', () => {
     expect(() => parseTikzAgentRunReplay(
       replayPayload({ runId: 'other-run' }),
       runId,
+      expectedBasis,
     )).toThrow(TikzAgentReplayError);
     const duplicate = replayPayload({
       events: [
@@ -70,14 +120,14 @@ describe('TikZ Agent replay client', () => {
         tikzAgentEvent(runId, 0, { type: 'context.read', title: 'duplicate' }),
       ],
     });
-    expect(() => parseTikzAgentRunReplay(duplicate, runId)).toThrow(/ordering/i);
+    expect(() => parseTikzAgentRunReplay(duplicate, runId, expectedBasis)).toThrow(/ordering/i);
     const outOfOrder = replayPayload({
       events: [
         tikzAgentEvent(runId, 1, { type: 'proposal.ready', title: 'proposal' }),
         tikzAgentEvent(runId, 0, { type: 'run.started', title: 'started' }),
       ],
     });
-    expect(() => parseTikzAgentRunReplay(outOfOrder, runId)).toThrow(TikzAgentReplayError);
+    expect(() => parseTikzAgentRunReplay(outOfOrder, runId, expectedBasis)).toThrow(TikzAgentReplayError);
   });
 
   it('preserves an explicit verification-pending state for bounded polling', () => {
@@ -85,7 +135,9 @@ describe('TikZ Agent replay client', () => {
       events: [],
       proposal: null,
       verificationPending: true,
-    }), runId, 1);
+      basis: afterBasis,
+      basisPhase: 'verification-pending',
+    }), runId, afterBasis, 1);
     expect(result.verificationPending).toBe(true);
     expect(result.events).toEqual([]);
     expect(result.terminal).toBeUndefined();
@@ -93,20 +145,24 @@ describe('TikZ Agent replay client', () => {
 
   it('sends the resume capability only as a bearer header and bounds the response', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
-      expect(String(input)).toBe('/api/tikz/runs/tikz-run-recovery-1?afterSequence=1');
+      expect(String(input)).toBe('/api/tikz/runs/tikz-run-recovery-1?afterSequence=1&documentId=document-1&epoch=epoch-1&revision=0&sourceId=document-1%3Atikz&sourceHash=1111111111111111');
       expect(String(input)).not.toContain('resume-token-secret');
       expect((init?.headers as Record<string, string>).Authorization)
         .toBe('Bearer resume-token-secret');
+      const terminal = tikzAgentEvent(runId, 2, { type: 'run.completed', title: 'done' });
       return new Response(JSON.stringify({
         ...replayPayload(),
-        events: [tikzAgentEvent(runId, 2, { type: 'run.completed', title: 'done' })],
+        events: [terminal],
         proposal: null,
+        basisPhase: 'terminal',
+        terminal,
       }), { status: 200, headers: { 'content-type': 'application/json' } });
     });
     const result = await fetchTikzAgentRunReplay({
       runId,
       resumeToken: 'resume-token-secret',
       afterSequence: 1,
+      expectedBasis,
       fetchImpl,
     });
     expect(result.events).toHaveLength(1);
@@ -122,8 +178,25 @@ describe('TikZ Agent replay client', () => {
       runId,
       resumeToken: 'resume-token-secret',
       afterSequence: -1,
+      expectedBasis,
       fetchImpl,
     })).rejects.toMatchObject({ code: 'too-large' });
+  });
+
+  it('rejects a replay payload bound to a different GeometryDoc revision', () => {
+    expect(() => parseTikzAgentRunReplay(
+      replayPayload(),
+      runId,
+      { ...expectedBasis, revision: 9 },
+    )).toThrow(/checkpoint/i);
+  });
+
+  it('rejects malformed proposal state instead of treating it as absent', () => {
+    expect(() => parseTikzAgentRunReplay(replayPayload({
+      basisPhase: 'running',
+      basisTransition: null,
+      proposal: { schemaVersion: 'untrusted-proposal/v0' },
+    }), runId, expectedBasis)).toThrow(/proposal checkpoint/i);
   });
 
   it('resolves a rejected proposal with the capability only in the bearer header', async () => {

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { tikzAgentEvent } from './protocol';
+import { compactGeometryConversationContext } from '@/lib/geometry/agent/conversation-context';
+import { createTikzAgentRunCheckpoint } from './run-checkpoint';
 import {
   createMemoryTikzAgentRunStore,
   TIKZ_AGENT_PROPOSAL_CHECKPOINT_SCHEMA_VERSION,
@@ -31,6 +33,25 @@ const checkpoint = (createdAt = 1_000): TikzAgentProposalCheckpoint => ({
   afterSourceHash: '2222222222222222',
   createdAt,
 });
+
+const runCheckpoint = () => createTikzAgentRunCheckpoint({
+  runId: 'tikz-run-1',
+  contextCheckpoint: compactGeometryConversationContext([
+    { role: 'user', content: 'construct the circle' },
+  ], {
+    lane: 'tikz',
+    basis: {
+      lane: 'tikz',
+      documentId: 'document-1',
+      epoch: 'epoch-1',
+      sourceId: 'document-1:tikz',
+      revision: 3,
+      sourceHash: '1111111111111111',
+      attestation: 'server-attested',
+    },
+  }).checkpoint,
+  createdAt: 900,
+})!;
 
 describe('TikzAgentRunStore', () => {
   afterEach(() => {
@@ -94,6 +115,17 @@ describe('TikzAgentRunStore', () => {
     });
   });
 
+  it('rejects event identities that are not derived from run and sequence', async () => {
+    const store = createMemoryTikzAgentRunStore(() => 1_000);
+    expect(await store.appendEvent({
+      ...tikzAgentEvent('tikz-run-1', 0, {
+        type: 'run.started',
+        title: 'started',
+      }),
+      eventId: 'opaque-event-id',
+    })).toMatchObject({ ok: false, code: 'invalid' });
+  });
+
   it('keeps proposal identity and accepts only one terminal event', async () => {
     let now = 1_000;
     const store = createMemoryTikzAgentRunStore(() => now);
@@ -130,6 +162,36 @@ describe('TikzAgentRunStore', () => {
 
     now += 31 * 60_000;
     expect(await store.read('tikz-run-1')).toEqual({ ok: true, value: null });
+  });
+
+  it('persists one immutable context basis and the proposal successor basis', async () => {
+    const store = createMemoryTikzAgentRunStore(() => 1_000);
+    expect(await store.checkpointRun(runCheckpoint())).toEqual({ ok: true, stored: true });
+    expect(await store.checkpointRun(runCheckpoint())).toEqual({ ok: true, stored: true });
+    expect(await store.publishProposal(checkpoint(), tikzAgentEvent('tikz-run-1', 1, {
+      type: 'proposal.ready',
+      title: 'ready',
+    }))).toEqual({ ok: true, stored: true });
+
+    const snapshot = await store.read('tikz-run-1');
+    expect(snapshot.ok && snapshot.value?.runCheckpoint?.basis).toMatchObject({
+      revision: 3,
+      sourceHash: '1111111111111111',
+    });
+    expect(snapshot.ok && snapshot.value?.basisTransition).toMatchObject({
+      transactionId: 'transaction-1',
+      before: { revision: 3, sourceHash: '1111111111111111' },
+      after: { revision: 4, sourceHash: '2222222222222222' },
+    });
+    expect(snapshot.ok && snapshot.value?.earliestSequence).toBe(1);
+  });
+
+  it('will not attach an initial basis after proposal state already exists', async () => {
+    const store = createMemoryTikzAgentRunStore(() => 1_000);
+    expect(await store.checkpointProposal(checkpoint())).toEqual({ ok: true, stored: true });
+    expect(await store.checkpointRun(runCheckpoint())).toEqual({ ok: true, stored: false });
+    const snapshot = await store.read('tikz-run-1');
+    expect(snapshot.ok && snapshot.value?.runCheckpoint).toBeUndefined();
   });
 
   it('rejects a second, different proposal checkpoint for one run', async () => {

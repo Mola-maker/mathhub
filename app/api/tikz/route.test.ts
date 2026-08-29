@@ -274,6 +274,7 @@ describe('POST /api/tikz', () => {
   });
 
   it('allows an answer-only agent result without a write proposal', async () => {
+    const fixture = proofAwareTriangleRouteFixture();
     vi.mocked(streamProvider).mockImplementationOnce(async (
       _provider,
       _messages,
@@ -287,6 +288,12 @@ describe('POST /api/tikz', () => {
       problem: 'Explain the nine-point circle',
       history: [],
       provider: 'relay',
+      tikzCode: fixture.source,
+      sourceRevision: 0,
+      sourceHash: fixture.sceneManifest.sourceHash,
+      sceneManifest: fixture.sceneManifest,
+      semanticKernel: fixture.semanticKernel,
+      contextRefs: fixture.contextRefs,
     }));
     const text = await response.text();
     expect(text).not.toContain('Model output is missing an explicit');
@@ -294,6 +301,7 @@ describe('POST /api/tikz', () => {
     const startedFrame = text.split(/\r?\n\r?\n/u)
       .find((frame) => frame.includes('"type":"run.started"'));
     expect(startedFrame).toContain('"agentRunRecovery"');
+    expect(startedFrame).toContain('"tikz-agent-run-recovery/v2"');
     expect(startedFrame).toContain('"resumeToken"');
     const runId = /"runId":"([^"]+)"/u.exec(text)?.[1];
     expect(runId).toBeTruthy();
@@ -303,8 +311,13 @@ describe('POST /api/tikz', () => {
     const replay = await runStore.store.read(runId);
     expect(replay.ok && replay.value?.events.map((event) => event.type)).toEqual([
       'run.started',
+      'context.read',
       'run.completed',
     ]);
+    expect(replay.ok && replay.value?.runCheckpoint?.basis).toMatchObject({
+      revision: 0,
+      sourceHash: fixture.sceneManifest.sourceHash,
+    });
   });
 
   it('re-attests a signed problem receipt and keeps the turn read-only', async () => {

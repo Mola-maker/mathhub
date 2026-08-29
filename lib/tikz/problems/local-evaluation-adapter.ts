@@ -6,6 +6,7 @@ import { hashSource } from '../document/source-hash';
 import type { GeometryTransactionRequest } from '../ir/transactions';
 import { attestAiTransaction } from '../transactions/transaction-attestation';
 import type { SourceHashEvidence } from '../transactions/broker';
+import { compactGeometryConversationContext } from '@/lib/geometry/agent/conversation-context';
 import type {
   GeometryEvaluationCapability,
   GeometryEvaluationLane,
@@ -17,6 +18,7 @@ import {
   type GeometryEvaluationAnswerEvidence,
   type GeometryEvaluationRenderArtifactAttestation,
   type GeometryEvaluationSnapshot,
+  type GeometryEvaluationTurnObservation,
 } from './evaluation-runner';
 
 type MutationLane = Extract<
@@ -146,6 +148,39 @@ export function createLocalGeometryEvaluationAdapter(
   return {
     capabilities: [...new Set(options.capabilities)],
     async execute({ caseDefinition, turn, turnIndex, snapshot, broker }) {
+      const conversationHistory = [
+        ...caseDefinition.turns.slice(0, turnIndex).flatMap((previous, index) => [
+          { role: 'user' as const, content: previous.instruction },
+          {
+            role: 'assistant' as const,
+            content: `Evaluation turn ${index} completed in the ${previous.lane} lane.`,
+          },
+        ]),
+        { role: 'user' as const, content: turn.instruction },
+      ];
+      const contextCheckpoint = compactGeometryConversationContext(
+        conversationHistory,
+        {
+          lane: 'tikz',
+          basis: {
+            lane: 'tikz',
+            documentId: snapshot.geometryDoc.basis.documentId,
+            epoch: snapshot.geometryDoc.basis.epoch,
+            revision: snapshot.geometryDoc.basis.revision,
+            sourceId: snapshot.geometryDoc.basis.sourceId,
+            sourceHash: snapshot.geometryDoc.basis.sourceHash,
+            attestation: 'server-attested',
+          },
+          maxMessages: 4,
+          maxMessageChars: 1_000,
+          maxTotalChars: 3_000,
+        },
+      ).checkpoint;
+      const finish = (
+        observation: Omit<GeometryEvaluationTurnObservation, 'contextCheckpoint'>,
+      ): GeometryEvaluationTurnObservation => {
+        return { ...observation, contextCheckpoint };
+      };
       const runId = `evaluation:${caseDefinition.caseId}:${turnIndex}:${snapshot.revision}`;
       const events = startedEvents(runId);
       if (turn.lane === 'answer-only') {
@@ -162,7 +197,7 @@ export function createLocalGeometryEvaluationAdapter(
           title: 'Semantic answer completed',
           outcome: 'answer',
         }));
-        return { agentEvents: events, answer };
+        return finish({ agentEvents: events, answer });
       }
       if (turn.lane === 'verify-rendering') {
         if (!options.render) {
@@ -192,7 +227,7 @@ export function createLocalGeometryEvaluationAdapter(
           title: 'Render verification completed',
           outcome: 'answer',
         }));
-        return { agentEvents: events, renderArtifacts };
+        return finish({ agentEvents: events, renderArtifacts });
       }
       if (!mutationLane(turn.lane)) {
         throw new TypeError(`Unsupported local evaluation lane ${turn.lane}.`);
@@ -247,10 +282,10 @@ export function createLocalGeometryEvaluationAdapter(
           outcome: 'failed',
         }));
       }
-      return {
+      return finish({
         agentEvents: events,
         transaction: { request, brokerResult, attestation },
-      };
+      });
     },
   };
 }

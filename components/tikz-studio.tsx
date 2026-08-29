@@ -76,9 +76,15 @@ import {
   acknowledgeTikzAgentProposalCommit,
   fetchTikzAgentRunReplay,
   rejectTikzAgentProposal,
+  TikzAgentReplayError,
   type TikzAgentReplayProposalSummary,
 } from '@/lib/tikz/agent/run-replay-client';
-import { compactTikzConversationHistory } from '@/lib/tikz/agent/conversation-history';
+import {
+  isTikzAgentRunBasis,
+  sameTikzAgentReplayBasis,
+  type TikzAgentReplayBasis,
+} from '@/lib/tikz/agent/run-checkpoint';
+import { MAX_TIKZ_HISTORY_MESSAGES } from '@/lib/tikz/agent/conversation-history';
 import {
   canAdvanceTikzAsyncWorkItem,
   createTikzAsyncWorkItemId,
@@ -1448,12 +1454,16 @@ export function TikzStudio({
       return;
     }
 
-    const history = compactTikzConversationHistory(messages
+    // The server owns semantic compaction and emits an auditable checkpoint.
+    // The client only bounds transport cardinality, avoiding a second lossy
+    // character-level pass before the authoritative source projection exists.
+    const history = messages
       .map(({ role, content }) => ({
         role,
         content: role === 'assistant' ? assistantHistoryText(content) : content,
       }))
-      .filter((message) => message.content.trim().length > 0));
+      .filter((message) => message.content.trim().length > 0)
+      .slice(-MAX_TIKZ_HISTORY_MESSAGES);
     const baseCode = engine.code;
     const baseRevision = engine.revision;
     const sceneManifest = buildSceneManifest({
@@ -1675,11 +1685,24 @@ export function TikzStudio({
             && !Array.isArray(event.agentRunRecovery)
           ) {
             const recovery = event.agentRunRecovery as Record<string, unknown>;
+            const recoveryBasis = recovery.basis;
+            const requestBasis = geometryDoc?.basis.sourceId
+              ? {
+                  documentId: geometryDoc.basis.documentId,
+                  epoch: geometryDoc.basis.epoch,
+                  sourceId: geometryDoc.basis.sourceId,
+                  revision: baseRevision,
+                  sourceHash: sceneManifest.sourceHash,
+                }
+              : null;
             if (
-              recovery.schemaVersion === 'tikz-agent-run-recovery/v1'
+              recovery.schemaVersion === 'tikz-agent-run-recovery/v2'
               && recovery.runId === activeAgentRunId
               && typeof recovery.resumeToken === 'string'
               && recovery.resumeToken.length <= 256
+              && isTikzAgentRunBasis(recoveryBasis)
+              && requestBasis
+              && sameTikzAgentReplayBasis(recoveryBasis, requestBasis)
             ) {
               activeAgentResumeToken = recovery.resumeToken;
             }
@@ -2279,10 +2302,23 @@ export function TikzStudio({
       // Agent events.  Use the separate recovery capability only for the
       // still-current request; an aborted request superseded by a new turn
       // must not append stale events into the new assistant message.
+      const recoveryGeometryBasis = engineRef.current.geometryDoc?.basis;
+      const currentReplayBasis: TikzAgentReplayBasis | null = recoveryGeometryBasis?.sourceId
+        && recoveryGeometryBasis.revision === engineRef.current.revision
+        && recoveryGeometryBasis.sourceHash === hashSource(engineRef.current.code)
+        ? {
+            documentId: recoveryGeometryBasis.documentId,
+            epoch: recoveryGeometryBasis.epoch,
+            sourceId: recoveryGeometryBasis.sourceId,
+            revision: recoveryGeometryBasis.revision,
+            sourceHash: recoveryGeometryBasis.sourceHash,
+          }
+        : null;
       const canRecover = agentControllerRef.current === controller
         && activeAgentRunId.length > 0
         && activeAgentResumeToken.length > 0
-        && !terminalRunIds.has(activeAgentRunId);
+        && !terminalRunIds.has(activeAgentRunId)
+        && currentReplayBasis !== null;
       const cancellationRequested = controller.signal.aborted
         && controller.signal.reason instanceof DOMException
         && controller.signal.reason.name === 'AbortError';
@@ -2299,10 +2335,33 @@ export function TikzStudio({
           let replay: Awaited<ReturnType<typeof fetchTikzAgentRunReplay>>;
           let recoveryPollCount = 0;
           for (;;) {
+            const latestGeometryBasis = engineRef.current.geometryDoc?.basis;
+            const latestReplayBasis = latestGeometryBasis?.sourceId
+              && latestGeometryBasis.revision === engineRef.current.revision
+              && latestGeometryBasis.sourceHash === hashSource(engineRef.current.code)
+              ? {
+                  documentId: latestGeometryBasis.documentId,
+                  epoch: latestGeometryBasis.epoch,
+                  sourceId: latestGeometryBasis.sourceId,
+                  revision: latestGeometryBasis.revision,
+                  sourceHash: latestGeometryBasis.sourceHash,
+                }
+              : null;
+            if (
+              !latestReplayBasis
+              || !sameTikzAgentReplayBasis(latestReplayBasis, currentReplayBasis!)
+            ) {
+              throw new TikzAgentReplayError(
+                'invalid',
+                'Canvas basis changed while recovering the Agent run',
+                409,
+              );
+            }
             replay = await fetchTikzAgentRunReplay({
               runId: activeAgentRunId,
               resumeToken: activeAgentResumeToken,
               afterSequence: lastAgentSequence,
+              expectedBasis: currentReplayBasis!,
               signal: recoveryController.signal,
             });
             for (const replayedEvent of replay.events) {
@@ -2369,11 +2428,15 @@ export function TikzStudio({
           }
         } catch (recoveryError) {
           if (agentControllerRef.current === controller && !recoveryController.signal.aborted) {
+            const staleBasis = recoveryError instanceof TikzAgentReplayError
+              && recoveryError.status === 409;
             updateAgentRecovery(setMessages, {
               status: 'unavailable',
               runId: activeAgentRunId,
               lastSequence: lastAgentSequence,
-              detail: 'Agent 进度恢复暂不可用；当前 Canvas 与 TikZ 源码保持不变，请基于最新状态重试。',
+              detail: staleBasis
+                ? '当前 GeometryDoc 已变化，旧 Agent 运行已隔离；不会把旧语义回放到新画板。'
+                : 'Agent 进度恢复暂不可用；当前 Canvas 与 TikZ 源码保持不变，请基于最新状态重试。',
             }, assistantMessageId);
           }
           // Do not surface the opaque capability or raw replay payload in the

@@ -6,6 +6,14 @@ import {
 } from './protocol';
 import type { AiTransactionAttestation } from '../transactions/transaction-attestation';
 import { isSourceHashAlgorithm } from '../document/source-hash';
+import {
+  createTikzAgentRunBasisTransition,
+  isTikzAgentRunBasisTransition,
+  isTikzAgentRunCheckpoint,
+  sameTikzAgentRunBasis,
+  type TikzAgentRunBasisTransition,
+  type TikzAgentRunCheckpoint,
+} from './run-checkpoint';
 
 export const TIKZ_AGENT_PROPOSAL_CHECKPOINT_SCHEMA_VERSION =
   'tikz-agent-proposal-checkpoint/v1' as const;
@@ -30,6 +38,10 @@ export interface TikzAgentProposalCheckpoint {
 export interface TikzAgentRunSnapshot {
   readonly runId: string;
   readonly events: readonly TikzAgentEvent[];
+  readonly runCheckpoint?: TikzAgentRunCheckpoint;
+  readonly basisTransition?: TikzAgentRunBasisTransition;
+  /** First event still retained before applying the caller's cursor. */
+  readonly earliestSequence?: number;
   readonly proposal?: TikzAgentProposalCheckpoint;
   readonly verificationPending?: boolean;
   readonly terminal?: TikzAgentEvent;
@@ -44,6 +56,8 @@ export type TikzAgentStoreReadResult<T> =
   | { readonly ok: false; readonly code: 'unavailable' | 'invalid'; readonly message: string };
 
 export interface TikzAgentRunStore {
+  /** Idempotently binds a run to one immutable source/context checkpoint. */
+  checkpointRun(checkpoint: TikzAgentRunCheckpoint): Promise<TikzAgentStoreWriteResult>;
   appendEvent(event: TikzAgentEvent): Promise<TikzAgentStoreWriteResult>;
   checkpointProposal(
     checkpoint: TikzAgentProposalCheckpoint,
@@ -82,6 +96,8 @@ const encoder = new TextEncoder();
 
 type MemoryRun = {
   events: TikzAgentEvent[];
+  runCheckpoint?: TikzAgentRunCheckpoint;
+  basisTransition?: TikzAgentRunBasisTransition;
   proposal?: TikzAgentProposalCheckpoint;
   verificationClaimed?: boolean;
   terminal?: TikzAgentEvent;
@@ -151,6 +167,52 @@ function validCheckpoint(value: TikzAgentProposalCheckpoint): boolean {
   }
 }
 
+function boundedRunCheckpoint(value: TikzAgentRunCheckpoint): boolean {
+  try {
+    return isTikzAgentRunCheckpoint(value)
+      && validId(value.runId)
+      && encoder.encode(JSON.stringify(value)).byteLength <= 16 * 1024;
+  } catch {
+    return false;
+  }
+}
+
+function transitionForProposal(
+  proposal: TikzAgentProposalCheckpoint,
+  runCheckpoint?: TikzAgentRunCheckpoint,
+): TikzAgentRunBasisTransition | null {
+  const transition = createTikzAgentRunBasisTransition({
+    runId: proposal.runId,
+    transactionId: proposal.transactionId,
+    documentId: proposal.documentId,
+    epoch: proposal.epoch,
+    sourceId: proposal.sourceId,
+    beforeRevision: proposal.beforeRevision,
+    beforeSourceHash: proposal.beforeSourceHash,
+    afterRevision: proposal.afterRevision,
+    afterSourceHash: proposal.afterSourceHash,
+    pluginSetDigest: runCheckpoint?.basis.pluginSetDigest,
+    createdAt: proposal.createdAt,
+  });
+  if (
+    !transition
+    || (
+      runCheckpoint
+      && !sameTikzAgentRunBasis(runCheckpoint.basis, transition.before)
+    )
+  ) return null;
+  return transition;
+}
+
+function boundedBasisTransition(value: TikzAgentRunBasisTransition): boolean {
+  try {
+    return isTikzAgentRunBasisTransition(value)
+      && encoder.encode(JSON.stringify(value)).byteLength <= 4 * 1024;
+  } catch {
+    return false;
+  }
+}
+
 function terminalEvent(event: TikzAgentEvent): boolean {
   return event.type === 'run.completed' || event.type === 'run.failed';
 }
@@ -162,6 +224,7 @@ function proposalReadyEvent(event: TikzAgentEvent): boolean {
 function boundedEvent(event: TikzAgentEvent): boolean {
   return isTikzAgentEvent(event)
     && validId(event.runId)
+    && event.eventId === `${event.runId}:${event.sequence}`
     && encoder.encode(JSON.stringify(event)).byteLength <= MAX_EVENT_BYTES;
 }
 
@@ -209,6 +272,30 @@ export function createMemoryTikzAgentRunStore(
   };
 
   return {
+    async checkpointRun(checkpoint) {
+      if (!boundedRunCheckpoint(checkpoint)) {
+        return { ok: false, code: 'invalid', message: 'invalid Agent run checkpoint' };
+      }
+      const run = current(checkpoint.runId);
+      if (run.runCheckpoint) {
+        return {
+          ok: true,
+          stored: JSON.stringify(run.runCheckpoint) === JSON.stringify(checkpoint),
+        };
+      }
+      if (
+        run.events.length > 0
+        || run.proposal
+        || run.basisTransition
+        || run.verificationClaimed
+        || run.terminal
+      ) {
+        return { ok: true, stored: false };
+      }
+      run.runCheckpoint = structuredClone(checkpoint);
+      run.expiresAt = now() + RUN_TTL_MS;
+      return { ok: true, stored: true };
+    },
     async appendEvent(event) {
       if (!boundedEvent(event) || terminalEvent(event)) {
         return { ok: false, code: 'invalid', message: 'invalid non-terminal agent event' };
@@ -220,6 +307,10 @@ export function createMemoryTikzAgentRunStore(
         return { ok: false, code: 'invalid', message: 'invalid proposal checkpoint' };
       }
       const run = current(checkpoint.runId);
+      const transition = transitionForProposal(checkpoint, run.runCheckpoint);
+      if (!transition || !boundedBasisTransition(transition)) {
+        return { ok: false, code: 'invalid', message: 'proposal basis transition is invalid' };
+      }
       if (run.terminal || run.verificationClaimed) return { ok: true, stored: false };
       if (run.proposal && run.proposal.createdAt + PROPOSAL_TTL_MS <= now()) {
         run.proposal = undefined;
@@ -227,10 +318,16 @@ export function createMemoryTikzAgentRunStore(
       if (run.proposal) {
         return {
           ok: true,
-          stored: JSON.stringify(run.proposal) === JSON.stringify(checkpoint),
+          stored: JSON.stringify(run.proposal) === JSON.stringify(checkpoint)
+            && JSON.stringify(run.basisTransition) === JSON.stringify(transition),
         };
       }
+      if (
+        run.basisTransition
+        && JSON.stringify(run.basisTransition) !== JSON.stringify(transition)
+      ) return { ok: true, stored: false };
       run.proposal = checkpoint;
+      run.basisTransition = transition;
       run.expiresAt = Math.max(run.expiresAt, now() + PROPOSAL_TTL_MS);
       return { ok: true, stored: true };
     },
@@ -244,12 +341,20 @@ export function createMemoryTikzAgentRunStore(
         return { ok: false, code: 'invalid', message: 'invalid proposal publication' };
       }
       const run = current(checkpoint.runId);
+      const transition = transitionForProposal(checkpoint, run.runCheckpoint);
+      if (!transition || !boundedBasisTransition(transition)) {
+        return { ok: false, code: 'invalid', message: 'proposal basis transition is invalid' };
+      }
       if (run.terminal || run.verificationClaimed) return { ok: true, stored: false };
       if (run.proposal && run.proposal.createdAt + PROPOSAL_TTL_MS <= now()) {
         run.proposal = undefined;
       }
       const serializedCheckpoint = JSON.stringify(checkpoint);
+      const serializedTransition = JSON.stringify(transition);
       if (run.proposal && JSON.stringify(run.proposal) !== serializedCheckpoint) {
+        return { ok: true, stored: false };
+      }
+      if (run.basisTransition && JSON.stringify(run.basisTransition) !== serializedTransition) {
         return { ok: true, stored: false };
       }
       const existingEvent = run.events.find((candidate) => candidate.eventId === event.eventId);
@@ -265,6 +370,7 @@ export function createMemoryTikzAgentRunStore(
         return { ok: true, stored: false };
       }
       run.proposal = checkpoint;
+      run.basisTransition = transition;
       run.events.push(event);
       if (run.events.length > MAX_EVENTS_PER_RUN) {
         run.events.splice(0, run.events.length - MAX_EVENTS_PER_RUN);
@@ -391,6 +497,15 @@ export function createMemoryTikzAgentRunStore(
         ok: true,
         value: {
           runId,
+          ...(run.runCheckpoint
+            ? { runCheckpoint: structuredClone(run.runCheckpoint) }
+            : {}),
+          ...(run.basisTransition
+            ? { basisTransition: structuredClone(run.basisTransition) }
+            : {}),
+          ...(run.events[0]
+            ? { earliestSequence: run.events[0].sequence }
+            : {}),
           events: structuredClone(
             run.events.filter((event) => event.sequence > afterSequence),
           ),
@@ -423,10 +538,7 @@ redis.call('SET', KEYS[3], ARGV[2], 'EX', ARGV[3])
 return 1
 `;
 
-const CHECKPOINT_SCRIPT = `
-if redis.call('EXISTS', KEYS[2]) == 1 or redis.call('EXISTS', KEYS[3]) == 1 then
-  return 0
-end
+const RUN_CHECKPOINT_SCRIPT = `
 local existing = redis.call('GET', KEYS[1])
 if existing then
   if existing == ARGV[1] then
@@ -434,7 +546,39 @@ if existing then
   end
   return 0
 end
+if redis.call('EXISTS', KEYS[2]) == 1
+  or redis.call('LLEN', KEYS[3]) > 0
+  or redis.call('EXISTS', KEYS[4]) == 1
+  or redis.call('EXISTS', KEYS[5]) == 1
+  or redis.call('EXISTS', KEYS[6]) == 1 then
+  return 0
+end
 redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+return 1
+`;
+
+const CHECKPOINT_SCRIPT = `
+if redis.call('EXISTS', KEYS[2]) == 1 or redis.call('EXISTS', KEYS[3]) == 1 then
+  return 0
+end
+local existing = redis.call('GET', KEYS[1])
+local existingTransition = redis.call('GET', KEYS[4])
+if existingTransition and existingTransition ~= ARGV[3] then
+  return 0
+end
+if existing then
+  if existing == ARGV[1] then
+    if not existingTransition then
+      redis.call('SET', KEYS[4], ARGV[3], 'EX', ARGV[4])
+    end
+    return 1
+  end
+  return 0
+end
+redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+if not existingTransition then
+  redis.call('SET', KEYS[4], ARGV[3], 'EX', ARGV[4])
+end
 return 1
 `;
 
@@ -465,19 +609,26 @@ if redis.call('EXISTS', KEYS[3]) == 1 or redis.call('EXISTS', KEYS[5]) == 1 then
   return 0
 end
 local existing = redis.call('GET', KEYS[2])
+local existingTransition = redis.call('GET', KEYS[6])
 if existing and existing ~= ARGV[1] then
+  return 0
+end
+if existingTransition and existingTransition ~= ARGV[6] then
   return 0
 end
 local last = redis.call('GET', KEYS[4])
 if last and tonumber(ARGV[3]) <= tonumber(last) then
   local lastEvent = redis.call('LINDEX', KEYS[1], -1)
-  if existing == ARGV[1] and lastEvent == ARGV[2] then
+  if existing == ARGV[1] and existingTransition == ARGV[6] and lastEvent == ARGV[2] then
     return 1
   end
   return 0
 end
 if not existing then
   redis.call('SET', KEYS[2], ARGV[1], 'EX', ARGV[5])
+end
+if not existingTransition then
+  redis.call('SET', KEYS[6], ARGV[6], 'EX', ARGV[7])
 end
 redis.call('RPUSH', KEYS[1], ARGV[2])
 redis.call('LTRIM', KEYS[1], -${MAX_EVENTS_PER_RUN}, -1)
@@ -497,7 +648,16 @@ local verificationPending = false
 if not terminal and redis.call('EXISTS', KEYS[4]) == 1 then
   verificationPending = true
 end
-return {events, proposal, terminal or false, verificationPending}
+local runCheckpoint = redis.call('GET', KEYS[5])
+local basisTransition = redis.call('GET', KEYS[6])
+return {
+  events,
+  proposal,
+  terminal or false,
+  verificationPending,
+  runCheckpoint or false,
+  basisTransition or false
+}
 `;
 
 const COMPLETE_SCRIPT = `
@@ -580,6 +740,8 @@ export function createRedisTikzAgentRunStore(
   const terminalKey = (runId: string) => redisKey(prefix, runId, 'terminal');
   const sequenceKey = (runId: string) => redisKey(prefix, runId, 'sequence');
   const claimKey = (runId: string) => redisKey(prefix, runId, 'verification-claim');
+  const runCheckpointKey = (runId: string) => redisKey(prefix, runId, 'run-checkpoint');
+  const basisTransitionKey = (runId: string) => redisKey(prefix, runId, 'basis-transition');
   const ttlSeconds = Math.ceil(RUN_TTL_MS / 1_000);
   const proposalTtlSeconds = Math.ceil(PROPOSAL_TTL_MS / 1_000);
 
@@ -589,7 +751,40 @@ export function createRedisTikzAgentRunStore(
     message: error instanceof Error ? error.message : 'agent run store unavailable',
   });
 
+  const storedRunCheckpoint = async (
+    runId: string,
+  ): Promise<TikzAgentRunCheckpoint | undefined> => {
+    const raw = await client.get(runCheckpointKey(runId));
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isTikzAgentRunCheckpoint(parsed)) {
+      throw new TypeError('stored Agent run checkpoint is invalid');
+    }
+    return parsed;
+  };
+
   return {
+    async checkpointRun(checkpoint) {
+      if (!boundedRunCheckpoint(checkpoint)) {
+        return { ok: false, code: 'invalid', message: 'invalid Agent run checkpoint' };
+      }
+      try {
+        const stored = Number(await client.eval(RUN_CHECKPOINT_SCRIPT, {
+          keys: [
+            runCheckpointKey(checkpoint.runId),
+            terminalKey(checkpoint.runId),
+            eventsKey(checkpoint.runId),
+            proposalKey(checkpoint.runId),
+            claimKey(checkpoint.runId),
+            basisTransitionKey(checkpoint.runId),
+          ],
+          arguments: [JSON.stringify(checkpoint), String(ttlSeconds)],
+        }));
+        return { ok: true, stored: stored === 1 };
+      } catch (error) {
+        return unavailable(error);
+      }
+    },
     async appendEvent(event) {
       if (!boundedEvent(event) || terminalEvent(event)) {
         return { ok: false, code: 'invalid', message: 'invalid non-terminal agent event' };
@@ -614,13 +809,26 @@ export function createRedisTikzAgentRunStore(
         return { ok: false, code: 'invalid', message: 'invalid proposal checkpoint' };
       }
       try {
+        const transition = transitionForProposal(
+          checkpoint,
+          await storedRunCheckpoint(checkpoint.runId),
+        );
+        if (!transition || !boundedBasisTransition(transition)) {
+          return { ok: false, code: 'invalid', message: 'proposal basis transition is invalid' };
+        }
         const stored = Number(await client.eval(CHECKPOINT_SCRIPT, {
           keys: [
             proposalKey(checkpoint.runId),
             terminalKey(checkpoint.runId),
             claimKey(checkpoint.runId),
+            basisTransitionKey(checkpoint.runId),
           ],
-          arguments: [JSON.stringify(checkpoint), String(proposalTtlSeconds)],
+          arguments: [
+            JSON.stringify(checkpoint),
+            String(proposalTtlSeconds),
+            JSON.stringify(transition),
+            String(ttlSeconds),
+          ],
         }));
         return { ok: true, stored: stored === 1 };
       } catch (error) {
@@ -637,6 +845,13 @@ export function createRedisTikzAgentRunStore(
         return { ok: false, code: 'invalid', message: 'invalid proposal publication' };
       }
       try {
+        const transition = transitionForProposal(
+          checkpoint,
+          await storedRunCheckpoint(checkpoint.runId),
+        );
+        if (!transition || !boundedBasisTransition(transition)) {
+          return { ok: false, code: 'invalid', message: 'proposal basis transition is invalid' };
+        }
         const stored = Number(await client.eval(PUBLISH_PROPOSAL_SCRIPT, {
           keys: [
             eventsKey(event.runId),
@@ -644,6 +859,7 @@ export function createRedisTikzAgentRunStore(
             terminalKey(event.runId),
             sequenceKey(event.runId),
             claimKey(event.runId),
+            basisTransitionKey(event.runId),
           ],
           arguments: [
             JSON.stringify(checkpoint),
@@ -651,6 +867,8 @@ export function createRedisTikzAgentRunStore(
             String(event.sequence),
             String(ttlSeconds),
             String(proposalTtlSeconds),
+            JSON.stringify(transition),
+            String(ttlSeconds),
           ],
         }));
         return { ok: true, stored: stored === 1 };
@@ -792,7 +1010,14 @@ export function createRedisTikzAgentRunStore(
         return { ok: false, code: 'invalid', message: 'invalid run cursor' };
       }
       try {
-        const [rawEvents, rawProposal, rawTerminal, rawVerificationPending] = await client.eval(
+        const [
+          rawEvents,
+          rawProposal,
+          rawTerminal,
+          rawVerificationPending,
+          rawRunCheckpoint,
+          rawBasisTransition,
+        ] = await client.eval(
           READ_SNAPSHOT_SCRIPT,
           {
             keys: [
@@ -800,34 +1025,118 @@ export function createRedisTikzAgentRunStore(
               proposalKey(runId),
               terminalKey(runId),
               claimKey(runId),
+              runCheckpointKey(runId),
+              basisTransitionKey(runId),
             ],
             arguments: [],
           },
-        ) as [string[], string | null, string | null, number | null];
-        if (rawEvents.length === 0 && !rawProposal && !rawTerminal && !rawVerificationPending) {
+        ) as [
+          string[],
+          string | null,
+          string | null,
+          number | null,
+          string | null,
+          string | null,
+        ];
+        if (
+          rawEvents.length === 0
+          && !rawProposal
+          && !rawTerminal
+          && !rawVerificationPending
+          && !rawRunCheckpoint
+          && !rawBasisTransition
+        ) {
           return { ok: true, value: null };
         }
-        const events = rawEvents
-          .flatMap((raw) => {
-            try {
-              const event = JSON.parse(raw) as unknown;
-              return isTikzAgentEvent(event) ? [event] : [];
-            } catch {
-              return [];
-            }
-          })
-          .filter((event) => event.sequence > afterSequence);
-        const proposal = rawProposal
-          ? JSON.parse(rawProposal) as TikzAgentProposalCheckpoint
+        let parsedEvents: TikzAgentEvent[];
+        let proposal: TikzAgentProposalCheckpoint | undefined;
+        let terminal: TikzAgentEvent | undefined;
+        let parsedRunCheckpoint: unknown;
+        let parsedBasisTransition: unknown;
+        try {
+          parsedEvents = rawEvents.map((raw) => JSON.parse(raw) as TikzAgentEvent);
+          proposal = rawProposal
+            ? JSON.parse(rawProposal) as TikzAgentProposalCheckpoint
+            : undefined;
+          terminal = rawTerminal
+            ? JSON.parse(rawTerminal) as TikzAgentEvent
+            : undefined;
+          parsedRunCheckpoint = rawRunCheckpoint
+            ? JSON.parse(rawRunCheckpoint) as unknown
+            : undefined;
+          parsedBasisTransition = rawBasisTransition
+            ? JSON.parse(rawBasisTransition) as unknown
+            : undefined;
+        } catch {
+          return { ok: false, code: 'invalid', message: 'stored Agent run JSON is invalid' };
+        }
+        if (parsedEvents.some((event, index) => (
+          !boundedEvent(event)
+          || event.runId !== runId
+          || (index > 0 && event.sequence <= parsedEvents[index - 1]!.sequence)
+        ))) {
+          return { ok: false, code: 'invalid', message: 'stored Agent event sequence is invalid' };
+        }
+        if (proposal !== undefined && (!validCheckpoint(proposal) || proposal.runId !== runId)) {
+          return { ok: false, code: 'invalid', message: 'stored proposal checkpoint is invalid' };
+        }
+        if (
+          terminal !== undefined
+          && (!boundedEvent(terminal) || !terminalEvent(terminal) || terminal.runId !== runId)
+        ) {
+          return { ok: false, code: 'invalid', message: 'stored terminal Agent event is invalid' };
+        }
+        if (parsedRunCheckpoint !== undefined) {
+          if (
+            !isTikzAgentRunCheckpoint(parsedRunCheckpoint)
+            || parsedRunCheckpoint.runId !== runId
+          ) {
+            return { ok: false, code: 'invalid', message: 'stored Agent run checkpoint is invalid' };
+          }
+        }
+        const runCheckpoint = parsedRunCheckpoint;
+        if (parsedBasisTransition !== undefined) {
+          if (
+            !isTikzAgentRunBasisTransition(parsedBasisTransition)
+            || parsedBasisTransition.runId !== runId
+            || (
+              runCheckpoint !== undefined
+              && !sameTikzAgentRunBasis(runCheckpoint.basis, parsedBasisTransition.before)
+            )
+          ) {
+            return { ok: false, code: 'invalid', message: 'stored Agent basis transition is invalid' };
+          }
+        }
+        const basisTransition = parsedBasisTransition;
+        if (proposal && basisTransition) {
+          const expectedTransition = transitionForProposal(proposal, runCheckpoint);
+          if (
+            !expectedTransition
+            || JSON.stringify(expectedTransition) !== JSON.stringify(basisTransition)
+          ) {
+            return { ok: false, code: 'invalid', message: 'stored proposal transition is inconsistent' };
+          }
+        }
+        const retainedTerminal = terminal
+          ? parsedEvents.find((event) => event.eventId === terminal?.eventId)
           : undefined;
-        const terminal = rawTerminal
-          ? JSON.parse(rawTerminal) as TikzAgentEvent
-          : undefined;
+        if (
+          retainedTerminal
+          && JSON.stringify(retainedTerminal) !== JSON.stringify(terminal)
+        ) {
+          return { ok: false, code: 'invalid', message: 'stored terminal event is inconsistent' };
+        }
+        const events = parsedEvents.filter((event) => event.sequence > afterSequence);
         return {
           ok: true,
           value: {
             runId,
             events,
+            ...(runCheckpoint ? { runCheckpoint } : {}),
+            ...(basisTransition ? { basisTransition } : {}),
+            ...(parsedEvents[0]
+              ? { earliestSequence: parsedEvents[0].sequence }
+              : {}),
             ...(proposal && validCheckpoint(proposal) ? { proposal } : {}),
             ...(rawVerificationPending ? { verificationPending: true } : {}),
             ...(terminal && isTikzAgentEvent(terminal) ? { terminal } : {}),

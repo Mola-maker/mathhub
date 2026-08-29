@@ -29,6 +29,11 @@ import {
 } from '@/lib/math/math-continuation';
 import type { CommandFailure } from '@/lib/math/geometry-render/run-script';
 import { makeSseStream, streamProvider } from '@/lib/llm/sse-stream';
+import {
+  compactGeometryConversationContext,
+  isGeometryAgentContextBasis,
+  type GeometryAgentContextBasis,
+} from '@/lib/geometry/agent/conversation-context';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,7 +50,7 @@ function resolveDrawingCommand(raw: string | undefined, problemText: string): Dr
 }
 
 function buildApiMessages(problem: string, history: Message[], drawingCommand: DrawingCommand): Message[] {
-  const hist = (Array.isArray(history) ? history : []).slice(-16);
+  const hist = Array.isArray(history) ? history : [];
   const augmented = hist.map((m) => {
     if (m.role !== 'user') return m;
     const parsed = parseStudioInput(m.content);
@@ -61,6 +66,25 @@ function buildApiMessages(problem: string, history: Message[], drawingCommand: D
   return augmented;
 }
 
+function declaredGeogebraContextBasis(value: unknown): GeometryAgentContextBasis | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const basis = value as Record<string, unknown>;
+  const candidate = {
+    lane: 'geogebra',
+    documentId: basis.documentId,
+    epoch: basis.epoch,
+    revision: basis.revision,
+    sourceHash: basis.sourceHash,
+    ...(typeof basis.sourceId === 'string' ? { sourceId: basis.sourceId } : {}),
+    // GeoGebra lives in the browser; the service can shape-check this anchor
+    // but cannot independently reconstruct the live applet in this request.
+    attestation: 'client-declared',
+  };
+  return isGeometryAgentContextBasis(candidate, 'geogebra')
+    ? candidate
+    : undefined;
+}
+
 export async function POST(req: NextRequest) {
   let body: {
     mode?: Mode;
@@ -74,6 +98,7 @@ export async function POST(req: NextRequest) {
     failures?: CommandFailure[];
     /** live canvas snapshot lines ("A: point @ (1, 2)") for state-aware repair */
     canvasState?: string[];
+    contextBasis?: unknown;
     provider: Provider;
     model?: string;
   };
@@ -202,24 +227,40 @@ export async function POST(req: NextRequest) {
     else return new Response('problem required', { status: 400 });
   }
 
+  const contextBasis = declaredGeogebraContextBasis(body.contextBasis);
+  if (body.contextBasis !== undefined && !contextBasis) {
+    return new Response('invalid GeoGebra context basis', { status: 400 });
+  }
+  const conversationContext = compactGeometryConversationContext(history, {
+    lane: 'geogebra',
+    basis: contextBasis,
+    maxMessages: 12,
+    maxMessageChars: 3_500,
+    maxTotalChars: 24_000,
+  });
+  const contextHistory = [...conversationContext.messages] as Message[];
   const continueDrawing = commandUsesContinuationCanvas(drawingCommand)
-    || isContinuationRequest(problemText, history.slice(0, -1));
+    || isContinuationRequest(problemText, contextHistory.slice(0, -1));
   const previousFromClient = Array.isArray(body.previousGgbCommands)
     ? body.previousGgbCommands.filter((c) => typeof c === 'string' && c.trim())
     : [];
   const previousGgbCommands = previousFromClient.length > 0
     ? previousFromClient
-    : (continueDrawing ? extractLastGgbCommandsFromHistory(history.slice(0, -1)) : []);
+    : (continueDrawing ? extractLastGgbCommandsFromHistory(contextHistory.slice(0, -1)) : []);
 
-  const lookupText = [problemText, ...history.filter((m) => m.role === 'user').map((m) => m.content)].join('\n');
+  const lookupText = [
+    problemText,
+    ...contextHistory.filter((m) => m.role === 'user').map((m) => m.content),
+  ].join('\n');
   const { prompt, ggbContext, drawingCommand: activeCommand } = buildMathDrawingSystemPrompt(lookupText, {
     drawingCommand,
     previousGgbCommands,
   });
-  const messages = buildApiMessages(problemText, history, activeCommand);
+  const messages = buildApiMessages(problemText, contextHistory, activeCommand);
 
   return makeSseStream(async (send, sendEvent, signal) => {
     sendEvent({ model, mode });
+    sendEvent({ agentContextCheckpoint: conversationContext.checkpoint });
     sendEvent({ drawingCommand: activeCommand });
     sendEvent({
       ggbLookup: {

@@ -52,6 +52,10 @@ import {
   type AdmittedProblemArtifact,
 } from './problem-admission-policy';
 import { problemCorpusIdentitySha256 } from './problem-corpus-registry';
+import {
+  isGeometryAgentContextCheckpoint,
+  type GeometryAgentContextCheckpoint,
+} from '@/lib/geometry/agent/conversation-context';
 
 export const GEOMETRY_EVALUATION_REPORT_SCHEMA_VERSION =
   'geometry-evaluation-report/v2' as const;
@@ -129,6 +133,8 @@ export interface GeometryEvaluationTransactionEvidence {
 /** Adapter output contains evidence only; it has no pass/fail assertions. */
 export interface GeometryEvaluationTurnObservation {
   readonly agentEvents: readonly TikzAgentEvent[];
+  /** Auditable bounded dialogue receipt; never semantic or source truth. */
+  readonly contextCheckpoint?: GeometryAgentContextCheckpoint;
   readonly answer?: GeometryEvaluationAnswerEvidence;
   readonly transaction?: GeometryEvaluationTransactionEvidence;
   readonly renderArtifacts?: readonly GeometryEvaluationRenderArtifactAttestation[];
@@ -932,6 +938,28 @@ function invariantAssertion(input: {
         'invariant:render-read-only',
         records.length === 0 && before.source === after.source,
       );
+    case 'context-checkpoint-current': {
+      const checkpoint = observation.contextCheckpoint;
+      const basis = checkpoint?.basis;
+      return assertion(
+        'invariant:context-checkpoint-current',
+        isGeometryAgentContextCheckpoint(checkpoint)
+          && checkpoint.lane === 'tikz'
+          && checkpoint.truthPolicy === 'current-source-projection-only'
+          && checkpoint.summaryPromotedToTruth === false
+          && basis !== undefined
+          && basis.attestation === 'server-attested'
+          && basis.documentId === before.documentId
+          && basis.epoch === before.epoch
+          && basis.revision === before.revision
+          && typeof basis.sourceId === 'string'
+          && basis.sourceId === before.geometryDoc.basis.sourceId
+          && basis.sourceHash === hashSource(before.source)
+          && (invariant.maximumRetainedMessages === undefined
+            || checkpoint.retainedMessageCount <= invariant.maximumRetainedMessages)
+          && (invariant.requiredLosses ?? []).every((loss) => checkpoint.loss.includes(loss)),
+      );
+    }
   }
 }
 
