@@ -221,6 +221,7 @@ type GeogebraProjectionSummary = {
   entities: number;
   opaqueCommands: number;
   semanticHash: string;
+  relationHash: string;
   semanticComparable: boolean;
 };
 
@@ -236,6 +237,7 @@ function projectionSummary(snapshot: GeogebraCommandSnapshot): GeogebraProjectio
     entities: projection.semantic.ir.entities.length,
     opaqueCommands: projection.construction.opaqueNodes.length,
     semanticHash: snapshot.semanticSignature.semanticHash,
+    relationHash: snapshot.semanticSignature.relationHash,
     semanticComparable: snapshot.semanticSignature.comparable,
   };
 }
@@ -1238,6 +1240,7 @@ export function MathStudio({
           sourceId: geometryProjection.sourceId,
           sourceHash: geometryProjection.sourceHash,
           semanticHash: geometryProjection.semanticHash,
+          relationHash: geometryProjection.relationHash,
         };
       }
 
@@ -1338,7 +1341,7 @@ export function MathStudio({
       {geometryProjection && (
         <span
           className="wp-math__status-ggb"
-          title={`GeoGebra GeometryDoc · ${geometryProjection.status} · ${geometryProjection.entities} 个实体 · ${geometryProjection.opaqueCommands} 条 opaque 命令 · renderer-neutral ${geometryProjection.semanticHash}`}
+          title={`GeoGebra GeometryDoc · ${geometryProjection.status} · ${geometryProjection.entities} 个实体 · ${geometryProjection.opaqueCommands} 条 opaque 命令 · semantic ${geometryProjection.semanticHash} · relations ${geometryProjection.relationHash}`}
         >
           geo:r{geometryProjection.revision} ·sig:{geometryProjection.semanticHash.slice(0, 6)}
           {!geometryProjection.semanticComparable ? '?' : ''}

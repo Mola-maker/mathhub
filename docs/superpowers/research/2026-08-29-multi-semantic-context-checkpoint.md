@@ -108,9 +108,10 @@ the existing `GeometryDoc` truth lanes.
       `.ggb.txt` sources, verifies their repository-pinned SHA-256 digests and
       projects each source through its real adapter;
     - the complex nine-point-circle core requires 19 portable entities and
-      seven portable midpoint/perpendicular-foot constraints to match under the
-      renderer-neutral mathematical signature. Relation and presentation hashes
-      remain separately visible and can become strict gates per fixture;
+      seven portable midpoint/perpendicular-foot constraints and six portable
+      segment-incidence relations to match under renderer-neutral signatures.
+      The relation hash is now a strict gate for this pair; presentation remains
+      separately visible and opt-in;
     - ordinary TikZ calc midpoint and perpendicular-foot coordinates now emit
       first-class constraints, rather than leaving those dependencies only in
       expression metadata;
@@ -118,13 +119,13 @@ the existing `GeometryDoc` truth lanes.
       expectations profile, so callers cannot swap paths, hashes or coverage
       thresholds while reusing a trusted case definition.
 13. Semantic context-compaction attestation
-    - context bases can now carry the renderer-neutral `semanticHash` alongside
-      revision and source hash;
-    - the TikZ route reconstructs and server-attests that hash, while Math
+    - context bases can now carry renderer-neutral `semanticHash` and
+      `relationHash` values alongside revision and source hash;
+    - the TikZ route reconstructs and server-attests both hashes, while Math
       Studio forwards the current GeoGebra broker projection as a
       client-declared value;
-    - long-horizon evaluation requires the checkpoint semantic hash to equal
-      the pre-turn GeometryDoc signature after older dialogue is dropped. The
+    - long-horizon evaluation requires both checkpoint hashes to equal the
+      pre-turn GeometryDoc signatures after older dialogue is dropped. The
       retained prose remains advisory under `current-source-projection-only`.
 
 ## External benchmark evidence
@@ -181,8 +182,9 @@ stores only our own fixture and a pinned provenance URL.
    keep compatibility re-exports during the migration.
 2. Promote selected GeoGebra bindings from read-only only after a bounded,
    lossless binding-to-command patch planner is available.
-3. Make portable incidence relations strict across the paired TikZ/GeoGebra
-   fixture after both adapters expose the same endpoint relation vocabulary;
-   then add circle/tangent and branch-sensitive intersection pairs.
+3. Add the independently re-authored FormalGeo circle/tangent seed documented
+   in `2026-08-30-formalgeo-imo-2025-circle-tangent-provenance.md`, then extend
+   the portable vocabulary to point-on-circle, tangent and branch-sensitive
+   intersection relations.
 4. Add explicit expiry/renewal policy for restore handles once a durable
    transcript store exists; continue emitting an empty handle list until then.

@@ -29,7 +29,9 @@
         "tikzSourceSha256": "72fa2792949965fd190a33e05e7b943f30391c07c2c5cfdb5e9542990ed8863c",
         "geogebraCommandsSha256": "dee5871c53afcf3b62665795971c5ad9551af3a2d80ae781e19ca77d59d3689b",
         "minimumPortableEntityCount": 19,
-        "minimumPortableConstraintCount": 7
+        "minimumPortableConstraintCount": 7,
+        "minimumPortableRelationCount": 6,
+        "requireRelationMatch": true
       },
       "turns": [
         {

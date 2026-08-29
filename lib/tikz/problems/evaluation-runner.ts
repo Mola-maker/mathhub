@@ -359,6 +359,13 @@ async function evaluatePairedSemanticFixture(input: {
     || (fixture.minimumPortableConstraintCount !== undefined
       && (!Number.isSafeInteger(fixture.minimumPortableConstraintCount)
         || fixture.minimumPortableConstraintCount < 0))
+    || (fixture.minimumPortableRelationCount !== undefined
+      && (!Number.isSafeInteger(fixture.minimumPortableRelationCount)
+        || fixture.minimumPortableRelationCount < 0))
+    || (fixture.requireRelationMatch !== undefined
+      && typeof fixture.requireRelationMatch !== 'boolean')
+    || (fixture.requirePresentationMatch !== undefined
+      && typeof fixture.requirePresentationMatch !== 'boolean')
   ) throw new Error('Paired semantic fixture contract is invalid');
 
   const [tikzBytes, geogebraBytes] = await Promise.all([
@@ -406,6 +413,7 @@ async function evaluatePairedSemanticFixture(input: {
   const geogebraSignature = geogebraProjection.semanticSignature;
   const comparison = compareGeometrySemanticSignatures(tikzSignature, geogebraSignature);
   const minimumConstraints = fixture.minimumPortableConstraintCount ?? 0;
+  const minimumRelations = fixture.minimumPortableRelationCount ?? 0;
   const assertions = [
     assertion(
       'paired-semantic:tikz-comparable',
@@ -428,6 +436,12 @@ async function evaluatePairedSemanticFixture(input: {
       tikzSignature.coverage.constraints.portable >= minimumConstraints
         && geogebraSignature.coverage.constraints.portable >= minimumConstraints,
       `minimum ${minimumConstraints}`,
+    ),
+    assertion(
+      'paired-semantic:minimum-portable-relations',
+      tikzSignature.coverage.relations.portable >= minimumRelations
+        && geogebraSignature.coverage.relations.portable >= minimumRelations,
+      `minimum ${minimumRelations}`,
     ),
     assertion(
       'paired-semantic:mathematical-equivalence',
@@ -1103,6 +1117,7 @@ function invariantAssertion(input: {
     case 'context-checkpoint-current': {
       const checkpoint = observation.contextCheckpoint;
       const basis = checkpoint?.basis;
+      const currentSignature = buildGeometrySemanticSignature(before.geometryDoc);
       return assertion(
         'invariant:context-checkpoint-current',
         isGeometryAgentContextCheckpoint(checkpoint)
@@ -1118,7 +1133,8 @@ function invariantAssertion(input: {
           && basis.sourceId === before.geometryDoc.basis.sourceId
           && basis.sourceHash === hashSource(before.source)
           && basis.semanticHash
-            === buildGeometrySemanticSignature(before.geometryDoc).semanticHash
+            === currentSignature.semanticHash
+          && basis.relationHash === currentSignature.relationHash
           && (invariant.maximumRetainedMessages === undefined
             || checkpoint.retainedMessageCount <= invariant.maximumRetainedMessages)
           && (invariant.requiredLosses ?? []).every((loss) => checkpoint.loss.includes(loss)),

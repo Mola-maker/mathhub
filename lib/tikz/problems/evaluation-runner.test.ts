@@ -605,6 +605,7 @@ describe('geometry evaluation runner', () => {
         coverage: {
           entities: { portable: 19, total: 19 },
           constraints: { portable: 7, total: 7 },
+          relations: { portable: 6 },
         },
       },
       geogebra: {
@@ -613,15 +614,21 @@ describe('geometry evaluation runner', () => {
         coverage: {
           entities: { portable: 19, total: 19 },
           constraints: { portable: 7, total: 7 },
+          relations: { portable: 6 },
         },
       },
       comparison: {
         equivalent: true,
         semanticHashMatches: true,
+        relationHashMatches: true,
       },
     });
     expect(report.pairedSemantic?.assertions).toContainEqual(expect.objectContaining({
       id: 'paired-semantic:mathematical-equivalence',
+      passed: true,
+    }));
+    expect(report.pairedSemantic?.assertions).toContainEqual(expect.objectContaining({
+      id: 'paired-semantic:relation-equivalence',
       passed: true,
     }));
   });

@@ -144,6 +144,9 @@ describe('geometry evaluation corpus', () => {
       schemaVersion: 'geometry-evaluation-paired-semantic-fixture/v1',
       authorship: 'independently-authored',
       minimumPortableEntityCount: 19,
+      minimumPortableConstraintCount: 7,
+      minimumPortableRelationCount: 6,
+      requireRelationMatch: true,
     });
   });
 });

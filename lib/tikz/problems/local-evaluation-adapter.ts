@@ -159,6 +159,7 @@ export function createLocalGeometryEvaluationAdapter(
         ]),
         { role: 'user' as const, content: turn.instruction },
       ];
+      const contextSignature = buildGeometrySemanticSignature(snapshot.geometryDoc);
       const contextCheckpoint = compactGeometryConversationContext(
         conversationHistory,
         {
@@ -170,7 +171,8 @@ export function createLocalGeometryEvaluationAdapter(
             revision: snapshot.geometryDoc.basis.revision,
             sourceId: snapshot.geometryDoc.basis.sourceId,
             sourceHash: snapshot.geometryDoc.basis.sourceHash,
-            semanticHash: buildGeometrySemanticSignature(snapshot.geometryDoc).semanticHash,
+            semanticHash: contextSignature.semanticHash,
+            relationHash: contextSignature.relationHash,
             attestation: 'server-attested',
           },
           maxMessages: 4,

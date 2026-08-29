@@ -1601,6 +1601,9 @@ export async function POST(req: NextRequest): Promise<Response> {
         ].join('\n')
       : '',
   ].filter(Boolean).join('\n\n');
+  const proposalSemanticSignature = proposalIdentity
+    ? buildGeometrySemanticSignature(proposalIdentity.geometryDoc)
+    : undefined;
   const conversationContext = normalizedHistory(
     body.history,
     proposalIdentity
@@ -1611,7 +1614,8 @@ export async function POST(req: NextRequest): Promise<Response> {
           revision: body.sourceRevision as number,
           sourceId: proposalIdentity.sourceId,
           sourceHash: body.sourceHash as string,
-          semanticHash: buildGeometrySemanticSignature(proposalIdentity.geometryDoc).semanticHash,
+          semanticHash: proposalSemanticSignature!.semanticHash,
+          relationHash: proposalSemanticSignature!.relationHash,
           attestation: 'server-attested',
         }
       : undefined,

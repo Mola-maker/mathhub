@@ -598,6 +598,40 @@ function graphRelationsOf(
   ));
 }
 
+/**
+ * Promote a two-endpoint TikZ path to the same portable incidence record that
+ * GeoGebra emits for Segment(A,B). Construction dependencies remain in their
+ * source-specific `depends-on` lane; this relation describes the mathematical
+ * topology shared by both renderers.
+ */
+function pathIncidenceRelations(
+  elements: readonly SceneElement[],
+  pointIdsByName: ReadonlyMap<string, string>,
+): GeometryRelation[] {
+  return elements.flatMap((element) => {
+    if (element.kind !== 'polyline' || element.cycle || element.refs.length !== 2) {
+      return [];
+    }
+    const endpoints = element.refs.map((reference) => pointIdsByName.get(reference));
+    if (!endpoints.every((endpoint): endpoint is string => endpoint !== undefined)) return [];
+    return [{
+      recordType: 'relation' as const,
+      id: `relation:incidence:${element.stableId}`,
+      kind: 'incidence',
+      directed: true,
+      participants: [
+        { role: 'result', entityId: element.stableId },
+        ...endpoints.map((entityId) => ({
+          role: 'input',
+          entityId,
+        })),
+      ],
+      sourceBindingIds: [`binding:${element.stableId}`],
+      metadata: { source: 'tikz-two-endpoint-path' },
+    }];
+  });
+}
+
 function publicSemanticPoints(
   points: readonly ScenePoint[],
 ): ScenePoint[] {
@@ -1533,6 +1567,7 @@ function managedConstructionSemantics(
               ];
             case 'perpendicular-foot':
               return [
+                { role: 'result', entityId: resolve(record.result) },
                 { role: 'point', entityId: resolve(record.point) },
                 {
                   role: 'reference-start',
@@ -1542,7 +1577,6 @@ function managedConstructionSemantics(
                   role: 'reference-end',
                   entityId: resolve(record.lineEnd),
                 },
-                { role: 'result', entityId: resolve(record.result) },
               ];
             case 'on-circle':
               return [
@@ -2392,6 +2426,15 @@ export function projectTikzAnalysisToGeometryTruth(
   ];
   const relations = [
     ...dependencyRelations(points, pointIdsByName).filter((relation) => (
+      !managed.relationKeys.has(relationSemanticKey(
+        relation.kind,
+        relation.directed ?? false,
+        relation.participants.flatMap((participant) => (
+          participant.entityId ? [participant.entityId] : []
+        )),
+      ))
+    )),
+    ...pathIncidenceRelations(elements, pointIdsByName).filter((relation) => (
       !managed.relationKeys.has(relationSemanticKey(
         relation.kind,
         relation.directed ?? false,

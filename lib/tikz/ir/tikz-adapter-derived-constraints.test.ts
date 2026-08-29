@@ -56,4 +56,23 @@ describe('TikZ derived coordinate semantic constraints', () => {
       }),
     ]));
   });
+
+  it('promotes a two-endpoint path to portable segment incidence', () => {
+    const source = String.raw`\begin{tikzpicture}
+\coordinate (A) at (0,0);
+\coordinate (B) at (4,0);
+\draw (A) -- (B);
+\end{tikzpicture}`;
+    const relations = geometryDoc(source).semantic.ir.relations;
+
+    expect(relations).toContainEqual(expect.objectContaining({
+      kind: 'incidence',
+      directed: true,
+      participants: [
+        expect.objectContaining({ role: 'result' }),
+        expect.objectContaining({ role: 'input', entityId: 'point:A' }),
+        expect.objectContaining({ role: 'input', entityId: 'point:B' }),
+      ],
+    }));
+  });
 });

@@ -129,6 +129,7 @@ export interface GeometryEvaluationPairedSemanticFixture {
   readonly geogebraCommandsSha256: string;
   readonly minimumPortableEntityCount: number;
   readonly minimumPortableConstraintCount?: number;
+  readonly minimumPortableRelationCount?: number;
   /** Relations/presentation are reported separately and become gates only when requested. */
   readonly requireRelationMatch?: boolean;
   readonly requirePresentationMatch?: boolean;
@@ -275,7 +276,7 @@ export const GEOMETRY_EVALUATION_CORPUS: readonly GeometryEvaluationCase[] = [
       expectationProfile: 'mathnet-nine-point-cyclic',
       authorship: 'independently-authored',
       sourceSha256: 'e5cb12b4dda508321456a8cf1d1e7e090d3545fb2fa7d151ce1732253ad909bc',
-      expectationsSha256: '141e094fa031c82ea4e4829c9990fce49f01e1f3ce8275ac92f9b7a3dc44782a',
+      expectationsSha256: '7fc11d2e3fe875afb0f56b71f26eef2cdbc65bd1026736df181e2eb9183ad1da',
       pairedSemanticFixture: {
         schemaVersion: 'geometry-evaluation-paired-semantic-fixture/v1',
         tikzFixturePath: 'evaluation/mathnet-nine-point-cyclic-semantic-core',
@@ -285,6 +286,8 @@ export const GEOMETRY_EVALUATION_CORPUS: readonly GeometryEvaluationCase[] = [
         geogebraCommandsSha256: 'dee5871c53afcf3b62665795971c5ad9551af3a2d80ae781e19ca77d59d3689b',
         minimumPortableEntityCount: 19,
         minimumPortableConstraintCount: 7,
+        minimumPortableRelationCount: 6,
+        requireRelationMatch: true,
       },
     },
     turns: [

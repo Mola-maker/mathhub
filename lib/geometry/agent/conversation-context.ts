@@ -18,6 +18,8 @@ export interface GeometryAgentContextBasis {
   readonly sourceId?: string;
   /** Renderer-neutral mathematical signature for compaction-isolation checks. */
   readonly semanticHash?: string;
+  /** Portable topology/relationship signature retained across compaction. */
+  readonly relationHash?: string;
   /** The service decides whether the basis was independently reconstructed. */
   readonly attestation: 'server-attested' | 'client-declared';
 }
@@ -164,6 +166,7 @@ export function isGeometryAgentContextBasis(
       )
     )
     && (basis.semanticHash === undefined || boundedBasisIdentity(basis.semanticHash))
+    && (basis.relationHash === undefined || boundedBasisIdentity(basis.relationHash))
     && (
       basis.attestation === 'server-attested'
       || basis.attestation === 'client-declared'

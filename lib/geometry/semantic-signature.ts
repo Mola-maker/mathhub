@@ -145,6 +145,11 @@ function normalizedKind(value: string): string {
   if (normalized === 'coordinate' || normalized === 'node') return 'point';
   if (normalized === 'perpendicular-line') return 'line';
   if (normalized === 'parallel-line') return 'line';
+  if (normalized === 'tangent-at-point') return 'tangent';
+  if (normalized === 'on-circle') return 'point-on-circle';
+  if (normalized === 'cyclic' || normalized === 'cyclic-quadrilateral') {
+    return 'concyclic';
+  }
   return normalized;
 }
 
